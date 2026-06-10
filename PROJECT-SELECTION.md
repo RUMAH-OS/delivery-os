@@ -170,11 +170,14 @@ START
 
 ---
 
+> **Note:** pack selection here is a **provisional triage** to bootstrap correctly. The mandatory **Discovery phase** (next) confirms or adjusts it — e.g. the mission reveals the project also bills money → add `invoicing`.
+
 ## After you've chosen
-1. Run the bootstrap command for your type (it scaffolds agents + CODEOWNERS + day-one docs).
-2. Add your pack's **DoD rows** (`domain-packs/PACKS.md`) and wire its **processes/checklists**.
-3. Write `project-context.md` + the recommended **ADRs**; stand up CI + the **validation harness**.
-4. **Register the project** in the Ecosystem layer (`GETTING-STARTED.md §4`) — especially the **source-of-truth review**.
-5. Continue with the full **[GETTING-STARTED.md](GETTING-STARTED.md)**.
+1. Run the bootstrap command for your type (scaffolds agents + CODEOWNERS + `CLAUDE.md` + day-one docs).
+2. **▶ DISCOVERY FIRST (mandatory).** Tell Claude *"Install Delivery OS and initialize this repository"* ([BOOTSTRAP-PROMPT.md](BOOTSTRAP-PROMPT.md)) → it runs the **[Founder Discovery Interview](discovery/FOUNDER-INTERVIEW.md)** and generates **PROJECT-BRIEF / PROJECT-MISSION / NORTH-STAR** from your answers, then reviews ecosystem alignment. **Gate:** [PROJECT-DISCOVERY-CHECKLIST.md](discovery/PROJECT-DISCOVERY-CHECKLIST.md). No roadmap/architecture before this is approved.
+3. Add your pack's **DoD rows** (`domain-packs/PACKS.md`) and wire its **processes/checklists**.
+4. Write the recommended **ADRs** (tracing to BRIEF/MISSION); stand up CI + the **validation harness**.
+5. **Register the project** in the Ecosystem layer (`GETTING-STARTED.md §4`) — especially the **source-of-truth review**.
+6. Continue with the full **[GETTING-STARTED.md](GETTING-STARTED.md)**.
 
 > Governance rules that matter for **every** type (don't skip): **author ≠ verifier** (structural), **honest failure** (never a false success), **irreversible actions are human-gated**, **one source of truth per entity**, **de-risk early** (thin slice to prod), and **evidence over assumptions** (probe before you guess).

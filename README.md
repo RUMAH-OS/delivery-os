@@ -7,6 +7,12 @@
 ## ▶ Start here: **[PROJECT-SELECTION.md](PROJECT-SELECTION.md)**
 **The front door.** Answer "what am I building?" and immediately get the right **packs, agents, ADRs, day-one docs, DoD additions, architecture risks, QA focus, common mistakes, and the exact bootstrap command** — for 10 project types, with a decision tree. Read it *before* the rest of the framework. Then follow **[GETTING-STARTED.md](GETTING-STARTED.md)** to install.
 
+## The project lifecycle (Delivery OS enforces this order)
+```
+PROJECT-SELECTION (pick packs) → Install → ★ DISCOVERY & ALIGNMENT ★ → Roadmap + ADRs + Architecture → Implementation (the loop) → Release
+```
+**[★ Discovery & Alignment](discovery/DISCOVERY-WORKFLOW.md) is mandatory and comes first** — strategic clarity before architecture. Right after install, Claude conducts a **[Founder Discovery Interview](discovery/FOUNDER-INTERVIEW.md)** and generates `PROJECT-BRIEF.md`, `PROJECT-MISSION.md`, `NORTH-STAR.md` **from your answers (never assumptions)**, then reviews ecosystem alignment. **No roadmap/ADR/architecture/code begins until those are founder-approved** ([gate checklist](discovery/PROJECT-DISCOVERY-CHECKLIST.md)). Kick it off with **[BOOTSTRAP-PROMPT.md](BOOTSTRAP-PROMPT.md)**: *"Install Delivery OS and initialize this repository."*
+
 ---
 
 ## The shape of v2

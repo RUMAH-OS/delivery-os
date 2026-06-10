@@ -25,9 +25,17 @@ bash delivery-os/scripts/new-project.sh "My Project" "internal-admin,crm"
 git add -A && git commit -m "chore: adopt Delivery OS + scaffold project"
 ```
 
-That gives you: `.claude/agents/` (lean default + pack agents), `CODEOWNERS` (structural author≠verifier), and `docs/` (project-context, master-roadmap, STATUS, project-log, release-readiness, adr/).
+That gives you: `.claude/agents/` (lean default + pack agents), `CODEOWNERS` (structural author≠verifier), a `CLAUDE.md` (discovery-first), and `docs/` (PROJECT-BRIEF/MISSION/NORTH-STAR stubs + project-context, master-roadmap, STATUS, project-log, release-readiness, adr/).
 
-**Then (the human 20 min):** fill `docs/project-context.md`, write `docs/adr/0001-*`, sketch `docs/master-roadmap.md` as vertical slices, add your **pack's DoD rows**, wire a CI **validation harness**, and **register the project** in `ecosystem-architecture` (§4). Done — Delivery OS is operational.
+**Then — DISCOVERY FIRST, not roadmap (§1.5).** Tell Claude **"Install Delivery OS and initialize this repository"** (or paste [BOOTSTRAP-PROMPT.md](BOOTSTRAP-PROMPT.md)). Claude runs the **Founder Discovery Interview** and generates BRIEF/MISSION/NORTH-STAR from **your answers**, then reviews ecosystem alignment. Only after you approve those do you move to roadmap/ADRs/architecture (§2). Delivery OS is then operational.
+
+## 1.5 Discovery & Alignment (MANDATORY — before any planning)
+The single most important step, and the one most projects skip. Right after install:
+1. **Founder Discovery Interview** — Claude asks; you answer; it marks unknowns `TBD` (never assumes). [`discovery/FOUNDER-INTERVIEW.md`]
+2. **Generate + approve** `docs/PROJECT-BRIEF.md` → `docs/PROJECT-MISSION.md` → `docs/NORTH-STAR.md`.
+3. **Ecosystem alignment** — entities owned vs consumed, source-of-truth, dependencies (§4).
+4. **Gate:** `discovery/PROJECT-DISCOVERY-CHECKLIST.md` — every box ✅ before roadmap/ADRs/architecture.
+> Full phase: [`discovery/DISCOVERY-WORKFLOW.md`]. **No roadmap, ADR, architecture, or code begins until BRIEF/MISSION/NORTH-STAR are founder-approved.**
 
 **Copy alternative (no submodule):**
 ```bash
@@ -47,7 +55,9 @@ bash delivery-os/scripts/new-project.sh "My Project" "internal-admin,crm"
 
 ---
 
-## 2. Project Bootstrap Guide (first day)
+## 2. Project Bootstrap Guide (first day — AFTER discovery §1.5)
+
+> **Precondition:** Discovery (§1.5) is complete — `PROJECT-BRIEF/MISSION/NORTH-STAR` are founder-approved and the discovery checklist is ✅. Roadmap/ADRs/architecture below must **trace back** to those documents.
 
 **A. Read the rules (5 min):** `delivery-os/core/GOVERNANCE.md` + `core/DEFINITION-OF-DONE.md` + `core/OPERATING-LOOP.md`.
 
@@ -114,7 +124,7 @@ git add -A && git commit -m "docs(ecosystem): register <project> + source-of-tru
 
 ## 5. Recommended workflow
 
-**Project creation** → §1 + §2 (adopt, scaffold, project-context, first ADRs, CI + harness, register in ecosystem).
+**Project creation** → §1 (adopt + scaffold) → **§1.5 Discovery & Alignment (interview → BRIEF/MISSION/NORTH-STAR → ecosystem alignment; gate)** → §2 (first ADRs, CI + harness, register in ecosystem). Discovery is not optional and comes before planning.
 
 **Roadmap creation** → break the work into **vertical slices** (one PR each, demonstrable end-to-end). Sequence by dependency **and de-risking value**; ship a thin slice to the real target env early; build the **deterministic spine before AI/integrations**; activate capabilities on bottleneck (don't build ahead).
 
