@@ -4,6 +4,8 @@ From an **empty repository** to a fully operational Delivery OS project. Optimiz
 
 > **Mental model:** **Delivery OS** = *how* you build (copy it in; clean-room). **Ecosystem Architecture** = *what/why* the project is + how it relates to others (register the project there). You touch both during setup.
 
+> **Step 0 — choose your setup first:** read **[PROJECT-SELECTION.md](PROJECT-SELECTION.md)** and answer "what am I building?" It tells you which **packs** to pass to the scaffolder, which **agents/ADRs/DoD rows** you need, and the architecture risks to watch. Everything below assumes you've picked your pack(s) there.
+
 ---
 
 ## 1. Quick Start (the 30-minute path)

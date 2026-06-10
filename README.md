@@ -4,6 +4,9 @@
 
 **Clean-room rule:** nothing in `core/`, `agents/`, `processes/`, `templates/`, `checklists/`, or `domain-packs/` names a specific project. The only place real projects appear is `case-studies/`.
 
+## ▶ Start here: **[PROJECT-SELECTION.md](PROJECT-SELECTION.md)**
+**The front door.** Answer "what am I building?" and immediately get the right **packs, agents, ADRs, day-one docs, DoD additions, architecture risks, QA focus, common mistakes, and the exact bootstrap command** — for 10 project types, with a decision tree. Read it *before* the rest of the framework. Then follow **[GETTING-STARTED.md](GETTING-STARTED.md)** to install.
+
 ---
 
 ## The shape of v2
