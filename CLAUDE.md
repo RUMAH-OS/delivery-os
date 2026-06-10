@@ -63,7 +63,7 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 | AI-OS mapping + every deviation's burden of proof | `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md` |
 
 ## 9. Active Now  — *what is currently active?*
-**Verification status (derived from disk, §12):** os_version `v3.1-6-gc80520c` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
+**Verification status (derived from disk, §12):** os_version `v3.2` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
 **Phase: framework maintenance.** **Version: v3.1** (verification enforcement — §12 + verify-gate hook).
 **Open gates / in-flight:**
 - `fix/operationalize-author-verifier` — v3.1 verify-gate (hook dogfood-tested in isolation; **not yet caught a real turn in a live project**; not merged — awaiting ratification).

@@ -59,6 +59,14 @@ A **single agent — including the orchestrator — may not issue a recommendati
 
 **Honest limit (stated, not hidden).** A hook can enforce that a fresh, passing, independence-*claimed* artifact **exists**; it cannot prove the verification was *truthful* or genuinely independent inside a single-agent runtime. The hook raises the cost of faking to deliberate; it does not make honesty automatic. The committed `pre-push` hook + CODEOWNERS-on-a-real-PR-with-a-second-reviewer remain the only fully model-independent layers — which is why git (§12 link 1) is mandatory, not advisory.
 
+## 13. Kernel mechanism vs governance policy (the hard line)
+Governance is **two planes**, and conflating them is what made the framework read as "governance is the OS." Use one test: **mechanism = key; policy = prompt.** A *prompt* is consent-based, swappable, and silent on failure — it can only ever be policy. Anything that must hold under *"if it can, it will"* must be a **mechanism**.
+
+- **KERNEL MECHANISM** (thin · non-swappable · fires without consent · fails closed): the verify-gate hook + committed `pre-push`, the git substrate (no-git ⇒ no-build), the derived `verify_status` engine, the drift-lint, key/capability-scoping, and **author≠verifier as a structural write-binding** (the verifier's write-scope excludes the code it grades — CODEOWNERS where git exists; a distinct verifier run where it does not). These are installed by the scaffolder and run whether or not anyone chooses to invoke them.
+- **GOVERNANCE POLICY** (large · versioned · swappable, the kernel invokes on demand): which decisions are consequential (§11 classes), which lenses a panel needs, which domain packs attach, where the Waterline sits (§8), and the operating doctrine (§1/§2/§5/§7/§9/§10) + reusable prompts.
+
+**§11 is policy, not a mechanism** (see §11): the *norm* (a consequential decision earns an independent review) is judgment-triggered and context-resolved; only the thin **artifact-existence** shell ("a `DECISION-REVIEW` exists") is mechanism-eligible, and it stays a DoD convention until an observed §11-skip earns a hook — the way §12 was earned by a real failure. **§11's consequential-decision list and the two-lens floor are inherited and non-swappable** (a consumer may deepen a panel, never exempt its own slice). The split keeps the kernel small and the policy large: *a thin enforcement substrate runs a large, swappable governance capability.*
+
 ## Reusable prompts
 - **Red-team audit** — independent skeptic; classify findings **Blocker / Should-fix / Safe-to-defer**; don't implement during the audit.
 - **Multi-reviewer readiness audit** — N independent lenses vote ready / ready-with-conditions / not-ready; gate the release on the conditions.

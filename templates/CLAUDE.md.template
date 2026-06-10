@@ -24,7 +24,11 @@
 → `wiki/_index.md`  ·  narrative · learnings · market · customers (playbook, **zero records**) · processes · operational context.
 **Not here:** cross-project facts (→ §7/§8), records (→ their system-of-record), business truth (→ `docs/`).
 
-## 5. Skills  — *where are the skills?*  (callable procedures — `.claude/skills/`, installed from `delivery-os/skills/`)
+<!-- KERNEL RULE: §5 Skills, §6 Agents, and §9 verify-line are STATE — rendered from disk by
+     `.claude/tools/render-kernel.mjs` (scan of `.claude/{skills,agents}` + `.verify-state.json`).
+     Do NOT hand-edit them; `.claude/tools/check-os-drift.mjs` fails the push if they advertise
+     something not on disk. §1-4,7,8 are INTENT — hand-authored. -->
+## 5. Skills  — *where are the skills?*  (DERIVED from `.claude/skills/` — run `render-kernel.mjs`)
 | Skill | Use when | Status |
 |---|---|---|
 | discovery-interview | founder discovery → BRIEF/MISSION/NORTH-STAR | <stable> |

@@ -32,10 +32,12 @@ wiki/
 ---
 title: <human title>
 id: <stable-slug>                 # never changes; links + dedup target
+kind: learning                    # domain-intelligence | finding | learning | process | design-spec | preregistration | index
 source_of_truth: this-file        # OR a pointer: docs/NORTH-STAR.md | ecosystem-architecture/06 | demand-crm-spine
-last_verified: YYYY-MM-DD         # the AS-OF date (not last-edited) — freshness anchor
+as_of: YYYY-MM-DD                 # the AS-OF date the content was true (alias: last_verified) — freshness anchor
+last_verified: YYYY-MM-DD         # last re-confirmation (may equal as_of)
 author: <who asserted it>         # attribution
-stability: current                # current | stale (past cadence) | superseded-by:<id>
+stability: current                # current | stale | locked | frozen | superseded-by:<id>
 audience: internal                # internal | shareable  — coarse distribution boundary
 confidentiality: normal           # normal | sensitive    — sensitive = legal/financial/PII, fail-closed
 review_cadence: 90d               # 30d | 90d | 180d | event-driven
@@ -43,6 +45,8 @@ references_ids: []                # stable Organisation/Contact/Property IDs thi
 ---
 ```
 **Field rules:**
+- `kind` ⇒ the cluster a page belongs to (the taxonomy emerged from the real corpus). It makes the corpus **machine-routable by type** without folder-as-type (lifecycle cuts across topic folders). Mandatory. **`kind: finding`** additionally **requires `as_of`** and is **append-only** (a finding quotes record values as-of a date; it is never edited, only superseded).
+- `stability` ⇒ `locked` = a controlled artifact that changes only via a dated supersession (e.g. a locked design-spec); `frozen` = append-only-amendments-only (e.g. a pre-registration frozen once the first outcome is logged). These are *lifecycle states with edit rules*, not just "more stable than current".
 - `source_of_truth ≠ this-file` ⇒ the page is a **pointer/narrative**; it must **not** introduce a fact absent from its cited source (drift = defect).
 - `last_verified` + `stability` ⇒ a page past its `review_cadence` is flagged `stale`; **a recalled fact is a time-stamped belief — verify before relying** (the memory rule, applied to the wiki). The reader (Claude) renders a stale hit with an explicit "as of <date>, may be outdated" wrapper.
 - `audience` / `confidentiality` ⇒ the **publish-safe-by-construction** guardrail. `sensitive` is never `shareable`. *(Justified today by ECR-0003 / `06` sensitive-data rules; also what makes the corpus safe for any future read-only consumer.)*

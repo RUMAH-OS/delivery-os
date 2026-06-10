@@ -22,15 +22,15 @@ if [ ! -d .git ]; then
 fi
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "FATAL: git init failed."; exit 1; }
 
-mkdir -p .claude/agents .claude/skills .claude/hooks docs/adr docs/verify wiki
+mkdir -p .claude/base/agents .claude/overlay/agents .claude/agents .claude/skills .claude/hooks .claude/tools docs/adr docs/verify wiki
 
-# 1. Lean-default agents (always)
+# 1. Lean-default agents (always) → COPIED-BASE (pristine; never hand-edit; os-sync builds .claude/agents/ from it + overlay)
 for a in software-engineer qa-test reviewer-critic lead-architect documentation; do
-  cp "$DOS/agents/$a.md" ".claude/agents/$a.md"
+  cp "$DOS/agents/$a.md" ".claude/base/agents/$a.md"
 done
 
-# 2. Pack agents (prefix stripped)
-add() { local src="$1"; local name; name="$(basename "$src" | sed 's/^domain--//;s/^optional--//')"; cp "$DOS/agents/$src.md" ".claude/agents/$name.md"; }
+# 2. Pack agents (prefix stripped) → COPIED-BASE
+add() { local src="$1"; local name; name="$(basename "$src" | sed 's/^domain--//;s/^optional--//')"; cp "$DOS/agents/$src.md" ".claude/base/agents/$name.md"; }
 IFS=',' read -ra LIST <<< "$PACKS"
 for p in "${LIST[@]}"; do case "$(echo "$p" | xargs)" in
   public-web)          add optional--seo; add optional--design-parity;;
@@ -80,29 +80,43 @@ sed -i.bak "s/<PROJECT>/$PROJECT/g" CLAUDE.md wiki/_index.md 2>/dev/null || true
 rm -f CLAUDE.md.bak wiki/_index.md.bak
 # The router is discovery-first by default (template §9). The discovery-interview skill fills §1–3.
 
-# 6. Verify-gate (Governance §12) — the ONLY enforcement that fires without the orchestrator choosing to.
+# 6. Verify-gate (Governance §12) + the AI-OS mechanisms — installed so a project INHERITS them automatically.
 mkdir -p .claude/hooks .githooks docs/verify
 cp "$DOS/templates/hooks/verify-gate.mjs"   .claude/hooks/verify-gate.mjs
 cp "$DOS/templates/settings.json.template"  .claude/settings.json
 cp "$DOS/templates/VERIFY.md.template"      docs/verify/_TEMPLATE.md
 cp "$DOS/templates/githooks/pre-push"       .githooks/pre-push
 chmod +x .githooks/pre-push 2>/dev/null || true
-printf '{"baseline_ts":0}' > .claude/.verify-state.json
+# AI-OS tools (base+overlay · drift-detection · kernel-render) — consumer-local, inherited by every project
+cp "$DOS/templates/tools/os-sync.mjs"        .claude/tools/os-sync.mjs
+cp "$DOS/templates/tools/check-os-drift.mjs" .claude/tools/check-os-drift.mjs
+cp "$DOS/templates/tools/render-kernel.mjs"  .claude/tools/render-kernel.mjs
+printf '{"baseline_ts":0,"impl_extra":[]}' > .claude/.verify-state.json
+printf '{"impl_extra":[]}' > .claude/.verify-config.json   # extend impl surface here if implementation lives outside src/
 git config core.hooksPath .githooks   # committed pre-push fires for ANY git client (model-independent)
+
+# 6a-ops. Build the live kernel from disk: base+overlay → .claude/agents/, render §5/§6/§9, stamp os_version.
+node .claude/tools/os-sync.mjs
+node .claude/tools/render-kernel.mjs
+node .claude/tools/check-os-drift.mjs || echo "  (drift warnings above are expected at scaffold time)"
 
 # 6b. Branch model: main (protected) + dev (active). Gated first commit.
 git add -A
-git commit -q -m "chore: scaffold Delivery OS v3 (verify-gate installed; Slice 0 NOT verified)" || true
+git commit -q -m "chore: scaffold Delivery OS v3 (verify-gate + AI-OS mechanisms installed; Slice 0 NOT verified)" || true
 git rev-parse --verify dev >/dev/null 2>&1 || git branch dev 2>/dev/null || true
 
-# 6c. Fail closed — prove the gate is actually wired, or abort (a half-scaffold is not a project).
-for f in .claude/settings.json .claude/hooks/verify-gate.mjs .githooks/pre-push docs/verify/_TEMPLATE.md; do
-  [ -f "$f" ] || { echo "FATAL: verify-gate not installed ($f missing). Aborting (Governance §12)."; exit 1; }
+# 6c. Fail closed — prove EVERY mechanism is wired, or abort (a half-scaffold is not a project).
+for f in .claude/settings.json .claude/hooks/verify-gate.mjs .githooks/pre-push docs/verify/_TEMPLATE.md \
+         .claude/tools/os-sync.mjs .claude/tools/check-os-drift.mjs .claude/tools/render-kernel.mjs \
+         .claude/.verify-config.json; do
+  [ -f "$f" ] || { echo "FATAL: AI-OS mechanism not installed ($f missing). Aborting (Governance §12)."; exit 1; }
 done
+[ -d .claude/base/agents ] || { echo "FATAL: base+overlay not wired (.claude/base/agents missing). Aborting."; exit 1; }
 
 echo "✓ Scaffolded '$PROJECT' (packs: ${PACKS:-none})"
-echo "  git: initialized · branches main+dev · verify-gate hook installed (.claude/settings.json + .githooks/pre-push)"
-echo "  .claude/agents/: $(ls .claude/agents | tr '\n' ' ')"
+echo "  git: initialized · branches main+dev · verify-gate + drift-lint enforced (.claude/settings.json + .githooks/pre-push)"
+echo "  AI-OS mechanisms installed: base+overlay (.claude/{base,overlay}) · tools (.claude/tools/) · version stamp · kernel render"
+echo "  .claude/agents/ (rendered from base+overlay): $(ls .claude/agents | tr '\n' ' ')"
 echo "  .claude/skills/: $(ls .claude/skills | tr '\n' ' ')"
 echo "  wrote CLAUDE.md (v3 router, discovery-first) + wiki/_index.md + docs/{PROJECT-BRIEF,PROJECT-MISSION,NORTH-STAR}.md stubs"
 echo ""
