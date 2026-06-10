@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Delivery OS — drift-lint (read-only; writes nothing). Makes the kernel unable to lie.
 // FAILS (exit 1) on phantom-dispatch: the router/CODEOWNERS advertises a skill/agent
-// with no backing file on disk (the rumah-admin lie). WARNS on cosmetic staleness
+// with no backing file on disk (a router that lies). WARNS on cosmetic staleness
 // (version behind latest tag) without failing — the reference tolerates an imprecise router.
 //
 //   node scripts/check-os-drift.mjs

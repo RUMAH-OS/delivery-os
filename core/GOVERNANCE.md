@@ -67,6 +67,28 @@ Governance is **two planes**, and conflating them is what made the framework rea
 
 **§11 is policy, not a mechanism** (see §11): the *norm* (a consequential decision earns an independent review) is judgment-triggered and context-resolved; only the thin **artifact-existence** shell ("a `DECISION-REVIEW` exists") is mechanism-eligible, and it stays a DoD convention until an observed §11-skip earns a hook — the way §12 was earned by a real failure. **§11's consequential-decision list and the two-lens floor are inherited and non-swappable** (a consumer may deepen a panel, never exempt its own slice). The split keeps the kernel small and the policy large: *a thin enforcement substrate runs a large, swappable governance capability.*
 
+## 14. Delivery OS learns from its consumers (the OS Feedback Loop)
+The framework must improve from real projects **without depending on anyone remembering to initiate it**. The loop: *project work → a predefined event → an OS-feedback triage → routing → (maybe) a framework improvement → every future project inherits it.* The **inheritance half is already mechanical** (a framework change → version bump → the scaffolder + version boundary). This principle makes the **capture/promotion half** mechanical at the trigger and human at the judgment — the §13 split applied to learning.
+
+**Mechanical trigger (the OS creates the opportunity to learn).** The verify-gate detects **release-class events** in the push: a **release tag** (and, by template, review/postmortem/compatibility/production-readiness/architecture-review artifacts). A **release tag cannot push without an OS-feedback triage** (`docs/feedback/OS-FEEDBACK-<event>.md`) — **fail-closed**, the §12 pattern (`templates/OS-FEEDBACK.md.template`). The events that produce the richest lessons are exactly the events that fire the trigger.
+
+**Human judgment (the triage answers three questions).** Were any framework-level lessons discovered? Any **OS Candidates** (`os_candidate: true` — a non-authoritative flag on the record that surfaced it, never a new store)? Route each lesson to its layer:
+- **Project-specific** (carries a project noun / only this project cares) → project `wiki/{learnings,findings}` + ADR.
+- **Ecosystem-specific** (changes who-owns-what / integration) → `ecosystem-architecture/` (ECR).
+- **Delivery OS** (statable with **no project noun** AND every future project benefits) → a framework change + a `case-studies/` worked example + a version bump.
+
+*"No framework lessons discovered." is a valid triage outcome — but the triage itself must exist.*
+
+**The promotion bar (the bloat brake).** A framework promotion is earned only by an **observed failure** OR a **second consumer pulling** for it (Waterline §8). The counterfactual — *"would this have prevented the failure if it had existed before the project started?"* — is **confirming evidence only when it cites a recorded failure artifact**, never a leading or imagined signal. Default triage outcome is **close/wait**.
+
+**A promotion is itself a consequential decision.** Promoting a lesson into the framework changes how every future project builds, so **each promotion runs a scaled Principle-11 panel** (§11) before it lands. The loop is recursive by design.
+
+**A promoted lesson goes to the RIGHT place — not assumed a skill.** It may become a **hook · template · doctrine line · skill · agent change · lint · process adjustment · or no framework change at all.** Storing the lesson in the wrong artifact (e.g. forcing every lesson into a skill) is itself a defect.
+
+**Guardrails (mechanized, not hoped).** The **no-backflow lint** (`scripts/check-no-backflow.mjs`) fails the build if a project noun appears in the agnostic framework (`core/ agents/ skills/ templates/ processes/ checklists/ domain-packs/`) — a kernel mechanism alongside the drift-lint. **Honest limit (same as §12):** the gate forces the triage to *exist and be answered*, not to be *insightful*; the independent §11 promotion panel is what gives the answer teeth.
+
+**Mechanism / policy line:** MECHANISM = the event-fired trigger · the no-backflow lint · the version-bump inheritance. POLICY = the triage content, the routing, the bar, and every promotion (§11-gated). *The OS creates the trigger and requires the triage to exist; humans answer it and decide every promotion.*
+
 ## Reusable prompts
 - **Red-team audit** — independent skeptic; classify findings **Blocker / Should-fix / Safe-to-defer**; don't implement during the audit.
 - **Multi-reviewer readiness audit** — N independent lenses vote ready / ready-with-conditions / not-ready; gate the release on the conditions.

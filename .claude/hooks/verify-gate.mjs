@@ -114,6 +114,16 @@ function freshPassArtifact(impl) {
 const emit = (o) => { process.stdout.write(JSON.stringify(o)); process.exit(0); };
 const warn = (msg) => { process.stderr.write(`[verify-gate] ${msg}\n`); process.exit(0); };
 
+function releaseBlocked(tag) {
+  return `BLOCKED by Delivery OS — OS Feedback Loop (Governance §14).\n` +
+    `Release "${tag}" cannot complete without an OS-feedback triage: docs/feedback/OS-FEEDBACK-${tag}.md.\n` +
+    `Answer three questions (template: delivery-os/templates/OS-FEEDBACK.md.template):\n` +
+    `  1. Were any framework-level lessons discovered this cycle?\n` +
+    `  2. Are there any OS Candidates?\n` +
+    `  3. Route each lesson → project knowledge / ecosystem architecture / Delivery OS.\n` +
+    `"No framework lessons discovered." is a VALID answer — but the review itself must exist.`;
+}
+
 function blocked(impl) {
   const list = impl.slice(0, 6).join(", ") + (impl.length > 6 ? ` …(+${impl.length - 6})` : "");
   return `BLOCKED by Delivery OS verify-gate (Governance §12).\n` +
@@ -161,11 +171,13 @@ try {
     // so a change committed via bare git and pushed with a clean tree is still caught.
     const Z = /^0+$/;
     const sh = (cmd) => { try { return execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
-    const changed = new Set(); let tip = "HEAD";
+    const changed = new Set(); const tags = []; let tip = "HEAD";
     for (const line of RAWIN.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
-      const [, localSha, , remoteSha] = line.split(/\s+/);
+      const [localRef, localSha, , remoteSha] = line.split(/\s+/);
       if (!localSha || Z.test(localSha)) continue;            // ref deletion
       tip = localSha;
+      const tagm = (localRef || "").match(/^refs\/tags\/(.+)$/);
+      if (tagm) tags.push({ name: tagm[1], sha: localSha });   // a tag = a release (OS Feedback Loop trigger)
       let files = "";
       if (remoteSha && !Z.test(remoteSha)) files = sh(`git diff --name-only ${remoteSha} ${localSha}`);
       else {                                                   // new ref: commits not already on a remote
@@ -173,6 +185,15 @@ try {
         for (const c of commits) files += sh(`git show --name-only --pretty=format: ${c}`) + "\n";
       }
       files.split("\n").map((s) => s.trim()).filter(Boolean).forEach((f) => changed.add(f));
+    }
+    // RELEASE TRIGGER (OS Feedback Loop, Governance §14): a release (a pushed tag) cannot complete
+    // without an OS-feedback triage existing in the tagged tree — the mechanism creates the
+    // opportunity to learn; the triage's content is human judgment ("no framework lessons" is valid).
+    for (const t of tags) {
+      // require THIS release's own triage (tag-named) — a stale OS-FEEDBACK from a prior release
+      // must not satisfy a new one ("each release asks its own question").
+      const named = sh(`git cat-file -t ${t.sha}:docs/feedback/OS-FEEDBACK-${t.name}.md`).trim() === "blob";
+      if (!named) { process.stderr.write(releaseBlocked(t.name) + "\n"); process.exit(1); }
     }
     const all = [...changed];
     const impl = all.filter((f) => isImpl(f) && !NONIMPL.test(f));

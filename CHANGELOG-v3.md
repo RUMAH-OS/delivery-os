@@ -4,6 +4,14 @@
 >
 > Ratified after three independent Principle-11 panels (proposal: `proposals/DELIVERY-OS-v3-PROPOSAL.md`, Revisions 2 & 3). Per-component AI-OS mapping + deviations: `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md`.
 
+## v3.8 — the OS Feedback Loop (Delivery OS learns from its consumers) (2026-06-11)
+The framework now improves from real projects **without anyone remembering to initiate it** — the capture/promotion half of the loop is mechanical at the trigger, human at the judgment (the §13 split applied to learning; ratified via a 4-lens Principle-11 review, `proposals/DELIVERY-OS-OS-FEEDBACK-LOOP.md`).
+- **Governance §14** — the loop doctrine: mechanical trigger · three-layer routing (project / ecosystem / Delivery OS) · the promotion bar (observed failure or second-consumer pull) · promotions are §11-gated · a promoted lesson may be a hook/template/doctrine/skill/agent/lint/process/**or none** (not assumed a skill) · the honest limit.
+- **Release-tag trigger** (`templates/hooks/verify-gate.mjs`, `pre-push`): a release tag is **hard-blocked** without `docs/feedback/OS-FEEDBACK-<tag>.md` — the §12 pattern for learning. *"No framework lessons discovered." is valid; the triage must exist.* `templates/OS-FEEDBACK.md.template`.
+- **No-backflow lint** (`scripts/check-no-backflow.mjs`): a project noun in the agnostic framework fails the build — caught a real backflow on its first run.
+- **Loop touchpoints:** an `os_candidate` retro question + a context-hygiene sweep (`core/OPERATING-LOOP.md`); an OS-feedback triage step in `production-readiness-review`.
+- **Dogfood:** this very release is the loop's first instance — `docs/feedback/OS-FEEDBACK-v3.8.md` (built the loop → found lessons about the loop → routed one to doctrine, one to a lint, one to a documented bound; **none to a skill**).
+
 ## v3.1 — verification is operationally enforced, not remembered (2026-06-10)
 Triggered by a live failure: a *generated, unexecuted* scaffold was presented as progress with no independent verifier; v3 **documented** author≠verifier (§3) and §11 but did not **operationalize** them for the single-orchestrator / no-git case (`case-studies/2026-06-10-author-verifier-not-operationalized.md`). Ratified by a 5-lens Principle-11 panel on the framework itself. Added — **two structural controls that make six conventions real**:
 - **Governance §12** — "verification is operationally enforced": no-git⇒no-build, the verify-gate hook, the no-VCS author≠verifier fallback, derived (never self-asserted) `verify_status`, and the stated honest limit.

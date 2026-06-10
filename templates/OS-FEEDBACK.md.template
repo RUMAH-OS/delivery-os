@@ -1,0 +1,23 @@
+---
+event: "<release tag | review | postmortem | compatibility-review | production-readiness | architecture-review>"
+date: "<YYYY-MM-DD>"
+triaged_by: "<who ran the triage>"
+---
+
+# OS Feedback Triage — <event>
+
+> Fired mechanically by the OS Feedback Loop (Governance §14). The trigger is a mechanism; the answers are human judgment. **"No framework lessons discovered." is a valid outcome — but the triage must exist.** A promoted lesson may become a hook · template · doctrine · skill · agent change · lint · process adjustment · **or no framework change at all** — store the right lesson in the right place; do not assume it becomes a skill.
+
+## 1. Were any framework-level lessons discovered this cycle?
+<one line, or a short list. If none: "None.">
+
+## 2. Are there any OS Candidates?
+<list any `os_candidate: true` items surfaced, or "None.">
+
+## 3. Routing — for each lesson, where does it belong?
+| Lesson | Layer (project / ecosystem / Delivery OS) | Why (no-noun test · earned bar · counterfactual to a *recorded* failure) | Destination |
+|---|---|---|---|
+| <…> | <…> | <…> | <wiki / ECR / framework change + case study + version bump> |
+
+## 4. Promotions proposed (each runs a scaled Principle-11 panel before it lands)
+<for any "Delivery OS" lesson: name the proposed framework artifact (hook/template/doctrine/skill/agent/lint/process/none) and that it must pass an independent §11 panel + the no-backflow lint. Or "None.">

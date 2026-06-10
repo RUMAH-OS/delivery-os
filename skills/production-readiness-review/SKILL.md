@@ -23,6 +23,7 @@ Before a release, a deploy promotion, or an irreversible cutover (DNS, data migr
 2. Verify the irreversible-action discipline (Governance §6): outward actions human-gated; **restoreable state captured + rollback defined** before any irreversible change; honest-failure on sensitive paths.
 3. Surface every condition; **gate the release on the conditions** — not on a majority feeling.
 4. Consolidate; the human merge gate makes the call.
+5. **OS-feedback triage (Governance §14).** Before tagging the release, answer the three triage questions — *were any framework-level lessons discovered this cycle? any OS Candidates? route each to project / ecosystem / Delivery OS?* — into `docs/feedback/OS-FEEDBACK-<tag>.md` (`templates/OS-FEEDBACK.md.template`). The release tag is **mechanically blocked** without it; *"No framework lessons discovered." is a valid answer.* Do not assume a lesson becomes a skill — route it to the right artifact (hook/template/doctrine/skill/agent/lint/process/none).
 
 ## Success criteria
 - Every required lens voted independently · conditions itemized and owned · rollback tested · backup taken (restore tested) for data changes · no false "ready" on an unmet condition.
