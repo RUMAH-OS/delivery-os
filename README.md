@@ -1,68 +1,62 @@
-# Delivery OS v2
+# Delivery OS
 
-> A reusable, **project-agnostic** multi-agent delivery framework. Copy it into any repo and a new project starts with a mature delivery system on **day one**. Distilled from two real projects — **Rumah Website** (CSR→SSR rebuild, launched) and **Property Lead OS** (AI agent platform) — but the **core references neither**. Project knowledge lives in the separate **Ecosystem Architecture** layer, never here.
+> A reusable **AI operating system / delivery framework**. Clone it, scaffold a project, and that project starts on day one with a delivery system whose lessons are **enforced, not documented** — verification, author≠verifier, and drift-protection fire automatically, without anyone remembering to run them. Distilled from two real projects (**Rumah Website**, **Property Lead OS**); the core **names neither** — project knowledge lives in the separate **Ecosystem Architecture** layer.
 
-**Clean-room rule:** nothing in `core/`, `agents/`, `processes/`, `templates/`, `checklists/`, or `domain-packs/` names a specific project. The only place real projects appear is `case-studies/`.
+**Current baseline: v3.6** (this README current as of v3.7). The architecture below is what every new project **inherits automatically** — proven end-to-end (clone GitHub `main` → `scripts/new-project.sh` → a fully-enforced project, no manual setup). Evidence: independent verification records in [`docs/verify/`](docs/verify/); the full review trail in [`proposals/`](proposals/) (start with [the architecture lock](proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md)).
 
-## ▶ Start here: **[PROJECT-SELECTION.md](PROJECT-SELECTION.md)**
-**The front door.** Answer "what am I building?" and immediately get the right **packs, agents, ADRs, day-one docs, DoD additions, architecture risks, QA focus, common mistakes, and the exact bootstrap command** — for 10 project types, with a decision tree. Read it *before* the rest of the framework. Then follow **[GETTING-STARTED.md](GETTING-STARTED.md)** to install.
-
-## The project lifecycle (Delivery OS enforces this order)
-```
-PROJECT-SELECTION (pick packs) → Install → ★ DISCOVERY & ALIGNMENT ★ → Roadmap + ADRs + Architecture → Implementation (the loop) → Release
-```
-**[★ Discovery & Alignment](discovery/DISCOVERY-WORKFLOW.md) is mandatory and comes first** — strategic clarity before architecture. Right after install, Claude conducts a **[Founder Discovery Interview](discovery/FOUNDER-INTERVIEW.md)** and generates `PROJECT-BRIEF.md`, `PROJECT-MISSION.md`, `NORTH-STAR.md` **from your answers (never assumptions)**, then reviews ecosystem alignment. **No roadmap/ADR/architecture/code begins until those are founder-approved** ([gate checklist](discovery/PROJECT-DISCOVERY-CHECKLIST.md)). Kick it off with **[BOOTSTRAP-PROMPT.md](BOOTSTRAP-PROMPT.md)**: *"Install Delivery OS and initialize this repository."*
+**Clean-room rule:** nothing in `core/`, `agents/`, `skills/`, `processes/`, `templates/`, `checklists/`, or `domain-packs/` names a specific project. The only place real projects appear is `case-studies/`.
 
 ---
 
-## The shape of v2
+## 1. The kernel — `CLAUDE.md`
+**The entrypoint is `CLAUDE.md`, the always-loaded router.** Open it and you understand a project immediately: identity · mission · north-star · skills · agents · knowledge · ecosystem edges · open gates · verification status. Its **state** sections (§5 Skills / §6 Agents / §9 verification) are **derived from disk** by `.claude/tools/render-kernel.mjs` — so the router **cannot lie** about what it can dispatch; its **intent** sections are hand-authored. The framework runs its own live kernel (this repo's [`CLAUDE.md`](CLAUDE.md)). *(Pack selection — "what am I building?" — is a pointer: [PROJECT-SELECTION.md](PROJECT-SELECTION.md). It is no longer the entrypoint; the kernel is.)*
+
+## 2. The enforced core (fires without you remembering)
+These are **mechanisms**, not conventions — they activate whether or not anyone chooses to invoke them, and they fail closed.
+
+- **Verify-gate** ([`templates/hooks/verify-gate.mjs`](templates/hooks/verify-gate.mjs)) — blocks an in-session turn **and** a commit when implementation files changed without a fresh, **verified, independent** `docs/verify/VERIFY-<slice>.md`. A committed `pre-push` hook (`core.hooksPath`) is the **model-independent backstop**: it inspects the **committed push range**, so a change committed via bare git and pushed with a clean tree is still caught. It is monorepo-aware (`apps/**`, `packages/**`, `services/**`) by default.
+- **Author ≠ Verifier (operationalized — Governance §12)** — author≠verifier is a **structural write-binding** (the verifier cannot edit what it grades), realized by CODEOWNERS-on-a-PR where git exists and a **distinct verifier run** where it doesn't. Status (`planned → generated → executed → verified`) is **derived from evidence, never self-asserted**. *Honest limit (stated, not hidden):* the gate proves a verified independent artifact **exists**; it cannot prove the verification was *truthful* — which is why git + branch protection matter.
+- **Drift detection** ([`templates/tools/check-os-drift.mjs`](templates/tools/check-os-drift.mjs)) — fails the push if the router or CODEOWNERS advertises a skill/agent not on disk (phantom dispatch) or a void ownership handle.
+- **Version boundary** — annotated tags + an `os_version` stamp recording the OS version a project **consumed**, with "behind" detection.
+- **Mechanism vs Policy (Governance §13)** — one line: **mechanism = key; policy = prompt**. The thin kernel mechanisms above are non-swappable; the large governance *policy* (which decisions are consequential, which review lenses, which packs, where the Waterline sits) is versioned and swappable. **Principle 11** (independent review of consequential decisions) is policy — its list and two-lens floor are inherited and non-swappable, but it is not a hook.
+
+## 3. How a project consumes the OS
+- **Copied-base + Local-overlay.** A consumer receives the framework's generic agents/skills/tools/hooks as **base** (`.claude/base/`, never hand-edited in place) and writes its specializations as **overlay** (`.claude/overlay/`). `os-sync` merges them into `.claude/agents/` — so **a project's specializations survive a framework version bump** instead of being clobbered. *(This replaces the old flat "copy agents into `.claude/agents/`" model.)*
+- **Skills** — callable capabilities in `.claude/skills/` (discovery-interview · grill-me · migration-assessment · principle-11-review · production-readiness-review · ecosystem-alignment-review · verify-gate). `verify-gate` fires mechanically; the rest are model-dispatched **by design** (auto-firing a founder interview would be wrong).
+- **Wiki contract** — the knowledge layer ([`templates/wiki/FRONTMATTER-CONTRACT.md`](templates/wiki/FRONTMATTER-CONTRACT.md)): homeless project-local *understanding* only, `kind`+`as_of` typed, **records vs understanding** enforced; it POINTS, never restates a fact another file owns.
+
+## 4. Dogfooding — the framework runs its own architecture
+Delivery OS is its own first consumer: it has a live `.claude/` with the verify-gate wired (`core.hooksPath`), and the gate has **caught real turns** on this repo (it blocked this very effort's changes until an independent verifier signed off). Every step of the v3 review was independently verified (author≠verifier); each verification repeatedly *found real defects* (a gitless gate, an `untagged` stamp, a missing wiki contract, a working-tree-only backstop) — each fixed and folded back. That fail→detect→incorporate loop is the operating model.
+
+## 5. The shape
 ```
-core/         the agnostic spine — loop, governance, definition-of-done, severity
-agents/       roles — a LEAN DEFAULT that scales up to a full roster
-processes/    "how we do X" — testing, ai-product, deployment, migrations, api, security
-templates/    artifacts you create on day one (+ as needed)
-checklists/   red-team QA, release/cutover, security, migration, api-change, preflight
-domain-packs/ opt-in bundles that ACTIVATE the right agents + gates + checklists + processes
-case-studies/ the two source projects (the only project-specific content)
+CLAUDE.md     the kernel (the framework's own live router)
+core/         the agnostic spine — loop, governance (incl. §12 enforcement, §13 mechanism/policy), DoD, severity
+agents/       roles — a LEAN DEFAULT that scales up (installed as copied-base; specialized via overlay)
+skills/       callable capabilities (.claude/skills) — verify-gate fires mechanically
+templates/    what the scaffolder installs: hooks/ (verify-gate, pre-push) · tools/ (os-sync, check-os-drift, render-kernel) · wiki/ · CLAUDE.md.template
+processes/ · checklists/ · domain-packs/   how we do X · red-team/release/security · opt-in bundles
+case-studies/ the source projects (the only project-specific content)
 ```
-**Core vs domain-packs is the whole idea:** the core is identical for every project; the **domain pack** is what makes it fit a web app, an internal admin, a CRM, a contracts/invoicing system, an API backend, or an AI product.
 
-## The core loop (unchanged truth, refined)
+## 6. The core loop
 ```
-Implement → Commit (hash) → Independent QA → Domain Review → Documentation → Status → Continue
+Implement → Commit (hash) → Independent QA (VERIFY artifact, author≠verifier) → Domain Review → Documentation → Status → Write-back → Continue
 ```
-Delivery unit = a **vertical slice** (one PR, reviewable in one sitting, demonstrable end-to-end). For systems with a deterministic core and a probabilistic/AI layer, **prove the deterministic spine first** (no AI/integrations) before layering the rest. See [core/OPERATING-LOOP.md](core/OPERATING-LOOP.md).
+Delivery unit = a **vertical slice** (one PR, demonstrable end-to-end). For a deterministic core + a probabilistic/AI layer, **prove the deterministic spine first**. The **Write-back** step routes each lesson to its one durable home. See [core/OPERATING-LOOP.md](core/OPERATING-LOOP.md), [core/DEFINITION-OF-DONE.md](core/DEFINITION-OF-DONE.md).
 
-## Agent roster — lean default, scales up
-**Lean default (start here, every project):**
-- **Software Engineer** — builds; owns production code.
-- **QA / Test** — validates independently; owns `tests/ e2e/ evals/`.
-- **Reviewer / Critic** — conformance + **simplicity** + **scope-held**; owns no files (verdicts only).
-- **+ a human merge gate** (the irreversible-action approval).
+## 7. Agent roster & domain packs
+**Lean default (every project):** Software Engineer (builds; owns production code) · QA/Test (validates independently; owns `tests/ e2e/ evals/`) · Reviewer/Critic (conformance + simplicity + scope; verdicts only) · **+ a human merge gate**. Add roles as needed (Lead Architect, Documentation; Security-&-Compliance, Database/Data, API-&-Integration, AI-Product). **Domain packs** activate the right agents/gates/checklists per surface: `public-web · internal-admin · crm · contracts-signatures · invoicing · api-first · ai-product` ([domain-packs/PACKS.md](domain-packs/PACKS.md)).
 
-This three-role model + human merge (from Property Lead OS) is, in practice, sharper than a large roster. **Add roles as the project grows:**
-- **Standard add-ons:** Lead Architect, Documentation, Project Manager.
-- **Optional:** SEO, Design-Parity, Accessibility.
-- **Domain:** Security-&-Compliance, Database/Data, API-&-Integration, **AI-Product**.
+## 8. Install
+**One command installs the *enforced* baseline** (git-init + `main`/`dev`, copied-base + overlay dirs, skills, the verify-gate hook + committed `pre-push` + `core.hooksPath`, the tools, vendored doctrine, the wiki contract, CODEOWNERS, the router) — **fail-closed** if any mechanism is missing:
+```
+bash delivery-os/scripts/new-project.sh "<Project>" "<packs>"
+```
+Then the discovery-first flow: Claude conducts a **[Founder Discovery Interview](discovery/FOUNDER-INTERVIEW.md)** and generates `PROJECT-BRIEF/MISSION/NORTH-STAR` from your answers, founder-approved before any roadmap/architecture/code. Full guide: [GETTING-STARTED.md](GETTING-STARTED.md).
 
-The defining structural rule (also from PLOS): **author ≠ verifier, enforced by file ownership** (CODEOWNERS) — the verifier physically cannot edit what it grades. See [agents/README.md](agents/README.md).
+## 9. What's enforced vs. by-design
+- **Enforced (cannot be silently lost):** verify-gate (in-session + pre-push range backstop) · author≠verifier · drift detection · version stamp · base+overlay survival · git substrate. A new project inherits all of these automatically.
+- **By-design / external:** CODEOWNERS needs **GitHub branch protection** enabled by you; 6 of 7 skills are model-dispatched (judgment, not a defect); wiki-page compliance is a discipline (the contract is provided); a non-standard impl layout (e.g. `supabase/functions/`) needs `impl_extra` in `.claude/.verify-config.json`.
 
-## Domain packs (pick one or more)
-Each pack lists the agents, DoD gates, processes, and checklists it activates. See [domain-packs/PACKS.md](domain-packs/PACKS.md).
-`public-web` · `internal-admin` · `crm` · `contracts-signatures` · `invoicing` · `api-first` · `ai-product`
-
-## What's new in v2 (vs v1)
-See [CHANGELOG-v2.md](CHANGELOG-v2.md). Headlines: **core + domain-packs** split · **launch→release** governance (DNS cutover is one annex) · **structural author≠verifier + Reviewer/Critic** · **vertical slices + deterministic-spine-first** · **Stakeholder Acceptance gate** · an entire **AI-Product pillar** (build-time vs runtime agents, **evals**, determinism, agent-run audit, human-gated actions) · **pre-registered decision reviews** · generalized **testing** (unit/property/contract/integration/e2e/evals) and **migrations/API/deployment** processes.
-
-## → Install & adopt: **[GETTING-STARTED.md](GETTING-STARTED.md)**
-A complete copy/paste guide: Quick Start (≤30 min from an empty repo), bootstrap, Claude integration, ecosystem registration, the recommended workflow, a worked **Rumah Admin** example, and the **Upgrade Path**. One-command scaffold: `bash delivery-os/scripts/new-project.sh "<Project>" "<packs>"`.
-
-## Day-one bootstrap (summary — full version in GETTING-STARTED.md)
-1. Copy `delivery-os/`; read `core/GOVERNANCE.md` + `core/DEFINITION-OF-DONE.md`.
-2. Pick your **domain pack(s)** ([domain-packs/PACKS.md](domain-packs/PACKS.md)); copy the activated agents into `.claude/agents/`.
-3. Write `project-context.md` (business source of truth) from the template.
-4. Draft `master-roadmap.md` (phases → vertical slices); write the first ADRs (stack, hosting, data).
-5. Stand up `STATUS.md`, `project-log.md`, and the **validation harness in CI** (fails the build on any invariant violation).
-6. Run the **credentials/env preflight** ([checklists/preflight-credentials-and-env.md](checklists/preflight-credentials-and-env.md)) — request all external access **now**.
-7. **De-risk early:** ship a thin vertical slice to the **real target environment** (deploy + CI + one real end-to-end transaction) in Phase 1–2.
-8. Provision the **toolchain before the first build** so the builder can self-verify (a lesson both source projects hit).
+History: [CHANGELOG-v3.md](CHANGELOG-v3.md) · [CHANGELOG-v2.md](CHANGELOG-v2.md). The v3 AI-OS review trail and ratified architecture: [proposals/](proposals/).
