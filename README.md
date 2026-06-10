@@ -45,7 +45,10 @@ Each pack lists the agents, DoD gates, processes, and checklists it activates. S
 ## What's new in v2 (vs v1)
 See [CHANGELOG-v2.md](CHANGELOG-v2.md). Headlines: **core + domain-packs** split · **launch→release** governance (DNS cutover is one annex) · **structural author≠verifier + Reviewer/Critic** · **vertical slices + deterministic-spine-first** · **Stakeholder Acceptance gate** · an entire **AI-Product pillar** (build-time vs runtime agents, **evals**, determinism, agent-run audit, human-gated actions) · **pre-registered decision reviews** · generalized **testing** (unit/property/contract/integration/e2e/evals) and **migrations/API/deployment** processes.
 
-## Day-one bootstrap (copy into the new repo's first issue)
+## → Install & adopt: **[GETTING-STARTED.md](GETTING-STARTED.md)**
+A complete copy/paste guide: Quick Start (≤30 min from an empty repo), bootstrap, Claude integration, ecosystem registration, the recommended workflow, a worked **Rumah Admin** example, and the **Upgrade Path**. One-command scaffold: `bash delivery-os/scripts/new-project.sh "<Project>" "<packs>"`.
+
+## Day-one bootstrap (summary — full version in GETTING-STARTED.md)
 1. Copy `delivery-os/`; read `core/GOVERNANCE.md` + `core/DEFINITION-OF-DONE.md`.
 2. Pick your **domain pack(s)** ([domain-packs/PACKS.md](domain-packs/PACKS.md)); copy the activated agents into `.claude/agents/`.
 3. Write `project-context.md` (business source of truth) from the template.
