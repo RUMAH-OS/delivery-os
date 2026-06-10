@@ -63,15 +63,13 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 | AI-OS mapping + every deviation's burden of proof | `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md` |
 
 ## 9. Active Now  — *what is currently active?*
-**Verification status (derived from disk, §12):** os_version `v3.3` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
-**Phase: framework maintenance.** **Version: v3.1** (verification enforcement — §12 + verify-gate hook).
-**Open gates / in-flight:**
-- `fix/operationalize-author-verifier` — v3.1 verify-gate (hook dogfood-tested in isolation; **not yet caught a real turn in a live project**; not merged — awaiting ratification).
-- `review/ai-os-hierarchy-alignment` — this AI-OS reframing review (see `proposals/DELIVERY-OS-v3-AI-OS-HIERARCHY-REVIEW.md`).
-**Known fidelity debt (from the adversarial review — these are REAL, not cosmetic):**
-- The framework does **not run its own verify-gate** (no `delivery-os/.claude/settings.json`); §12 is dogfood-tested *in isolation only* and has **not caught a real turn** in any consumer.
-- **rumah-admin — the at-risk consumer — has the gate INERT** (no `.git`, no `.claude/`, no `docs/verify/`); its VERIFY artifact is even mis-pathed outside the gate. The Slice-1.0 failure mode is still latent in the project §12 was written to protect.
-- **Consumers re-implement, they don't consume:** `new-project.sh` was never run on rumah-admin (flattened stale-v2 `.delivery-os/` copy, hand-typed router that over-claims) or PLOS (no router; agent names `qa-tester`≠`qa-test` void the CODEOWNERS binding).
-- **6 of 7 skills are advisory** (description-match, no mechanical fire); only verify-gate fires.
-- README header still says "v2"; no git tags; AI-OS identity lives in `proposals/`, not `core/`.
-**Verification status (§12):** governed in template form only — **not yet enforced on the framework itself or its consumers.**
+**Verification status (derived from disk, §12):** os_version `v3.4` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
+**Phase: framework maintenance. Version: v3.4.** The AI-OS review sequence (review → lock → dogfood → operationalize → inheritance) is **complete on branch `review/ai-os-hierarchy-alignment`**, awaiting founder authorization to merge → push.
+**Resolved (was adversarial-review fidelity debt):**
+- The framework **now runs its own verify-gate** (`delivery-os/.claude/`) and it has **caught real turns** (`docs/verify/VERIFY-step3-dogfood.md`, `VERIFY-framework-update.md`).
+- **AI-OS learnings are operationalized into the scaffolder and auto-inherited** by a new project — independently verified (`docs/verify/VERIFY-inheritance.md`): verify-gate · author≠verifier · base+overlay · drift-lint · version boundary · wiki contract · §13 mechanism/policy · skills · dogfooding.
+- Tags `v3.0…v3.4` exist (local). The architecture lock is `proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md`.
+**Open (not yet done):**
+- **Not merged to `main`; not pushed to GitHub** — awaiting founder authorization.
+- **Consumers not yet adopted:** PLOS + rumah-admin still on the old model; the **PLOS compatibility review** is the next step, then rumah-admin resumes.
+- **Bounded limit (cosmetic, cannot bypass enforcement):** a newly-*added* skill is under-advertised in §5 until `render-kernel.mjs` re-runs.
