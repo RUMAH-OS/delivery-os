@@ -1,10 +1,14 @@
-# Delivery OS — Router (the framework dogfoods its own kernel)
+# Delivery OS — Router (reference router; NOT yet a self-hosted kernel)
 
 > Delivery OS v3 router: the single entrypoint. It **ANSWERS or POINTS, never restates.**
-> This is the framework operating from its **own** live CLAUDE.md — the reference implementation
-> of `templates/CLAUDE.md.template`. If this file disagrees with a canonical source under
-> `core/`, the **canonical source wins — fix this file.**
-> **Hand-maintained — no generator reconciles it.** Last reconciled: 2026-06-10 (v3.1).
+> This is the framework's **reference router** — the live instance of `templates/CLAUDE.md.template`.
+> **Honest status (corrected after the 2026-06-10 adversarial review):** this is a router *document*,
+> not a running kernel. The framework does **not** yet self-install the verify-gate (`no delivery-os/.claude/`,
+> no installed hook), so it does **not** dogfood its own §12 gate. That is open fidelity debt (§9), not a
+> claim of compliance. A kernel is load-bearing and derived-from-disk; this file is hand-maintained and can
+> drift — treat it as navigation, not enforcement.
+> If this file disagrees with a canonical source under `core/`, the **canonical source wins — fix this file.**
+> Last reconciled: 2026-06-10 (v3.1).
 
 ## 1. Identity  — *what is this?*
 **Delivery OS** — a reusable **AI operating system / delivery framework** for building software with Claude: a navigation **kernel** (this router + skills + wiki) over an intact **execution spine** (loop · DoD · governance · packs). Distilled clean-room from two real projects; **names no project except in `case-studies/`**. → `README.md`, `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md`
@@ -63,5 +67,10 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 **Open gates / in-flight:**
 - `fix/operationalize-author-verifier` — v3.1 verify-gate (hook dogfood-tested in isolation; **not yet caught a real turn in a live project**; not merged — awaiting ratification).
 - `review/ai-os-hierarchy-alignment` — this AI-OS reframing review (see `proposals/DELIVERY-OS-v3-AI-OS-HIERARCHY-REVIEW.md`).
-**Known fidelity debt (from the hierarchy review):** README header still says "v2"; no git tags (`v3.0`/`v3.1` are commit subjects, not tags); consumer routers over-claim on-disk capabilities (rumah-admin lists absent `.claude/skills`; PLOS has no router).
-**Verification status (§12):** framework changes are governed by the same gate they ship.
+**Known fidelity debt (from the adversarial review — these are REAL, not cosmetic):**
+- The framework does **not run its own verify-gate** (no `delivery-os/.claude/settings.json`); §12 is dogfood-tested *in isolation only* and has **not caught a real turn** in any consumer.
+- **rumah-admin — the at-risk consumer — has the gate INERT** (no `.git`, no `.claude/`, no `docs/verify/`); its VERIFY artifact is even mis-pathed outside the gate. The Slice-1.0 failure mode is still latent in the project §12 was written to protect.
+- **Consumers re-implement, they don't consume:** `new-project.sh` was never run on rumah-admin (flattened stale-v2 `.delivery-os/` copy, hand-typed router that over-claims) or PLOS (no router; agent names `qa-tester`≠`qa-test` void the CODEOWNERS binding).
+- **6 of 7 skills are advisory** (description-match, no mechanical fire); only verify-gate fires.
+- README header still says "v2"; no git tags; AI-OS identity lives in `proposals/`, not `core/`.
+**Verification status (§12):** governed in template form only — **not yet enforced on the framework itself or its consumers.**
