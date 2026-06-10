@@ -33,8 +33,24 @@ Front-load the riskiest unknowns: ship a thin vertical slice to the **real targe
 ## 10. Commit & scope discipline
 One slice → ≥1 dedicated commit (what + why + slice id); commit history is an artifact (referenced by hash in `project-log.md`). Hold scope — the Reviewer/Critic rejects anything "smuggled in" beyond the slice. Know your platform's deploy gotchas and keep them in the deployment runbook.
 
+## 11. Consequential decisions require independent multi-agent review
+A **single agent — including the orchestrator — may not issue a recommendation on a consequential decision.** A decision is **consequential** when it is any of:
+- **Architectural** — system shape, boundaries, data model, technology/stack/hosting, ADR-worthy choices.
+- **Migration-related** — keep / modernize / partial-migrate / rebuild calls; cutover, backfill, or data-move strategy.
+- **Production-readiness** — go/no-go, release/cutover, "is this safe to ship," rollback posture.
+- **Security-sensitive** — auth/authz, money/invoicing, e-signatures, secrets, anything touching PII.
+- **Data-sensitive** — schema/migration, retention/erasure, irreversible writes, anything risking data loss or integrity.
+
+**The mechanism (not optional theatre):**
+- **Independent first, consolidated second.** Each relevant role / domain-pack specialist (e.g. Lead Architect, Engineer, QA, Reviewer/Critic, Database/Data, Security-&-Compliance, API-&-Integration) reaches its own evidence-based finding **blind to the others** — no shared draft, no anchoring on a prior conclusion. Only then is a **consolidated recommendation** produced.
+- **Surface disagreements; never smooth them.** The consolidation reports where the perspectives diverge and why; a buried disagreement is a process failure. The point of more agents is *independent viewpoints*, not the appearance of rigor.
+- **Author ≠ verifier holds (Principle 3).** Whoever drafts the candidate recommendation does not also adjudicate it; the Reviewer/Critic challenges it adversarially before it reaches the human.
+- **Which lenses are required** is set by the decision class above ∩ the project's active **domain pack(s)**. Scale the panel to the stakes (a small reversible call needs fewer lenses than a money/data/cutover one) — but **at least two independent lenses + the Reviewer/Critic** for anything in the list.
+- **The human merge gate decides.** The panel informs; it does not replace stakeholder approval (Principle 6). Capture the review (findings + dissents + consolidation) as a durable artifact alongside the decision.
+
 ## Reusable prompts
 - **Red-team audit** — independent skeptic; classify findings **Blocker / Should-fix / Safe-to-defer**; don't implement during the audit.
 - **Multi-reviewer readiness audit** — N independent lenses vote ready / ready-with-conditions / not-ready; gate the release on the conditions.
+- **Independent decision-review panel** (Principle 11) — for a consequential decision, run the required role lenses **blind to each other**, collect findings + classifications, **surface every disagreement**, then consolidate; the orchestrator never concludes alone.
 - **Runtime diagnostic probe** — temporary, token-gated, reports live config/env **presence** (never values) + build id; remove after root-cause.
 - **Pre-registered decision review** — commit hypotheses/metrics/decision-rules/min-sample **before** the data (see `processes/pre-registered-decisions.md`).

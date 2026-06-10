@@ -6,6 +6,7 @@ v2 = v1's agnostic core **+** the strongest lessons from a second source project
 - **Core vs domain-packs split.** v1 implicitly assumed "one public web app, launched once." v2 separates a 100%-agnostic `core/` from opt-in `domain-packs/` (web, admin, crm, contracts, invoicing, api-first, ai-product). *(Why: v1 broke on admin/CRM/API/AI projects.)*
 - **launch → release.** "Launch = DNS cutover" was web-specific; v2 has `processes/deployment-governance.md` (environments, promotion, flags, canary, rollback-by-change-type) with DNS cutover demoted to one annex.
 - **Lean default roster.** Lead with **Engineer / QA / Reviewer-Critic + human merge**; scale up. *(The 3-role model proved sharper than a large roster.)*
+- **Consequential-decision review gate (Governance §11).** Architectural / migration / production-readiness / security-sensitive / data-sensitive decisions now require an **independent multi-agent review before any recommendation** — role lenses work blind, disagreements are surfaced, then consolidated; no single agent (orchestrator included) concludes alone. *(Why: a single-agent conclusion on a high-stakes call is exactly what the multi-agent model exists to prevent.)*
 
 ## Promoted from the AI agent platform (second source)
 - **Structural author≠verifier** via CODEOWNERS — the verifier owns `tests/ e2e/ evals/` and cannot edit production code. Upgrades v1's process-only "independent QA."

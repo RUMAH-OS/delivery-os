@@ -30,5 +30,6 @@ Merges **and** outward/irreversible business actions (sending, charging, publish
 - Auth / money / signatures / PII → security-&-compliance review.
 - Runtime AI agents → **evals** + determinism + agent-run audit.
 - Data/schema → reversible-migration + applies-clean check.
+- **Consequential decision** (architectural / migration / production-readiness / security-sensitive / data-sensitive) → **independent multi-agent decision review before any recommendation** — role lenses work blind, disagreements are surfaced, then consolidated (Governance §11). No single agent concludes alone.
 
 Which gates are active is set by the project's **domain pack(s)**.
