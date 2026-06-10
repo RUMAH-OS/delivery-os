@@ -1,7 +1,7 @@
 # The Operating Loop
 
 ```
-Implement → Commit (hash) → Independent QA → Domain Review → Documentation → Status → Continue
+Implement → Commit (hash) → Independent QA → Domain Review → Documentation → Status → Write-back → Continue
 ```
 
 ## Delivery unit: the vertical slice
@@ -20,6 +20,20 @@ Implement → Commit (hash) → Independent QA → Domain Review → Documentati
 `implement (Engineer) → validate (QA, owns tests/evals) → conformance + simplicity + scope (Reviewer/Critic) → stakeholder acceptance (human) → merge (human)`
 - **Author ≠ verifier**, enforced by file ownership (see `agents/README.md`).
 - **Defects flow author-ward** — QA/Reviewer report; only the author fixes. No grader patches the work it grades.
+
+## Knowledge cadence — the Write-back step (v3)
+The loop does not end at "Status." Before **Continue**, route what the slice taught the system to its **one** durable home — so the knowledge layer stays true instead of rotting. This is **routing, not a new store** (one source of truth per concern, Governance §7).
+
+| What you learned | Lands in (its single home) |
+|---|---|
+| Agent cross-session continuity | `memory/MEMORY.md` (the inbox/WAL — **derived, never authority**) |
+| Durable project-local understanding (narrative, learnings, market, customer, process) | `wiki/` (the right page; + a line in `wiki/learnings/`) |
+| A project decision | `docs/adr/` (an ADR) |
+| **A cross-project decision / ownership change** | an **ECR** in the ecosystem layer + the affected registry — **never a project file** |
+| A reusable technique that got better | bump the **Skill** `version` (+ `## Changelog` line) |
+| A canonical fact changed | update the canonical doc, then refresh the `CLAUDE.md` pointer + `last_verified` |
+
+**Memory is the universal inbox, never the final home** — the write-back step empties it into the correct durable store and leaves a one-line pointer. **Cross-project facts never land in the wiki.** Freshness is visible, not silent: a wiki page past its `last_verified` cadence is flagged `stability: stale` and surfaces in the periodic **context-hygiene** pass (a milestone-boundary review that re-confirms `source_of_truth:` pointers resolve, harvests `learnings/` into stable pages/Skills, and re-checks staleness). Where a project has no CI, hygiene is a manual checklist item — honest, not hidden.
 
 ## Irreversible-action gate
 Merges **and** outward/irreversible business actions (sending, charging, publishing, migrating, deleting) require **explicit human approval**. Automated/AI agents **draft**, they do not act. (See `core/GOVERNANCE.md`.)
