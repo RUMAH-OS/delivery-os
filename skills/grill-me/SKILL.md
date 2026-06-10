@@ -7,7 +7,7 @@ description: >
   BRIEF/MISSION/NORTH-STAR to a measured confidence threshold (or an honest TBD).
   Invoke after discovery-interview when answers feel vague, or when the founder wants depth.
 decision_class: none
-required_lenses: [reviewer-critic]   # the blind skeptic that grades answer quality (author != verifier on elicitation)
+required_lenses: [interviewer, reviewer-critic]   # the drafting conductor + the BLIND skeptic that grades answer quality (author != verifier on elicitation)
 inputs:  [the in-progress docs/PROJECT-BRIEF.md, PROJECT-MISSION.md, NORTH-STAR.md, the founder (live)]
 outputs: [hardened BRIEF/MISSION/NORTH-STAR, a Confidence Ledger appended to each]
 ---

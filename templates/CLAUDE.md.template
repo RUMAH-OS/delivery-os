@@ -3,7 +3,8 @@
 > Delivery OS v3 router: the single entrypoint. It **ANSWERS or POINTS, never restates.**
 > Canonical truth = `docs/` (project) + `../ecosystem-architecture/` (portfolio). If this file
 > disagrees with a canonical source, the **canonical source wins — fix this file.**
-> Last reconciled: <YYYY-MM-DD>.
+> **This router is hand-maintained — no generator reconciles it.** Keep it current via the
+> operating-loop Write-back step + the context-hygiene pass. Last reconciled: <YYYY-MM-DD>.
 >
 > **Authoring rule (the anti-drift discipline):** every line below is either (a) an **address/link**,
 > (b) a **one-line fact this project owns** (identity, phase, own edges), or (c) a **pointer that names

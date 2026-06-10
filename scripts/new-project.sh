@@ -20,7 +20,7 @@ for a in software-engineer qa-test reviewer-critic lead-architect documentation;
 done
 
 # 2. Pack agents (prefix stripped)
-add() { local src="$1"; local name; name="$(basename "$src" | sed 's/^domain--//;s/^optional--//')"; cp "$DOS/agents/$src.md" ".claude/agents/$name"; }
+add() { local src="$1"; local name; name="$(basename "$src" | sed 's/^domain--//;s/^optional--//')"; cp "$DOS/agents/$src.md" ".claude/agents/$name.md"; }
 IFS=',' read -ra LIST <<< "$PACKS"
 for p in "${LIST[@]}"; do case "$(echo "$p" | xargs)" in
   public-web)          add optional--seo; add optional--design-parity;;
