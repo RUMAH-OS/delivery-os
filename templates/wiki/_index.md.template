@@ -1,0 +1,18 @@
+# <PROJECT> — Wiki index
+
+> The navigable map of project-local **homeless knowledge**. The `CLAUDE.md` router §4 points here.
+> Rules + frontmatter contract: `delivery-os/templates/wiki/FRONTMATTER-CONTRACT.md`.
+> **Records → their system-of-record. Cross-project facts → ../ecosystem-architecture/. This holds only understanding.**
+
+## Pages
+*(one line per page; created by the operating-loop Write-back step when there is real content — none yet is fine)*
+
+| id | title | folder | source_of_truth | last_verified | summary |
+|---|---|---|---|---|---|
+| — | *(no pages yet — earned, not scaffolded)* | — | — | — | — |
+
+## Pointers (where these concerns actually live — do NOT recreate them here)
+- Owns/consumes · source-of-truth · glossary · projects · integration · cross-project decisions → `../ecosystem-architecture/` (06 · 10 · 02 · 05 · 09 · 11 · decisions/)
+- Business truth (what/mission/north-star/ADRs) → `docs/`
+- How we build (loop · DoD · governance · packs · skills) → `delivery-os/`
+- Agent cross-session continuity → `memory/MEMORY.md`

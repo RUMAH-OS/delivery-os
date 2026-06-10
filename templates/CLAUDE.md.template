@@ -1,0 +1,59 @@
+# <PROJECT> — Router
+
+> Delivery OS v3 router: the single entrypoint. It **ANSWERS or POINTS, never restates.**
+> Canonical truth = `docs/` (project) + `../ecosystem-architecture/` (portfolio). If this file
+> disagrees with a canonical source, the **canonical source wins — fix this file.**
+> Last reconciled: <YYYY-MM-DD>.
+>
+> **Authoring rule (the anti-drift discipline):** every line below is either (a) an **address/link**,
+> (b) a **one-line fact this project owns** (identity, phase, own edges), or (c) a **pointer that names
+> the owning file**. A line that *restates a fact another file owns* is a defect — delete it, link instead.
+
+## 1. Identity  — *what is this project?*
+<one-paragraph identity: what it is, who it's for, its role in the ecosystem. → docs/PROJECT-BRIEF.md>
+
+## 2. Mission  — *mission?*
+<one line; → docs/PROJECT-MISSION.md>
+
+## 3. North Star  — *north star?*
+<one line; → docs/NORTH-STAR.md>
+**Invariants (always-on, outrank any tech choice):** <the project's must-not-regress list>
+
+## 4. Wiki  — *where is the wiki?*  (project-local HOMELESS knowledge only)
+→ `wiki/_index.md`  ·  narrative · learnings · market · customers (playbook, **zero records**) · processes · operational context.
+**Not here:** cross-project facts (→ §7/§8), records (→ their system-of-record), business truth (→ `docs/`).
+
+## 5. Skills  — *where are the skills?*  (callable procedures — `.claude/skills/`, installed from `delivery-os/skills/`)
+| Skill | Use when | Status |
+|---|---|---|
+| discovery-interview | founder discovery → BRIEF/MISSION/NORTH-STAR | <stable> |
+| grill-me | adversarial follow-up to confidence thresholds | <experimental> |
+| migration-assessment | read-only audit + capability register of an existing system | <stable> |
+| principle-11-review | independent multi-lens review of a consequential decision | <stable> |
+| production-readiness-review | pre-release/cutover go/no-go | <stable> |
+| ecosystem-alignment-review | owns/consumes vs registry; ECR conflicts | <stable> |
+
+## 6. Agents  — *where are the agents?*  (`.claude/agents/` — lean default + active packs)
+<software-engineer · qa-test · reviewer-critic · lead-architect · documentation  + pack roles>
+Loop: `delivery-os/core/OPERATING-LOOP.md` · DoD: `delivery-os/core/DEFINITION-OF-DONE.md` · Author≠verifier (CODEOWNERS).
+Consequential decision → run `principle-11-review` (Governance §11). The router **points, it never adjudicates.**
+
+## 7. Worlds  — *what other projects exist?*  (POINTERS only — `../ecosystem-architecture/` OWNS these facts; declare only MY OWN edges)
+| World | Path | My edge (what I consume / expose) | Governing fact |
+|---|---|---|---|
+| ecosystem-architecture | ../ecosystem-architecture/ | registered-in (portfolio truth; governs all) | README |
+| delivery-os | ./delivery-os/ | I follow it (execution standard) | — |
+| <sibling project> | <../path/> | <consume X / expose Y> | <ECR-xxxx / 06 / 05> |
+
+## 8. Sources of Truth  — *what ecosystem documents matter?*  (one home per concern; this router caches none of it)
+| Concern | Canonical home |
+|---|---|
+| Business truth (what/mission/north-star/invariants) | docs/PROJECT-BRIEF · PROJECT-MISSION · NORTH-STAR |
+| Owns/consumes, no-two-owner rule, glossary | ../ecosystem-architecture/06-source-of-truth-registry.md · 10-shared-business-entities.md |
+| Cross-project decisions | ../ecosystem-architecture/decisions/ECR-*.md |
+| How we build (loop, DoD, governance, packs) | delivery-os/ |
+| <project-specific concerns> | <doc paths> |
+
+## 9. Active Now  — *what is currently active?*
+**Phase: discovery.** FIRST RESPONSIBILITY (before any roadmap/ADR/architecture/code): run the `discovery-interview` skill → generate + founder-approve `docs/PROJECT-BRIEF·MISSION·NORTH-STAR`, then run `ecosystem-alignment-review`; gate on `delivery-os/discovery/PROJECT-DISCOVERY-CHECKLIST.md`.
+*(After the gate clears, replace this with the current phase + live gate + what's blocked, pointing to `docs/STATUS.md`.)*

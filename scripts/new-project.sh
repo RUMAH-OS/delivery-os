@@ -12,7 +12,7 @@ PROJECT="${1:?Project name required}"
 PACKS="${2:-}"
 DOS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # delivery-os root
 
-mkdir -p .claude/agents docs/adr
+mkdir -p .claude/agents .claude/skills docs/adr wiki
 
 # 1. Lean-default agents (always)
 for a in software-engineer qa-test reviewer-critic lead-architect documentation; do
@@ -31,6 +31,12 @@ for p in "${LIST[@]}"; do case "$(echo "$p" | xargs)" in
   api-first)           add domain--api-integration; add domain--database-data; add domain--security-compliance;;
   ai-product)          add domain--ai-product; add domain--database-data; add domain--api-integration;;
   "" ) ;; *) echo "WARN: unknown pack '$p' (skipped)";; esac; done
+
+# 2b. Skills (v3 — callable capabilities via the native .claude/skills mechanism)
+for s in discovery-interview grill-me migration-assessment principle-11-review production-readiness-review ecosystem-alignment-review; do
+  mkdir -p ".claude/skills/$s"
+  cp "$DOS/skills/$s/SKILL.md" ".claude/skills/$s/SKILL.md"
+done
 
 # 3. CODEOWNERS (structural author != verifier)
 cat > CODEOWNERS <<'EOF'
@@ -57,32 +63,17 @@ cp "$DOS/templates/release-readiness.md" docs/release-readiness.md
 cp "$DOS/templates/ADR-template.md"     docs/adr/0000-template.md
 sed -i.bak "s/<PROJECT>/$PROJECT/g" docs/*.md 2>/dev/null || true; rm -f docs/*.bak
 
-# 5. CLAUDE.md — encodes "discovery first" so Claude knows it in every session
-cat > CLAUDE.md <<EOF
-# $PROJECT
-
-This project follows **Delivery OS** (\`delivery-os/\`). Agents: \`.claude/agents/\`.
-Packs: ${PACKS:-none}. Loop: \`delivery-os/core/OPERATING-LOOP.md\`; Definition of Done:
-\`delivery-os/core/DEFINITION-OF-DONE.md\` + the active pack rows.
-
-## FIRST RESPONSIBILITY (before any roadmap, ADR, architecture, or code)
-Run **Project Discovery & Alignment** (\`delivery-os/discovery/DISCOVERY-WORKFLOW.md\`):
-1. Conduct the Founder Discovery Interview (\`delivery-os/discovery/FOUNDER-INTERVIEW.md\`) —
-   ask, reflect back, **do not assume**; mark unknowns \`TBD — to confirm\`.
-2. Generate \`docs/PROJECT-BRIEF.md\`, \`docs/PROJECT-MISSION.md\`, \`docs/NORTH-STAR.md\`
-   from the founder's answers; get approval on each.
-3. Review Ecosystem alignment (entities owned vs consumed; source-of-truth; dependencies).
-4. Gate on \`delivery-os/discovery/PROJECT-DISCOVERY-CHECKLIST.md\`.
-**Only after those are approved** may you create the roadmap, ADRs, and architecture.
-
-## Always-on rules
-Author ≠ verifier (CODEOWNERS). Honest failure (no false success). Irreversible actions
-are human-gated. One source of truth per entity. De-risk early. Evidence over assumptions.
-EOF
+# 5. CLAUDE.md — the v3 ROUTER (the single entrypoint) + wiki index, from templates
+cp "$DOS/templates/CLAUDE.md.template"      CLAUDE.md
+cp "$DOS/templates/wiki/_index.md.template" wiki/_index.md
+sed -i.bak "s/<PROJECT>/$PROJECT/g" CLAUDE.md wiki/_index.md 2>/dev/null || true
+rm -f CLAUDE.md.bak wiki/_index.md.bak
+# The router is discovery-first by default (template §9). The discovery-interview skill fills §1–3.
 
 echo "✓ Scaffolded '$PROJECT' (packs: ${PACKS:-none})"
 echo "  .claude/agents/: $(ls .claude/agents | tr '\n' ' ')"
-echo "  wrote CLAUDE.md (discovery-first) + docs/{PROJECT-BRIEF,PROJECT-MISSION,NORTH-STAR}.md stubs"
+echo "  .claude/skills/: $(ls .claude/skills | tr '\n' ' ')"
+echo "  wrote CLAUDE.md (v3 router, discovery-first) + wiki/_index.md + docs/{PROJECT-BRIEF,PROJECT-MISSION,NORTH-STAR}.md stubs"
 echo ""
 echo "NEXT — do NOT jump to roadmap/architecture. Start the discovery phase:"
 echo "  Tell Claude: \"Install Delivery OS and initialize this repository.\""
