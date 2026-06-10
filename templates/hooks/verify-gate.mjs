@@ -23,11 +23,14 @@ const STATE = join(ROOT, ".claude", ".verify-state.json");
 const CONFIG = join(ROOT, ".claude", ".verify-config.json");
 const VERIFY_DIRS = ["docs/verify", "docs"];
 
-// Implementation surfaces the gate protects. Everything else (tests, docs, evals, config) is exempt.
-// A consumer whose "implementation" is not under src/ (e.g. THIS framework, whose implementation is
-// scripts/ + templates/hooks/) extends the surface via .claude/.verify-config.json { "impl_extra": [...] }.
-const IMPL_BASE = /^(src|app|lib|api|migrations|db|packages\/[^/]+\/src)\//;
-const NONIMPL = /(^|\/)(tests?|e2e|evals|docs|\.claude)\/|\.(test|spec)\.|\.md$/;
+// Implementation surfaces the gate protects. Everything else (tests, docs, evals, build output) is exempt.
+// MONOREPO-AWARE by default: root-level src/app/lib/api/migrations/db AND the whole apps/<name>/ and
+// packages/<name>/ trees (Next.js / Turborepo / pnpm-workspace layouts — e.g. apps/web/lib, apps/worker/src).
+// Errs toward over-protection (a config change in a package needs a VERIFY) because fail-closed beats
+// silent under-protection. A consumer whose implementation lives elsewhere (e.g. THIS framework, under
+// scripts/ + templates/) extends the surface via .claude/.verify-config.json { "impl_extra": [...] }.
+const IMPL_BASE = /^(src|app|lib|api|migrations|db)\/|^(apps|packages|services)\/[^/]+\//;
+const NONIMPL = /(^|\/)(tests?|e2e|evals|docs|\.claude|node_modules|dist|build|\.next|out|coverage)\/|\.(test|spec)\.|\.md$/;
 function loadImplExtra() {
   try { const c = JSON.parse(readFileSync(CONFIG, "utf8")); return Array.isArray(c.impl_extra) ? c.impl_extra : []; }
   catch { return []; }
