@@ -1,14 +1,14 @@
-# Delivery OS — Router (reference router; NOT yet a self-hosted kernel)
+# Delivery OS — Router (self-hosted kernel; the framework dogfoods its own gate)
 
 > Delivery OS v3 router: the single entrypoint. It **ANSWERS or POINTS, never restates.**
-> This is the framework's **reference router** — the live instance of `templates/CLAUDE.md.template`.
-> **Honest status (corrected after the 2026-06-10 adversarial review):** this is a router *document*,
-> not a running kernel. The framework does **not** yet self-install the verify-gate (`no delivery-os/.claude/`,
-> no installed hook), so it does **not** dogfood its own §12 gate. That is open fidelity debt (§9), not a
-> claim of compliance. A kernel is load-bearing and derived-from-disk; this file is hand-maintained and can
-> drift — treat it as navigation, not enforcement.
+> This is the framework's live kernel — the reference instance of `templates/CLAUDE.md.template`.
+> **Honest status (as of v3.3, dogfood-proven):** the framework now **self-installs and runs its own
+> verify-gate** (`delivery-os/.claude/` with the hook + `core.hooksPath` pre-push). §5/§6/§9 below are
+> **derived from disk** by `.claude/tools/render-kernel.mjs`; `.claude/tools/check-os-drift.mjs` blocks a
+> push if they advertise anything not on disk. Evidence: `docs/verify/VERIFY-step3-dogfood.md`,
+> `docs/verify/VERIFY-framework-update.md`. The framework consumes the same architecture it ships.
 > If this file disagrees with a canonical source under `core/`, the **canonical source wins — fix this file.**
-> Last reconciled: 2026-06-10 (v3.1).
+> Last reconciled: 2026-06-10 (v3.3).
 
 ## 1. Identity  — *what is this?*
 **Delivery OS** — a reusable **AI operating system / delivery framework** for building software with Claude: a navigation **kernel** (this router + skills + wiki) over an intact **execution spine** (loop · DoD · governance · packs). Distilled clean-room from two real projects; **names no project except in `case-studies/`**. → `README.md`, `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md`
@@ -63,7 +63,7 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 | AI-OS mapping + every deviation's burden of proof | `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md` |
 
 ## 9. Active Now  — *what is currently active?*
-**Verification status (derived from disk, §12):** os_version `v3.2` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
+**Verification status (derived from disk, §12):** os_version `v3.3` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
 **Phase: framework maintenance.** **Version: v3.1** (verification enforcement — §12 + verify-gate hook).
 **Open gates / in-flight:**
 - `fix/operationalize-author-verifier` — v3.1 verify-gate (hook dogfood-tested in isolation; **not yet caught a real turn in a live project**; not merged — awaiting ratification).

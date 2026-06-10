@@ -73,12 +73,19 @@ cp "$DOS/templates/release-readiness.md" docs/release-readiness.md
 cp "$DOS/templates/ADR-template.md"     docs/adr/0000-template.md
 sed -i.bak "s/<PROJECT>/$PROJECT/g" docs/*.md 2>/dev/null || true; rm -f docs/*.bak
 
-# 5. CLAUDE.md — the v3 ROUTER (the single entrypoint) + wiki index, from templates
+# 5. CLAUDE.md — the v3 ROUTER (the single entrypoint) + wiki index + frontmatter contract, from templates
 cp "$DOS/templates/CLAUDE.md.template"      CLAUDE.md
 cp "$DOS/templates/wiki/_index.md.template" wiki/_index.md
+cp "$DOS/templates/wiki/FRONTMATTER-CONTRACT.md" wiki/FRONTMATTER-CONTRACT.md   # the wiki contract travels WITH the project
 sed -i.bak "s/<PROJECT>/$PROJECT/g" CLAUDE.md wiki/_index.md 2>/dev/null || true
 rm -f CLAUDE.md.bak wiki/_index.md.bak
 # The router is discovery-first by default (template §9). The discovery-interview skill fills §1–3.
+
+# 5b. Vendor the DOCTRINE (copied-base) so the router's delivery-os/core|discovery pointers RESOLVE
+#     (mechanism/policy §13, operating loop, DoD, governance, the discovery gate travel WITH the project).
+mkdir -p delivery-os
+cp -r "$DOS/core"      delivery-os/core
+cp -r "$DOS/discovery" delivery-os/discovery 2>/dev/null || true
 
 # 6. Verify-gate (Governance §12) + the AI-OS mechanisms — installed so a project INHERITS them automatically.
 mkdir -p .claude/hooks .githooks docs/verify
@@ -91,8 +98,10 @@ chmod +x .githooks/pre-push 2>/dev/null || true
 cp "$DOS/templates/tools/os-sync.mjs"        .claude/tools/os-sync.mjs
 cp "$DOS/templates/tools/check-os-drift.mjs" .claude/tools/check-os-drift.mjs
 cp "$DOS/templates/tools/render-kernel.mjs"  .claude/tools/render-kernel.mjs
-printf '{"baseline_ts":0,"impl_extra":[]}' > .claude/.verify-state.json
-printf '{"impl_extra":[]}' > .claude/.verify-config.json   # extend impl surface here if implementation lives outside src/
+printf '{"baseline_ts":0}' > .claude/.verify-state.json
+# record the OS VERSION CONSUMED (the version boundary) — os-sync stamps this into .verify-state.json
+OS_VERSION="$(git -C "$DOS" describe --tags --always 2>/dev/null || echo untagged)"
+printf '{"impl_extra":[],"os_version":"%s"}' "$OS_VERSION" > .claude/.verify-config.json   # extend impl_extra if implementation lives outside src/
 git config core.hooksPath .githooks   # committed pre-push fires for ANY git client (model-independent)
 
 # 6a-ops. Build the live kernel from disk: base+overlay → .claude/agents/, render §5/§6/§9, stamp os_version.
@@ -112,6 +121,9 @@ for f in .claude/settings.json .claude/hooks/verify-gate.mjs .githooks/pre-push 
   [ -f "$f" ] || { echo "FATAL: AI-OS mechanism not installed ($f missing). Aborting (Governance §12)."; exit 1; }
 done
 [ -d .claude/base/agents ] || { echo "FATAL: base+overlay not wired (.claude/base/agents missing). Aborting."; exit 1; }
+[ -f delivery-os/core/GOVERNANCE.md ]   || { echo "FATAL: doctrine not vendored (delivery-os/core/GOVERNANCE.md missing) — router pointers would dangle. Aborting."; exit 1; }
+[ -f wiki/FRONTMATTER-CONTRACT.md ]      || { echo "FATAL: wiki contract not installed. Aborting."; exit 1; }
+grep -q '"os_version"' .claude/.verify-config.json || { echo "FATAL: OS version boundary not recorded. Aborting."; exit 1; }
 
 echo "✓ Scaffolded '$PROJECT' (packs: ${PACKS:-none})"
 echo "  git: initialized · branches main+dev · verify-gate + drift-lint enforced (.claude/settings.json + .githooks/pre-push)"

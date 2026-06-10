@@ -42,7 +42,11 @@ for (const f of bases) {
 
 const statePath = join(ROOT, ".claude", ".verify-state.json");
 let state = {}; try { state = JSON.parse(readFileSync(statePath, "utf8")); } catch {}
-state.os_version = osVersion();
+// The stamp records the OS VERSION CONSUMED. A consumer's own repo has no OS tags, so the
+// scaffolder records the OS version in .verify-config.json (os_version); use it when present.
+// The framework self-syncing has no such config key → falls back to its own git tags (correct).
+let cfg = {}; try { cfg = JSON.parse(readFileSync(join(ROOT, ".claude", ".verify-config.json"), "utf8")); } catch {}
+state.os_version = cfg.os_version || osVersion();
 ensure(statePath); writeFileSync(statePath, JSON.stringify(state));
 
 console.log(`os-sync: ${copied} base + ${merged} overlay → .claude/agents/ (os_version=${state.os_version})`);
