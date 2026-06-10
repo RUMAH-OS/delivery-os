@@ -33,11 +33,13 @@
 | principle-11-review | independent multi-lens review of a consequential decision | <stable> |
 | production-readiness-review | pre-release/cutover go/no-go | <stable> |
 | ecosystem-alignment-review | owns/consumes vs registry; ECR conflicts | <stable> |
+| verify-gate | produce/check a slice's independent VERIFY artifact; diagnose a gate block (§12) | <stable> |
 
 ## 6. Agents  — *where are the agents?*  (`.claude/agents/` — lean default + active packs)
 <software-engineer · qa-test · reviewer-critic · lead-architect · documentation  + pack roles>
 Loop: `delivery-os/core/OPERATING-LOOP.md` · DoD: `delivery-os/core/DEFINITION-OF-DONE.md` · Author≠verifier (CODEOWNERS).
 Consequential decision → run `principle-11-review` (Governance §11). The router **points, it never adjudicates.**
+**Always-on (Governance §12):** no implementation slice may be reported as progress/done in the **same turn it was authored** — it needs an independent `docs/verify/VERIFY-<slice>.md` (verify_status: verified, author ≠ verifier). The verify-gate hook (`.claude/settings.json`) enforces this; `generated`/`executed` are not `verified`.
 
 ## 7. Worlds  — *what other projects exist?*  (POINTERS only — `../ecosystem-architecture/` OWNS these facts; declare only MY OWN edges)
 | World | Path | My edge (what I consume / expose) | Governing fact |
@@ -56,5 +58,6 @@ Consequential decision → run `principle-11-review` (Governance §11). The rout
 | <project-specific concerns> | <doc paths> |
 
 ## 9. Active Now  — *what is currently active?*
+**Verification status (derived, §12):** <current slice → verify_status: planned|generated|executed|verified> · **Open gates:** <…> · **Last independent review:** <VERIFY/DECISION-REVIEW path + date>.
 **Phase: discovery.** FIRST RESPONSIBILITY (before any roadmap/ADR/architecture/code): run the `discovery-interview` skill → generate + founder-approve `docs/PROJECT-BRIEF·MISSION·NORTH-STAR`, then run `ecosystem-alignment-review`; gate on `delivery-os/discovery/PROJECT-DISCOVERY-CHECKLIST.md`.
 *(After the gate clears, replace this with the current phase + live gate + what's blocked, pointing to `docs/STATUS.md`.)*

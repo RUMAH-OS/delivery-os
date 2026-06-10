@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Delivery OS — committed pre-push verify-gate (Governance §12).
+# Installed via `git config core.hooksPath .githooks` by scripts/new-project.sh, so it
+# travels in the repo and fires for ANY git client — the only fully model-independent layer.
+# Reuses the same detector as the Claude hook; a non-zero exit blocks the push.
+node .claude/hooks/verify-gate.mjs pre-commit <<'EOF'
+{ "tool_input": { "command": "git push" } }
+EOF
+# The hook emits a deny JSON on stdout when blocking; translate "deny" into a non-zero exit.
+if node .claude/hooks/verify-gate.mjs pre-commit <<'EOF' | grep -q '"permissionDecision":"deny"'
+{ "tool_input": { "command": "git push" } }
+EOF
+then
+  echo "✗ push blocked by Delivery OS verify-gate: no fresh, passing, independent VERIFY-<slice>.md for changed implementation files." >&2
+  echo "  (bootstrap/debug bypass: DELIVERY_OS_GATE_BYPASS=1 git push — logged)" >&2
+  exit 1
+fi
+exit 0

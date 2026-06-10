@@ -12,7 +12,17 @@ PROJECT="${1:?Project name required}"
 PACKS="${2:-}"
 DOS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # delivery-os root
 
-mkdir -p .claude/agents .claude/skills docs/adr wiki
+# 0. Git is the enforcement substrate (Governance §12: no git ⇒ CODEOWNERS/CI/verify-gate are inert).
+#    Fail closed — a scaffold that can't enforce author≠verifier must not be presented as ready.
+command -v git >/dev/null 2>&1 || { echo "FATAL: git not found. Delivery OS requires git (Governance §12)."; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "FATAL: node not found. The verify-gate hook requires Node."; exit 1; }
+if [ ! -d .git ]; then
+  git init -q
+  git symbolic-ref HEAD refs/heads/main 2>/dev/null || true   # default branch = main (protected/stable)
+fi
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "FATAL: git init failed."; exit 1; }
+
+mkdir -p .claude/agents .claude/skills .claude/hooks docs/adr docs/verify wiki
 
 # 1. Lean-default agents (always)
 for a in software-engineer qa-test reviewer-critic lead-architect documentation; do
@@ -33,7 +43,7 @@ for p in "${LIST[@]}"; do case "$(echo "$p" | xargs)" in
   "" ) ;; *) echo "WARN: unknown pack '$p' (skipped)";; esac; done
 
 # 2b. Skills (v3 — callable capabilities via the native .claude/skills mechanism)
-for s in discovery-interview grill-me migration-assessment principle-11-review production-readiness-review ecosystem-alignment-review; do
+for s in discovery-interview grill-me migration-assessment principle-11-review production-readiness-review ecosystem-alignment-review verify-gate; do
   mkdir -p ".claude/skills/$s"
   cp "$DOS/skills/$s/SKILL.md" ".claude/skills/$s/SKILL.md"
 done
@@ -70,7 +80,28 @@ sed -i.bak "s/<PROJECT>/$PROJECT/g" CLAUDE.md wiki/_index.md 2>/dev/null || true
 rm -f CLAUDE.md.bak wiki/_index.md.bak
 # The router is discovery-first by default (template §9). The discovery-interview skill fills §1–3.
 
+# 6. Verify-gate (Governance §12) — the ONLY enforcement that fires without the orchestrator choosing to.
+mkdir -p .claude/hooks .githooks docs/verify
+cp "$DOS/templates/hooks/verify-gate.mjs"   .claude/hooks/verify-gate.mjs
+cp "$DOS/templates/settings.json.template"  .claude/settings.json
+cp "$DOS/templates/VERIFY.md.template"      docs/verify/_TEMPLATE.md
+cp "$DOS/templates/githooks/pre-push"       .githooks/pre-push
+chmod +x .githooks/pre-push 2>/dev/null || true
+printf '{"baseline_ts":0}' > .claude/.verify-state.json
+git config core.hooksPath .githooks   # committed pre-push fires for ANY git client (model-independent)
+
+# 6b. Branch model: main (protected) + dev (active). Gated first commit.
+git add -A
+git commit -q -m "chore: scaffold Delivery OS v3 (verify-gate installed; Slice 0 NOT verified)" || true
+git rev-parse --verify dev >/dev/null 2>&1 || git branch dev 2>/dev/null || true
+
+# 6c. Fail closed — prove the gate is actually wired, or abort (a half-scaffold is not a project).
+for f in .claude/settings.json .claude/hooks/verify-gate.mjs .githooks/pre-push docs/verify/_TEMPLATE.md; do
+  [ -f "$f" ] || { echo "FATAL: verify-gate not installed ($f missing). Aborting (Governance §12)."; exit 1; }
+done
+
 echo "✓ Scaffolded '$PROJECT' (packs: ${PACKS:-none})"
+echo "  git: initialized · branches main+dev · verify-gate hook installed (.claude/settings.json + .githooks/pre-push)"
 echo "  .claude/agents/: $(ls .claude/agents | tr '\n' ' ')"
 echo "  .claude/skills/: $(ls .claude/skills | tr '\n' ' ')"
 echo "  wrote CLAUDE.md (v3 router, discovery-first) + wiki/_index.md + docs/{PROJECT-BRIEF,PROJECT-MISSION,NORTH-STAR}.md stubs"

@@ -4,6 +4,14 @@
 >
 > Ratified after three independent Principle-11 panels (proposal: `proposals/DELIVERY-OS-v3-PROPOSAL.md`, Revisions 2 & 3). Per-component AI-OS mapping + deviations: `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md`.
 
+## v3.1 — verification is operationally enforced, not remembered (2026-06-10)
+Triggered by a live failure: a *generated, unexecuted* scaffold was presented as progress with no independent verifier; v3 **documented** author≠verifier (§3) and §11 but did not **operationalize** them for the single-orchestrator / no-git case (`case-studies/2026-06-10-author-verifier-not-operationalized.md`). Ratified by a 5-lens Principle-11 panel on the framework itself. Added — **two structural controls that make six conventions real**:
+- **Governance §12** — "verification is operationally enforced": no-git⇒no-build, the verify-gate hook, the no-VCS author≠verifier fallback, derived (never self-asserted) `verify_status`, and the stated honest limit.
+- **The verify-gate hook** (`templates/hooks/verify-gate.mjs` + `templates/settings.json.template` + committed `templates/githooks/pre-push`) — the first mechanical enforcement plane in Delivery OS: blocks commit/push (`PreToolUse`) and turn-end (`Stop`) when implementation files change without a fresh, passing, independent `docs/verify/VERIFY-<slice>.md`.
+- **Scaffolder** (`scripts/new-project.sh`) now `git init`s, creates `main`/`dev`, installs the hook + `core.hooksPath`, and **fails closed** if the gate isn't wired.
+- **DoD row 4a** (verification artifact mandatory) + closed self-QA loophole · **status ladder** `planned→generated→executed→verified` (`core/DEFINITION-OF-DONE.md`, `core/OPERATING-LOOP.md`) · **router** always-on rule + verification-status line (`templates/CLAUDE.md.template`) · new **`verify-gate` skill**.
+- **Honest limit:** a hook proves an artifact *exists*; it cannot prove the verification was *truthful* in a single-agent runtime. The committed git hook + PR-with-a-second-reviewer remain the model-independent layers.
+
 ## The one rule the whole layer rests on
 **POINTS, never RESTATES.** An *address* is a pointer with no payload (allowed; near-zero drift). A *duplicate* is a payload with no owner (forbidden — a Governance §7 defect, and *more* to keep in sync = *more* cognitive load). Every v3 artifact line is an address, an owned-fact, or a named pointer.
 

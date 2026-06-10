@@ -9,12 +9,16 @@ Implement → Commit (hash) → Independent QA → Domain Review → Documentati
 - **Deterministic-spine-first.** When a system has a deterministic core (scoring, money math, state machine) and a probabilistic/AI or integration layer, **prove the deterministic spine in isolation first** (no AI, no third party), then layer the rest on the *unchanged* spine.
 - **No empty speculative folders.** Build only what the slice needs; earn structure when a slice requires it.
 
-## Status vocabulary (anti "premature done")
-| Who | May assert |
-|---|---|
-| Software Engineer | **"ready for QA"** — never "done" |
-| QA / Test | **"verified"** — the only role that can |
-| Merge (human) | **"done"** — only a merge makes it done |
+## Status vocabulary (anti "premature done") — derived, never self-asserted
+Each slice carries `verify_status: planned → generated → executed → verified`, **computed by the verify-gate from evidence** (Governance §12, full table in `DEFINITION-OF-DONE.md`). The role assertions ride on it:
+
+| Who | May assert | Caps the slice at |
+|---|---|---|
+| Software Engineer | **"ready for QA"** — never "done" | `generated` (code exists) / `executed` (it ran) |
+| QA / Test (≠ author) | **"verified"** — the only role that can, and only with a fresh passing `VERIFY-<slice>.md` | `verified` |
+| Merge (human) | **"done"** — only a merge makes it done | done |
+
+**`generated` ≠ `executed` ≠ `verified`.** A scaffold that compiles is `generated`; code that *ran* with captured output is `executed`; only an independent lens confirming acceptance on the slice's **real surface** earns `verified`. The builder may not report "done" while the derived status is below `verified`.
 
 ## The roles in the loop
 `implement (Engineer) → validate (QA, owns tests/evals) → conformance + simplicity + scope (Reviewer/Critic) → stakeholder acceptance (human) → merge (human)`
@@ -34,6 +38,9 @@ The loop does not end at "Status." Before **Continue**, route what the slice tau
 | A canonical fact changed | update the canonical doc, then refresh the `CLAUDE.md` pointer + `last_verified` |
 
 **Memory is the universal inbox, never the final home** — the write-back step empties it into the correct durable store and leaves a one-line pointer. **Cross-project facts never land in the wiki.** Freshness is visible, not silent: a wiki page past its `last_verified` cadence is flagged `stability: stale` and surfaces in the periodic **context-hygiene** pass (a milestone-boundary review that re-confirms `source_of_truth:` pointers resolve, harvests `learnings/` into stable pages/Skills, and re-checks staleness). Where a project has no CI, hygiene is a manual checklist item — honest, not hidden.
+
+## The verify-gate (mechanical — Governance §12)
+The loop's status transitions are not honor-system. A scaffolder-installed `.claude/settings.json` hook fires **without the builder choosing to**: it blocks `git commit`/`git push` (`PreToolUse`) and turn-end (`Stop`) whenever implementation files (`src/ app/ lib/ api/ migrations/ db/`) changed without a **fresh, passing, independent** `docs/verify/VERIFY-<slice>.md`, and warns on each implementation write (`PostToolUse`). A committed `.githooks/pre-push` backstops it for any git client. This is what converts "ready for QA → verified" from a remembered step into a system behavior.
 
 ## Irreversible-action gate
 Merges **and** outward/irreversible business actions (sending, charging, publishing, migrating, deleting) require **explicit human approval**. Automated/AI agents **draft**, they do not act. (See `core/GOVERNANCE.md`.)

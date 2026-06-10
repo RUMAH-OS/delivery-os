@@ -1,0 +1,58 @@
+---
+slice: "<id> — <title>"
+verify_status: executed        # planned | generated | executed | verified  (verifier sets 'verified' only when ALL below pass)
+author: "<who/what AUTHORED the code under test — agent id / session / human>"
+verifier: "<who/what RAN this verification — MUST differ from author (Governance §3/§12)>"
+date: "<YYYY-MM-DD>"
+independence_basis: "codeowners-PR | recorded-distinct-invocation"   # how author≠verifier is proven here
+---
+
+# VERIFY — Slice <id> <title>
+
+## Verdict
+**verify_status:** `executed`  ·  one line: <why this verdict>
+> A verdict of `verified` is permitted ONLY if: every acceptance criterion PASSes on its OWN surface,
+> every load-bearing claim is Confirmed/Evidence-backed, all required gates are closed, and the
+> verifier was a REAL distinct lens from the author. Otherwise the slice caps at `executed`.
+
+## Independence header  (Governance §3/§12 — proves author ≠ verifier)
+- Verifier identity / invocation: <distinct agent id · session · timestamp — NOT the build session>
+- Author identity (code under test): <id/session>
+- [ ] I assert: the verifier did **not** author the production code under test.
+- [ ] Independence was **real** (a true second invocation, not the same context restyled). If not → mark non-independent; status caps at `executed`.
+
+## Execution evidence  (Governance §1 — direct runtime output, never a description of what *would* happen)
+| # | Command | Exit | Output (verbatim / log path) |
+|---|---------|------|------------------------------|
+| 1 | `<cmd>` | 0 | `<actual stdout/stderr>` |
+> A row with no command + real output is not evidence. Prose is not evidence.
+
+## Acceptance criteria  (copied verbatim from the slice — each PASS/FAIL + its evidence pointer)
+| # | Criterion | Surface exercised | Evidence (→ cmd #) | PASS/FAIL |
+|---|-----------|-------------------|--------------------|-----------|
+| 1 | <…> | <HTTP→running app / imports src / fresh-DB migration> | #n | PASS/FAIL |
+> A criterion whose evidence does NOT touch its own surface is FAIL — regardless of a green check.
+> (Slice-1.0 lesson: raw SQL does not verify an API criterion; DDL-only does not verify app behavior.)
+
+## Surface statement  (anti-Slice-1.0)
+- The slice's real surface: <app / API / migration>. Driven by: <how the tests reach it>.
+- [ ] No criterion was "verified" via a surface that bypasses the slice (e.g. raw SQL for an app criterion; reading code instead of running it).
+
+## Classified open assumptions  (every claim the verdict rests on)
+| Claim | Confirmed / Evidence-backed / Assumption / Unverified / Failed | Severity |
+|-------|---------------------------------------------------------------|----------|
+| <…> | <…> | Blocker / Should-fix / Safe-to-defer |
+> ANY load-bearing claim not Confirmed/Evidence-backed → status caps at `executed`.
+
+## Gate ledger  (DoD core rows + active pack rows — each ✅ needs an evidence pointer; ⬜/🔴 are honest)
+| Gate | Status | Evidence |
+|------|--------|----------|
+| Build/validate green | ✅/⬜/🔴 | <→cmd #> |
+| Dedicated commit + slice id (or NO-GIT flagged) | … | <hash> |
+| CI green (in cloud) | … | … |
+| Migration reversible + applies-clean-on-fresh-DB + rollback rehearsed | … | … |
+| Failure paths → honest error, no false success | … | … |
+| <pack rows: RBAC/authz · evals+grounding · canonical · money-idempotent> | … | … |
+
+## Bug reports  (defects flow author-ward — the verifier files, never fixes)
+1. [Severity] <defect> — repro: <…>  → back to the author.
