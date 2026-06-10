@@ -1,0 +1,28 @@
+{
+  "_comment": "Delivery OS verify-gate (Governance §12). Installed by scripts/new-project.sh into .claude/settings.json. The ONLY enforcement element that fires without the orchestrator choosing to.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/verify-gate.mjs pre-commit" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/verify-gate.mjs post-write" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/verify-gate.mjs stop" }
+        ]
+      }
+    ]
+  }
+}

@@ -32,13 +32,13 @@ Delivery OS keeps its durable knowledge as **append-only history**, not a projec
 ## 5. Skills  — *what can be called?*  (`skills/<name>/SKILL.md` — the framework's own verbs)
 | Skill | Use when | Status |
 |---|---|---|
-| discovery-interview | founder discovery → BRIEF/MISSION/NORTH-STAR | stable |
-| grill-me | adversarial follow-up to confidence thresholds | experimental |
-| migration-assessment | read-only audit + capability register of an existing system | stable |
-| principle-11-review | independent multi-lens review of a consequential decision | stable |
-| production-readiness-review | pre-release / cutover go/no-go | stable |
-| ecosystem-alignment-review | owns/consumes vs registry; ECR conflicts | stable |
-| verify-gate | produce/check a slice's independent VERIFY artifact; diagnose a gate block (§12) | stable |
+| discovery-interview | Conduct the Founder Discovery Interview and generate PROJECT-BRI | stable |
+| ecosystem-alignment-review | Cross-check a project's owned/consumed entities against the ecos | stable |
+| grill-me | Adversarial, deep follow-up interview that pushes each load-bear | experimental |
+| migration-assessment | Read-only, capability-by-capability audit of an existing/inherit | stable |
+| principle-11-review | Run an independent multi-lens review of a CONSEQUENTIAL decision | stable |
+| production-readiness-review | Pre-release / pre-cutover go/no-go | stable |
+| verify-gate | Operationalizes author≠verifier (Governance §12) | stable |
 
 ## 6. Agents  — *who does the work?*  (`agents/` — lean default + pack roles)
 software-engineer · qa-test · reviewer-critic · lead-architect · documentation  +  pack roles (security-compliance · database-data · api-integration · ai-product · seo · design-parity).
@@ -63,6 +63,7 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 | AI-OS mapping + every deviation's burden of proof | `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md` |
 
 ## 9. Active Now  — *what is currently active?*
+**Verification status (derived from disk, §12):** os_version `v3.1-6-gc80520c` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
 **Phase: framework maintenance.** **Version: v3.1** (verification enforcement — §12 + verify-gate hook).
 **Open gates / in-flight:**
 - `fix/operationalize-author-verifier` — v3.1 verify-gate (hook dogfood-tested in isolation; **not yet caught a real turn in a live project**; not merged — awaiting ratification).

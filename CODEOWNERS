@@ -1,0 +1,10 @@
+# Delivery OS dogfoods author≠verifier on itself. Handles back .claude/agents/* files.
+*                    @software-engineer
+/scripts/            @software-engineer
+/templates/          @software-engineer
+/core/               @owner
+/proposals/          @owner
+/docs/               @owner
+/docs/verify/        @qa-test
+/CODEOWNERS          @owner
+/CLAUDE.md           @owner
