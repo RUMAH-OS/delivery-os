@@ -1,18 +1,23 @@
 #!/usr/bin/env sh
-# Delivery OS — committed pre-push verify-gate (Governance §12).
-# Installed via `git config core.hooksPath .githooks` by scripts/new-project.sh, so it
-# travels in the repo and fires for ANY git client — the only fully model-independent layer.
-# Reuses the same detector as the Claude hook; a non-zero exit blocks the push.
-node .claude/hooks/verify-gate.mjs pre-commit <<'EOF'
-{ "tool_input": { "command": "git push" } }
-EOF
-# The hook emits a deny JSON on stdout when blocking; translate "deny" into a non-zero exit.
-if node .claude/hooks/verify-gate.mjs pre-commit <<'EOF' | grep -q '"permissionDecision":"deny"'
-{ "tool_input": { "command": "git push" } }
-EOF
-then
-  echo "✗ push blocked by Delivery OS verify-gate: no fresh, passing, independent VERIFY-<slice>.md for changed implementation files." >&2
+# Delivery OS — committed pre-push gate (Governance §12). Installed via
+# `git config core.hooksPath .githooks`, so it travels in the repo and fires for ANY git
+# client — the model-independent backstop. It inspects the COMMITTED PUSH RANGE (not the
+# working tree), so a change committed via bare git and pushed with a clean tree is still caught.
+# Git feeds ref lines on stdin; pass them straight to the gate in pre-push mode.
+
+# Gate 1 — verify-gate over the push range: impl changes need a verified, independent VERIFY in the push.
+if ! cat | node .claude/hooks/verify-gate.mjs pre-push; then
+  echo "✗ push blocked by Delivery OS verify-gate: the pushed commits change implementation files" >&2
+  echo "  without a verified, independent docs/verify/VERIFY-<slice>.md in the push." >&2
   echo "  (bootstrap/debug bypass: DELIVERY_OS_GATE_BYPASS=1 git push — logged)" >&2
   exit 1
+fi
+
+# Gate 2 — drift-lint: the kernel must not advertise a skill/agent it cannot dispatch.
+if [ -f .claude/tools/check-os-drift.mjs ]; then
+  if ! node .claude/tools/check-os-drift.mjs >&2; then
+    echo "✗ push blocked by Delivery OS drift-lint: router/CODEOWNERS advertises something not on disk." >&2
+    exit 1
+  fi
 fi
 exit 0

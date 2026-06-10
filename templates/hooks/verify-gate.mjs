@@ -35,7 +35,8 @@ function loadImplExtra() {
 const IMPL_EXTRA = loadImplExtra();
 const isImpl = (f) => IMPL_BASE.test(f) || IMPL_EXTRA.some((p) => f.startsWith(p));
 
-const readStdin = () => { try { return JSON.parse(readFileSync(0, "utf8")); } catch { return {}; } };
+const RAWIN = (() => { try { return readFileSync(0, "utf8"); } catch { return ""; } })();
+const readStdin = () => { try { return JSON.parse(RAWIN); } catch { return {}; } };
 const hasGit = () => { try { execSync("git rev-parse --git-dir", { stdio: "ignore" }); return true; } catch { return false; } };
 const mtime = (p) => { try { return statSync(p).mtimeMs; } catch { return 0; } };
 
@@ -69,6 +70,15 @@ function walk(dir, acc = []) {
 }
 
 // --- find a fresh, passing, independent VERIFY artifact ---
+function fmText(txt) {
+  const m = (txt || "").match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const fm = {};
+  if (m) for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([a-z_]+):\s*(.+?)\s*$/i);
+    if (kv) fm[kv[1].toLowerCase()] = kv[2].replace(/^["']|["']$/g, "");
+  }
+  return fm;
+}
 function frontmatter(file) {
   let txt = ""; try { txt = readFileSync(file, "utf8"); } catch { return {}; }
   const m = txt.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -139,6 +149,39 @@ try {
   if (MODE === "stop") {
     const impl = changedImpl();
     if (impl.length && !freshPassArtifact(impl)) emit({ decision: "block", reason: blocked(impl) });
+    process.exit(0);
+  }
+
+  if (MODE === "pre-push") {
+    // git feeds ref lines on stdin: "<localRef> <localSha> <remoteRef> <remoteSha>".
+    // The model-independent backstop: inspect the COMMITTED push RANGE (not the working tree),
+    // so a change committed via bare git and pushed with a clean tree is still caught.
+    const Z = /^0+$/;
+    const sh = (cmd) => { try { return execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
+    const changed = new Set(); let tip = "HEAD";
+    for (const line of RAWIN.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
+      const [, localSha, , remoteSha] = line.split(/\s+/);
+      if (!localSha || Z.test(localSha)) continue;            // ref deletion
+      tip = localSha;
+      let files = "";
+      if (remoteSha && !Z.test(remoteSha)) files = sh(`git diff --name-only ${remoteSha} ${localSha}`);
+      else {                                                   // new ref: commits not already on a remote
+        const commits = sh(`git rev-list ${localSha} --not --remotes`).split("\n").map((s) => s.trim()).filter(Boolean);
+        for (const c of commits) files += sh(`git show --name-only --pretty=format: ${c}`) + "\n";
+      }
+      files.split("\n").map((s) => s.trim()).filter(Boolean).forEach((f) => changed.add(f));
+    }
+    const all = [...changed];
+    const impl = all.filter((f) => isImpl(f) && !NONIMPL.test(f));
+    if (!impl.length) process.exit(0);
+    // a verified, independent VERIFY artifact must be part of the pushed tree (read at the tip commit)
+    const verifyPaths = all.filter((f) => /VERIFY-.*\.md$/i.test(f));
+    let ok = false;
+    for (const vp of verifyPaths) {
+      const fm = fmText(sh(`git show ${tip}:${vp}`));
+      if (String(fm.verify_status).toLowerCase() === "verified" && fm.author && fm.verifier && fm.author !== fm.verifier) { ok = true; break; }
+    }
+    if (!ok) { process.stderr.write(blocked(impl) + "\n"); process.exit(1); }
     process.exit(0);
   }
 } catch (err) {
