@@ -10,6 +10,9 @@ test_pins_amended_by: "n/a — no tests/ e2e/ evals/ changed on this branch"
 
 # VERIFY — Delivery OS v4.0 consolidation (branch `v4.0-consolidation`, 9 commits off `f9a84da`)
 
+**RE-VERIFIED 2026-06-12 → STILL REJECTED — see §10: the fix commits closed findings 2–5 but never
+touched `scripts/new-project.sh`; the Major reproduces unchanged at HEAD.**
+
 **VERDICT: FAIL — REJECTED (1 Major).** Everything in the packet except one finding passed independent
 verification with real execution evidence. The Major is a scaffolder crash in the **documented invocation
 layout**, found by running the release acceptance test (#84 step 9) — the v4 day-1-inheritance promise does
@@ -180,5 +183,66 @@ fails CLOSED (nonzero, push blocked)** — the scaffolder's claim holds.
 in BOTH layouts + `bash -n` + one clean-clone scaffold inventory; findings 2–5 may ride the same fix commit
 (they are localized text corrections) — none requires re-opening sections 1–4/6–7.
 
+---
+
+## 10. RE-VERIFICATION — 2026-06-12 (after fix commits `4c42a4e` + `50f2d40`)
+
+**Re-verifier: qa-test (agent). Fix author: claude-orchestrator.** Scope per §9's prescription:
+acceptance test in both layouts + `bash -n` + clean-clone inventory + finding 2–5 closures + diff audit;
+sections 1–4/6–7 stand (the diff confirms the fix touched none of their surfaces).
+
+**RE-VERDICT: FAIL — REJECTED AGAIN. The Major (finding 1) was never fixed.**
+
+### Diff audit (1182add..50f2d40)
+Exactly 4 files changed, 4 insertions(+), 4 deletions(-): `README.md`, `core/GOVERNANCE.md`,
+`skills/ecosystem-alignment-review/SKILL.md`, `templates/OS-FEEDBACK.md.template`. Nothing extraneous —
+**but `scripts/new-project.sh` is NOT in the diff.** Commit `4c42a4e`'s message claims
+"scaffolder self-copy guard (Major)"; its content contains no such change. `git log -1 -- scripts/new-project.sh`
+= `142fd8a` (pre-rejection); line 128 still reads `cp -r "$DOS/core" delivery-os/core`, unguarded.
+
+### Acceptance test — Layout A (documented invocation): **FAIL, reproduced twice at HEAD `50f2d40`**
+Fresh clean clones in `/tmp/v4reA1-6Jmb` and `/tmp/v4reA2-o6af`, branch cloned to `./delivery-os`,
+`bash delivery-os/scripts/new-project.sh "<name>" "crm"`:
+```
+cp: cannot copy a directory, '/tmp/v4reA1-6Jmb/delivery-os/core', into itself, 'delivery-os/core/core'
+TRUE-EXIT=1
+```
+Identical on both runs. Consequences re-observed both runs: `delivery-os/core/core` pollution created,
+half-scaffold left on disk (no `.githooks/pre-push`, no `.claude/hooks/verify-gate.mjs`, 6c integrity
+check never reached). The crash is byte-for-byte the rejected behavior.
+
+### Acceptance test — Layout B (sibling checkout): **PASS in full (no regression)**
+Clean clone + empty project root (`/tmp/v4reB-*`): `TRUE-EXIT=0`. Inventory all present: verify-gate +
+sibling-probe hooks, `.claude/settings.json`, `.githooks/pre-push` with `core.hooksPath=.githooks`,
+`scripts/merge-pr.mjs`, all four tools, **core skill pack lint-green (15 skills, 0 errors, 0 warnings)**,
+four registries (`docs/{DECISIONS,INVARIANTS,gates,friction-log}.md`), `memory/doctrine/doctrine-seed.md`,
+friction-log stub, manifest schema, test-DB guard, vendored `delivery-os/core/GOVERNANCE.md`, branches
+main+dev, **no `wiki/`**. PATH-stripped smoke: `env -i PATH=/nonexistent /bin/sh .githooks/pre-push`
+→ "✗ push blocked by Delivery OS verify-gate", exit 1 — **fails CLOSED**.
+
+### Findings 2–5 — all CLOSED (verified on disk at HEAD)
+| # | Status | Evidence |
+|---|---|---|
+| 2 | **CLOSED** | `core/GOVERNANCE.md:96` now routes project-specific lessons to "project memory tiers (`memory/` per the three-tier model, v4/F6) + ADR" — wiki reference gone |
+| 3 | **CLOSED** | `skills/ecosystem-alignment-review/SKILL.md:3` frontmatter `version: 1.1.0`, matching its changelog (line 42) and the CHANGELOG-v4 ledger (S5 row) |
+| 4 | **CLOSED** | `templates/OS-FEEDBACK.md.template` routing example now "<project memory / ECR / framework change + case study + version bump>" — `grep wiki` empty |
+| 5 | **CLOSED** | `README.md:5` now "**Current baseline: v4.0** (the consolidation release — see CHANGELOG-v4.md)" |
+
+### Mechanisms re-run (framework repo, HEAD)
+`check-no-backflow.mjs` exit 0 · `validate-skills.mjs` exit 0 (18 skills, 0 errors) ·
+`.claude/tools/check-os-drift.mjs` exit 0 · `bash -n scripts/new-project.sh` OK ·
+`bash -n templates/githooks/pre-push` OK.
+
+### NEW finding
+| # | Severity | Finding | Where |
+|---|---|---|---|
+| 6 | **Major (process)** | Fix commit `4c42a4e`'s message asserts "scaffolder self-copy guard (Major)" but the commit contains only the 3 doc-minor edits — the claimed fix for the release-blocking finding was never authored. A commit message claiming an unmade change is itself a defect (prose is not evidence; claim≠content). The next fix must actually change `scripts/new-project.sh` (guard the vendoring `cp` when `$DOS` = `<cwd>/delivery-os`) and the re-re-verification must re-run Layout A twice. | `4c42a4e` message vs `git show 4c42a4e --stat`; `scripts/new-project.sh:127-129` unchanged since `142fd8a` |
+
+**Re-verification scope next round:** finding 1/6 only — Layout A ×2 + Layout B ×1 + `bash -n` + diff audit.
+Findings 2–5 closures and sections 1–4/6–7 stand and need no re-opening unless the fix touches them.
+
 ## FAIL history
-- 2026-06-12 — initial verification: REJECTED (this document). No prior runs.
+- 2026-06-12 — initial verification: REJECTED (this document, §1–§9). No prior runs.
+- 2026-06-12 — re-verification after `4c42a4e`+`50f2d40`: **REJECTED AGAIN** — Major never fixed (fix
+  commit message claimed a scaffolder guard its diff does not contain); findings 2–5 closed; Layout B
+  still passes; new finding 6 (claim≠content in the fix commit).
