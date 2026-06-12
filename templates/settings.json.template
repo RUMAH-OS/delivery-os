@@ -1,6 +1,13 @@
 {
-  "_comment": "Delivery OS verify-gate (Governance §12). Installed by scripts/new-project.sh into .claude/settings.json. The ONLY enforcement element that fires without the orchestrator choosing to.",
+  "_comment": "Delivery OS enforcement hooks (Governance §12 + §14 + §7). Installed by scripts/new-project.sh into .claude/settings.json. These fire without the orchestrator choosing to. v4 adds the SessionStart sibling probe (peer reality at session start — incident-5 class) ; the §14 review-artifact detector + N-merges backstop ride the verify-gate's pre-push mode via .githooks/pre-push.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/sibling-probe.mjs" }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

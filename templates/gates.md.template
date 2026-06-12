@@ -1,0 +1,17 @@
+# <PROJECT> — Gate Ledger (pre-committed evidence gates)
+
+> A gate is a pre-registered threshold ("when N reaches X, we decide/act Y") that rations building by
+> evidence. **Gates change by signature only — never by reinterpretation** (a gate was once quietly
+> reinterpreted instead of re-signed; and the gate itself turned out wrong with no honest way to say so).
+> **Unbuilt counters make gates fail silently by never firing** — every gate ships its live counter.
+
+## Rules (the evidence governor — Governance §15)
+- **Capture before the gate; consumers at gate-fire; build-ahead capped at one step.** Machinery consuming a gate's output is not built while the gate is unfired (recorded: a CLI + query pack + index built for a 6-item corpus while both gates sat unfired).
+- **Every gate has:** an owner · a live counter (N/threshold, surfaced where the operator works) · a **reconsideration date** (so a wrong gate can fail honestly instead of silently never firing).
+- **Panels MUST pre-read this ledger** before recommending machinery (Governance §11 refusal rule: inputs below their own gate ⇒ the panel refuses; design doc only).
+- Amendment = a new signature row, with the old threshold kept for the record.
+
+## Ledger
+| ID | Gate (threshold + what fires) | Live counter (N/threshold + where surfaced) | Owner | Signature + date | Reconsideration date | Status |
+|----|-------------------------------|---------------------------------------------|-------|------------------|----------------------|--------|
+| G-001 | <e.g. "≥10 replies → run the learning review"> | <query/surface> | <…> | <…> | <YYYY-MM-DD> | unfired / FIRED <date> / amended |

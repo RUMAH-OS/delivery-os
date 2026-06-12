@@ -5,6 +5,8 @@ author: "<who/what AUTHORED the code under test — agent id / session / human>"
 verifier: "<who/what RAN this verification — MUST differ from author (Governance §3/§12)>"
 date: "<YYYY-MM-DD>"
 independence_basis: "codeowners-PR | recorded-distinct-invocation"   # how author≠verifier is proven here
+machine_probe: "<ONE command the verify-gate re-executes at gate time; exit 0 = still passing. Pick the most load-bearing check (a test, a scan, a smoke). Required for `verified` unless genuinely impossible — then `machine_probe: none — <why>`.>"
+test_pins_amended_by: "<verifier id, ONLY if this slice changed files under tests/ e2e/ evals/ — the QA-signed acknowledgment the write-scoping gate checks; omit otherwise>"
 ---
 
 # VERIFY — Slice <id> <title>
@@ -26,6 +28,10 @@ independence_basis: "codeowners-PR | recorded-distinct-invocation"   # how autho
 |---|---------|------|------------------------------|
 | 1 | `<cmd>` | 0 | `<actual stdout/stderr>` |
 > A row with no command + real output is not evidence. Prose is not evidence.
+> **Machine-guard line (shared resources):** when the verification touches a shared store/queue/port, state the
+> guard here — run-unique tokens in every fixture/assertion + the preamble proving the resource is YOURS
+> (e.g. listening PID checked; DB name asserted `*_test`). Earned: the same shared-resource race recurred three
+> times before run-unique tokens fixed it; a stale server on the expected port once nearly poisoned a verdict.
 
 ## Acceptance criteria  (copied verbatim from the slice — each PASS/FAIL + its evidence pointer)
 | # | Criterion | Surface exercised | Evidence (→ cmd #) | PASS/FAIL |
@@ -49,10 +55,17 @@ independence_basis: "codeowners-PR | recorded-distinct-invocation"   # how autho
 |------|--------|----------|
 | Build/validate green | ✅/⬜/🔴 | <→cmd #> |
 | Dedicated commit + slice id (or NO-GIT flagged) | … | <hash> |
-| CI green (in cloud) | … | … |
+| **CI green — machine-read at merge** (the merge runs VIA `merge-pr`, which reads the checks API; never piped/watched output) | … | gate output |
 | Migration reversible + applies-clean-on-fresh-DB + rollback rehearsed | … | … |
 | Failure paths → honest error, no false success | … | … |
 | <pack rows: RBAC/authz · evals+grounding · canonical · money-idempotent> | … | … |
+> v4 note: the old "CI green: runs at PR time" deferral row is DELETED — deferring the CI check to "later" is
+> exactly how a red CI merged once (the merge gate now owns this check mechanically).
+
+## FAIL history  (kept in-doc — a failed run is part of the record, never overwritten)
+> On FAIL: the author fixes, the verifier RE-verifies, and the failed run stays here as a dated section
+> (verdict, evidence, what was rejected). A VERIFY doc whose failures vanish is laundering its history.
+- <YYYY-MM-DD> — <FAIL summary + pointer to the re-verification section> *(or "none")*
 
 ## Bug reports  (defects flow author-ward — the verifier files, never fixes)
 1. [Severity] <defect> — repro: <…>  → back to the author.

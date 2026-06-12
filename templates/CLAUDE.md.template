@@ -1,14 +1,20 @@
 # <PROJECT> — Router
 
-> Delivery OS v3 router: the single entrypoint. It **ANSWERS or POINTS, never restates.**
+> Delivery OS v4 router: the single entrypoint, **capped ~100 lines**. It **ANSWERS or POINTS, never restates.**
 > Canonical truth = `docs/` (project) + `../ecosystem-architecture/` (portfolio). If this file
 > disagrees with a canonical source, the **canonical source wins — fix this file.**
-> **This router is hand-maintained — no generator reconciles it.** Keep it current via the
-> operating-loop Write-back step + the context-hygiene pass. Last reconciled: <YYYY-MM-DD>.
+> **Two halves (v4):** §1–4, 7-intent, 8 are the **HAND half** (identity, mission, north star, invariants,
+> pointers — founder-signed, slow). §5, §6 roster, §9, and §7's edge facts are the **DERIVED half** — rendered
+> from disk by `.claude/tools/render-kernel.mjs`; **hand-editing a derived section is a fail-closed drift-lint
+> error**, and `os_version` derives from the `.claude/.verify-config.json` pin, never from prose.
+> *(v4 deleted the old "hand-maintained — no generator reconciles it" header: that sentence was the root cause
+> of the costliest cross-repo incident on record, self-documented and propagated verbatim into two consumers.)*
 >
 > **Authoring rule (the anti-drift discipline):** every line below is either (a) an **address/link**,
 > (b) a **one-line fact this project owns** (identity, phase, own edges), or (c) a **pointer that names
 > the owning file**. A line that *restates a fact another file owns* is a defect — delete it, link instead.
+> Anything evicted from this always-loaded file MUST land in a lower tier in the same change — eviction
+> without a destination is a translation-ledger violation.
 
 ## 1. Identity  — *what is this project?*
 <one-paragraph identity: what it is, who it's for, its role in the ecosystem. → docs/PROJECT-BRIEF.md>
@@ -18,26 +24,35 @@
 
 ## 3. North Star  — *north star?*
 <one line; → docs/NORTH-STAR.md>
-**Invariants (always-on, outrank any tech choice):** <the project's must-not-regress list>
+<!-- §0-CLASS INVARIANT BLOCK — the hand half's core. NEVER migrates to a skill or a derived section:
+     in the field this block survived 75 PRs untouched while every capability around it churned, and it
+     compounded (later capabilities rode invariants designed before their consumers existed). Keep it
+     always-loaded; description-triggered retrieval is the proven failure class for must-hold rules. -->
+**Invariants (always-on, outrank any tech choice):** <the project's must-not-regress list — D2/D6/D9-class rules, the waterline, author≠verifier, each bound to an INVARIANTS.md scan>
 
-## 4. Wiki  — *where is the wiki?*  (project-local HOMELESS knowledge only)
-→ `wiki/_index.md`  ·  narrative · learnings · market · customers (playbook, **zero records**) · processes · operational context.
-**Not here:** cross-project facts (→ §7/§8), records (→ their system-of-record), business truth (→ `docs/`).
+## 4. Memory & registries  — *where does knowledge live?*  (three tiers; the wiki layer is retired — F6)
+| Tier / registry | Home |
+|---|---|
+| Portfolio doctrine (noun-free, scaffold-seeded) | `memory/doctrine/` |
+| Project memory (nouns stay local) | `memory/<project>/` |
+| State | **never stored — derived** (this router's §5/§9; `manifest.json`) |
+| Decisions · Invariants · Gates · Friction | `docs/DECISIONS.md` · `docs/INVARIANTS.md` · `docs/gates.md` · `docs/friction-log.md` |
+**The friction log is the sole intake from founder reality.** Cross-project facts → §7/§8, never here.
 
 <!-- KERNEL RULE: §5 Skills, §6 Agents, and §9 verify-line are STATE — rendered from disk by
      `.claude/tools/render-kernel.mjs` (scan of `.claude/{skills,agents}` + `.verify-state.json`).
      Do NOT hand-edit them; `.claude/tools/check-os-drift.mjs` fails the push if they advertise
      something not on disk. §1-4,7,8 are INTENT — hand-authored. -->
-## 5. Skills  — *where are the skills?*  (DERIVED from `.claude/skills/` — run `render-kernel.mjs`)
-| Skill | Use when | Status |
-|---|---|---|
-| discovery-interview | founder discovery → BRIEF/MISSION/NORTH-STAR | <stable> |
-| grill-me | adversarial follow-up to confidence thresholds | <experimental> |
-| migration-assessment | read-only audit + capability register of an existing system | <stable> |
-| principle-11-review | independent multi-lens review of a consequential decision | <stable> |
-| production-readiness-review | pre-release/cutover go/no-go | <stable> |
-| ecosystem-alignment-review | owns/consumes vs registry; ECR conflicts | <stable> |
-| verify-gate | produce/check a slice's independent VERIFY artifact; diagnose a gate block (§12) | <stable> |
+## 5. Skills  — *where are the skills?*  (DERIVED from `.claude/skills/` — run `render-kernel.mjs`; trigger column from `mechanical_spine`)
+| Skill | Use when | Trigger | Status |
+|---|---|---|---|
+| verification | independent slice verification (the executable half of the verify-gate) | /verify-slice + hook | <stable> |
+| principle-11-review | blind multi-lens panel on a consequential decision (incl. production-readiness class) | /panel <class> | <stable> |
+| friction-triage | any founder complaint/observation → classified defect | /friction | <stable> |
+| cross-system-reality-audit | before any plan gating on a peer repo | /audit-peer + sibling probe | <stable> |
+| learning-review | phase end / after any significant failure | /learning-review | <stable> |
+| decision-ratification | 2+ decisions block execution, BEFORE asking the founder | /ratify | <stable> |
+| executable-contracts · gate-ledger · instruments-audit · write-back-gate · debugging-and-error-recovery · ecosystem-alignment-review · verify-gate · discovery-interview · migration-assessment | <per description> | <…> | <…> |
 
 ## 6. Agents  — *where are the agents?*  (`.claude/agents/` — lean default + active packs)
 <software-engineer · qa-test · reviewer-critic · lead-architect · documentation  + pack roles>

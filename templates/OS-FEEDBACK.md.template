@@ -1,5 +1,5 @@
 ---
-event: "<release tag | review | postmortem | compatibility-review | production-readiness | architecture-review>"
+event: "<release tag | review | review-artifact | n-merges-backstop | postmortem | compatibility-review | production-readiness | architecture-review>"
 date: "<YYYY-MM-DD>"
 triaged_by: "<who ran the triage>"
 ---

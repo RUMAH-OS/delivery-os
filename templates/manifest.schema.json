@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Delivery OS capability manifest (v4)",
+  "description": "A per-repo manifest GENERATED FROM CODE (never hand-maintained — Governance §7 scoped derived-state rule) that peers read at session start via the sibling-probe hook. Purpose: make 'what is currently true about a peer system' a derived fact with an owner, so plans never gate on a stale registry/router claim (incident 5: days planned behind a gate that was already open). Each project writes its own generator (the shape is the contract; the generator is project-local code).",
+  "type": "object",
+  "required": ["project", "generated_at", "generator"],
+  "properties": {
+    "project": { "type": "string", "description": "repo/project name" },
+    "generated_at": { "type": "string", "format": "date-time", "description": "generation timestamp — a probe treats an old manifest as STALE, not as truth" },
+    "generator": { "type": "string", "description": "path of the script that generated this file (proves it is derived, not hand-written)" },
+    "os_version": { "type": "string", "description": "the Delivery OS version pin this consumer is on (.claude/.verify-config.json)" },
+    "phase": { "type": "string", "description": "derived phase/slice marker (e.g. latest slice id from docs/slices/ or git)" },
+    "routes": {
+      "type": "array", "description": "HTTP surface actually served (scanned from code/router registration)",
+      "items": { "type": "object", "required": ["method", "path"], "properties": {
+        "method": { "type": "string" }, "path": { "type": "string" }, "auth": { "type": "string" } } }
+    },
+    "contracts": {
+      "type": "array", "description": "contract artifacts this repo EXPOSES (producer-side, fixture-bearing — see templates/api-contract.md)",
+      "items": { "type": "object", "required": ["name", "path"], "properties": {
+        "name": { "type": "string" }, "version": { "type": "string" }, "path": { "type": "string" },
+        "fixtures": { "type": "string", "description": "path to the fixtures a consumer's CI exercises" } } }
+    },
+    "migrations": {
+      "type": "object", "description": "schema truth, derived",
+      "properties": { "count": { "type": "integer" }, "latest": { "type": "string" } }
+    },
+    "verify": {
+      "type": "object", "description": "latest independent verification, derived from docs/verify/ frontmatter",
+      "properties": { "latest": { "type": "string" }, "status": { "type": "string" }, "date": { "type": "string" } }
+    },
+    "consumes": {
+      "type": "array", "description": "peer seams this repo consumes (so probes know which manifests to read)",
+      "items": { "type": "object", "required": ["project"], "properties": {
+        "project": { "type": "string" }, "contract": { "type": "string" } } }
+    }
+  }
+}
