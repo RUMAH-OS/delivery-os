@@ -13,10 +13,20 @@ if ! cat | node .claude/hooks/verify-gate.mjs pre-push; then
   exit 1
 fi
 
-# Gate 2 — drift-lint: the kernel must not advertise a skill/agent it cannot dispatch.
+# Gate 2 — drift-lint: the kernel must not advertise a skill/agent it cannot dispatch,
+# and os_version must derive from the pin (fail-closed, v4).
 if [ -f .claude/tools/check-os-drift.mjs ]; then
   if ! node .claude/tools/check-os-drift.mjs >&2; then
-    echo "✗ push blocked by Delivery OS drift-lint: router/CODEOWNERS advertises something not on disk." >&2
+    echo "✗ push blocked by Delivery OS drift-lint: router/CODEOWNERS advertises something not on disk," >&2
+    echo "  or a derived os_version field was hand-edited (Governance §7/§14)." >&2
+    exit 1
+  fi
+fi
+
+# Gate 3 — skill-format lint (v4, fail-closed): one hybrid dialect; exemptions live in the validator.
+if [ -f .claude/tools/validate-skills.mjs ]; then
+  if ! node .claude/tools/validate-skills.mjs >&2; then
+    echo "✗ push blocked by Delivery OS validate-skills: a skill violates the ratified format (B31/C6)." >&2
     exit 1
   fi
 fi
