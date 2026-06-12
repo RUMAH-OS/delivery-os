@@ -93,7 +93,7 @@ Both triggers are **HARD-BLOCK, fail-closed** (founder ruling **F7** — the §1
 **Batch ratification precedent (founder ruling F2):** a consolidated promotion batch (many lessons, one release packet) may run **one consolidated §11 ratification over the packet** instead of per-promotion panels, **provided** per-promotion earning evidence travels in the packet's changelog and the translation ledger maps every lesson (an unmapped lesson blocks the merge). Per-promotion panels at batch scale would reproduce the ceremony-overrun incident inside the throttling mechanism itself.
 
 **Human judgment (the triage answers three questions).** Were any framework-level lessons discovered? Any **OS Candidates** (`os_candidate: true` — a non-authoritative flag on the record that surfaced it, never a new store)? Route each lesson to its layer:
-- **Project-specific** (carries a project noun / only this project cares) → project `wiki/{learnings,findings}` + ADR.
+- **Project-specific** (carries a project noun / only this project cares) → project memory tiers (`memory/` per the three-tier model, v4/F6) + ADR.
 - **Ecosystem-specific** (changes who-owns-what / integration) → `ecosystem-architecture/` (ECR).
 - **Delivery OS** (statable with **no project noun** AND every future project benefits) → a framework change + a `case-studies/` worked example + a version bump.
 
