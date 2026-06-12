@@ -12,9 +12,17 @@
 | 4a | **Verification artifact exists** — a fresh, passing `docs/verify/VERIFY-<slice>.md` authored by the verifier (≠ author): real run-evidence (commands + exit codes + output), per-criterion pass/fail on the slice's **real surface**, classified open assumptions, gate ledger. **No artifact ⇒ the slice cannot pass "ready for QA"; the verify-gate hook (Governance §12) blocks commit/turn-end.** | `templates/VERIFY.md.template` |
 | 5 | **Reviewer/Critic** verdict: conformant + **simple** + **scope-held** | review note |
 | 6 | **Stakeholder acceptance** (human walkthrough on the running thing) | acceptance note (`templates/acceptance-walkthrough.md`) |
-| 7 | Docs updated (`project-log` w/ hash + statuses; ADR if a decision) | doc diff |
-| 8 | Status updated (`STATUS.md`) | dashboard |
-| 9 | **Human merge** (no self-merge) | merge |
+| 7 | **Write-back** — any canonical doc / binding decision the slice falsifies is amended (or carries a dated IOU) **in the same PR**; a decision made → a `DECISIONS.md` ledger entry. A slice that contradicts a standing spec is not done while the spec stands unamended. | amendment diff / ledger entry (write-back-gate) |
+| 8 | **Audit-before-assume** (cross-system slices only) — any gate/blocker resting on a **peer repo's** state cites a same-day read-only audit of that repo's actual disk (`cross-system-reality-audit`), never a registry/router claim | audit citation in the slice/VERIFY |
+| 9 | **Human merge VIA the merge gate** (`merge-pr` — machine-read checks API, all-green, no override flag; no self-merge) | gate output + merge |
+
+**Phase-0 row (non-waivable, precedes every other slice of an operating system):**
+| 0 | **Durability** — data the project's doctrine declares irreplaceable sits on managed storage with PITR/backups **and a TESTED restore** — or a founder-signed risk amendment exists. Earned: a raw-forever preservation doctrine ran for weeks on an unbacked-up, hand-migrated local database. | restore-test evidence / signed amendment |
+
+**Telemetry row (projects with measurement/capture claims):**
+| 10 | **Verify the instruments** — new capture/measurement instrumentation is proven *recording* (a live row exists) before anything relies on it; the cadenced instruments-audit (loop standing beat) is scheduled | live-row evidence + audit schedule |
+
+> **DoD hygiene rule (v4):** **no row without an enforcement surface.** Every row names the mechanism or artifact that proves it; a row nobody can mechanically or artifact-wise check is deleted, not kept as aspiration. (Earned: two doc-status rows were *required, nonexistent, and unnoticed* for an entire project — unenforced rows train DoD-skimming. Those rows are deleted in v4; their job is done by derived state, git history, and the `DECISIONS.md` ledger.)
 
 ## Status vocabulary  (derived, never self-asserted — Governance §12)
 A slice carries `verify_status`, **computed from evidence by the verify-gate**, never hand-set by the author:
