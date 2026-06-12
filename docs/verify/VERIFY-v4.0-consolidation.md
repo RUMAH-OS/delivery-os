@@ -13,6 +13,11 @@ test_pins_amended_by: "n/a — no tests/ e2e/ evals/ changed on this branch"
 **RE-VERIFIED 2026-06-12 → STILL REJECTED — see §10: the fix commits closed findings 2–5 but never
 touched `scripts/new-project.sh`; the Major reproduces unchanged at HEAD.**
 
+**ROUND 3 (2026-06-12, after `579bdf6`) → see §11: findings 1 and 6 are CLOSED — the guard is real and
+Layout A passes twice — but the now-reachable acceptance surface exposed a NEW Major (finding 7): the
+scaffolded drift-lint false-positives on the v4 router template and blocks every new project's first push.
+REJECTED on finding 7.**
+
 **VERDICT: FAIL — REJECTED (1 Major).** Everything in the packet except one finding passed independent
 verification with real execution evidence. The Major is a scaffolder crash in the **documented invocation
 layout**, found by running the release acceptance test (#84 step 9) — the v4 day-1-inheritance promise does
@@ -241,8 +246,75 @@ main+dev, **no `wiki/`**. PATH-stripped smoke: `env -i PATH=/nonexistent /bin/sh
 **Re-verification scope next round:** finding 1/6 only — Layout A ×2 + Layout B ×1 + `bash -n` + diff audit.
 Findings 2–5 closures and sections 1–4/6–7 stand and need no re-opening unless the fix touches them.
 
+## 11. RE-RE-VERIFICATION (round 3) — 2026-06-12 (after fix commit `579bdf6`)
+
+**Re-verifier: qa-test (agent). Fix author: claude-orchestrator.** Scope per §10's prescription:
+findings 1/6 only — diff audit + Layout A ×2 + Layout B ×1 + `bash -n` (+ the standing lints).
+Independence: this verifier authored no commit on the branch; all evidence fresh-executed this session
+on clean clones of `579bdf6` with run-unique project tokens.
+
+### Diff audit (`d26873d..579bdf6`) — claim = content this time
+Exactly 1 file changed: `scripts/new-project.sh` (+8/−3). The guard is REAL at lines 127–134:
+`if [ "$(cd "$DOS" && pwd)" != "$(pwd)/delivery-os" ]; then … cp -r "$DOS/core" delivery-os/core … fi`
+— the vendoring `cp` is skipped exactly when `$DOS` already *is* `<cwd>/delivery-os`. Consistent with
+6c line 185 (`delivery-os/core/GOVERNANCE.md` resolves via the vendored clone itself in Layout A).
+**Finding 6 (claim≠content) CLOSED.**
+
+### Acceptance test — Layout A (documented invocation): **PASS, ×2 on clean temp dirs**
+`/tmp/v4r3A1-4v708u-*` (packs `crm`) and `/tmp/v4r3A2-3mem5a-*` (packs `internal-admin`): branch cloned
+to `./delivery-os`, `bash delivery-os/scripts/new-project.sh …` → **TRUE-EXIT=0 both runs**.
+- **No pollution:** no `delivery-os/core/core`, no `delivery-os/discovery/discovery`; the vendored clone's
+  `git status --porcelain` is empty (untouched) — both runs.
+- **Hook chain installed:** `.githooks/pre-push` (+x), `.claude/hooks/{verify-gate,sibling-probe}.mjs`,
+  `.claude/settings.json`, `core.hooksPath=.githooks` — both runs.
+- **6c integrity check reached and green:** full 6c inventory present, `validate-skills: 15 skills — 0
+  error(s) — PASSED`, final `✓ Scaffolded` banner printed — both runs. Branches main+dev; os_version pin
+  `v3.8-14-g579bdf6` (correct `git describe` pre-tag); no `wiki/`.
+- **PATH-stripped smoke (independent re-run):** `env -i PATH=/nonexistent /bin/sh .githooks/pre-push`
+  → "✗ push blocked", exit 1 — **fails CLOSED**. **Finding 1 CLOSED.**
+
+### Acceptance test — Layout B (sibling checkout): **PASS in full (no regression)**
+`/tmp/v4r3B-af2kdg-*`: `bash ../dos-src/scripts/new-project.sh` → TRUE-EXIT=0. The guard correctly does
+NOT skip here: doctrine vendored (`delivery-os/core/GOVERNANCE.md` + `delivery-os/discovery/` copied, no
+`core/core`). Full 20-item inventory present (hooks, settings, merge-pr, all four tools, four registries,
+doctrine seed, test-DB guard, manifest schema, `.gitattributes`/`.env.example`, verify-config pin,
+VERIFY template), 15 skills lint-green, branches main+dev, no wiki. PATH-stripped smoke fails CLOSED.
+
+### Mechanisms re-run (framework repo, HEAD `579bdf6`)
+`bash -n scripts/new-project.sh` OK · `bash -n templates/githooks/pre-push` OK ·
+`check-no-backflow.mjs` exit 0 · `validate-skills.mjs` exit 0 (18 skills, 0 errors) ·
+`.claude/tools/check-os-drift.mjs` (framework self) exit 0.
+
+### NEW finding — found on the acceptance surface the guard just made reachable
+| # | Severity | Finding | Where |
+|---|---|---|---|
+| 7 | **Major (release-blocking)** | **Every freshly scaffolded v4 project's FIRST PUSH is blocked by a drift-lint false positive.** `templates/tools/check-os-drift.mjs:48` extracts the router's os_version with `/os_version\s*`([^`]+)`/` — the FIRST match in the scaffolded `CLAUDE.md` is the v4 template's own doctrine prose at line 9 ("…and \`os_version\` derives from the \`.claude/.verify-config.json\` pin…"), so `routerVer` = `" derives from the "` ≠ pin → fail-closed. Observed in all 3 scaffolds (masked at scaffold time by `new-project.sh:167`'s `\|\| echo "(drift warnings…expected)"`, but PERSISTENT: post-scaffold `check-os-drift.mjs` exits 1). Proven at render level: invoking the installed `.githooks/pre-push` with git's stdin protocol → Gate 1 (verify-gate) passes, **Gate 2 blocks**: "✗ push blocked by Delivery OS drift-lint". The message's remediation ("re-run render-kernel") CANNOT fix it — line 9 is the HAND half; §9 line 88 is already correct. Sole escapes: hand-edit the doctrine prose or `DELIVERY_OS_GATE_BYPASS=1` — a fail-closed gate that false-positives on day 1 trains bypass usage. Pre-existing (`374c218`/`d85f563`, before the rejections): unreachable in Layout A before this guard (scaffold crashed first) and unobserved in rounds 1–2's Layout B (swallowed at scaffold time; the throwaway's drift-lint was never re-run). The framework's own self-lint passes only because its still-v3 root router lacks the template's line-9 prose. Fix direction (verifier does not fix): anchor the extraction to the §9 derived line (e.g. match only on the `**Verification status (derived from disk…` line, or require a version-shaped capture), or reword template line 9 so `os_version` isn't followed by backticked prose. | `templates/tools/check-os-drift.mjs:48` (+ installed copies) vs `templates/CLAUDE.md.template:9`; mask at `scripts/new-project.sh:167` |
+
+### Round-3 verdicts
+| Item | Verdict |
+|---|---|
+| Diff audit (guard real, nothing extraneous) | **PASS** — finding 6 closed |
+| Layout A ×2 (exit 0, no pollution, hook chain, 6c green) | **PASS** — finding 1 closed |
+| Layout B ×1 (full inventory + fail-closed smoke) | **PASS** — no regression |
+| `bash -n` + no-backflow + validate-skills + drift-lint (framework) | **PASS** |
+| Release acceptance surface overall | **FAIL** — finding 7: scaffolded project's first push blocked by a false-positive gate |
+
+**RE-RE-VERDICT: FAIL — REJECTED on NEW finding 7 (Major).** Findings 1–6 are all closed; the prescribed
+round-3 scope passed in full — but the same acceptance surface finding 1 gated on (day-1 inheritance
+surviving documented usage) now demonstrably ends in a blocked first push with misleading remediation.
+`verify_status` stays `executed`; it does NOT flip to `verified`.
+
+**Re-verification scope next round (finding 7 only):** fix, then (a) Layout A ×1 + Layout B ×1, each with
+post-scaffold `node .claude/tools/check-os-drift.mjs` → exit 0 INSIDE the throwaway, (b) simulated
+first-push hook invocation (`printf 'refs/heads/main <sha> …' | bash .githooks/pre-push origin <url>`)
+→ exit 0 (or blocked ONLY by an honest gate, not a parse error), (c) framework self drift-lint still
+exit 0, (d) diff audit. Sections 1–4/6–7 and findings 1–6 closures stand.
+
 ## FAIL history
 - 2026-06-12 — initial verification: REJECTED (this document, §1–§9). No prior runs.
 - 2026-06-12 — re-verification after `4c42a4e`+`50f2d40`: **REJECTED AGAIN** — Major never fixed (fix
   commit message claimed a scaffolder guard its diff does not contain); findings 2–5 closed; Layout B
   still passes; new finding 6 (claim≠content in the fix commit).
+- 2026-06-12 — round 3 after `579bdf6`: findings 1+6 **CLOSED** (guard real; Layout A passes ×2, Layout B
+  ×1, all lints green) — **REJECTED on NEW finding 7 (Major)**: scaffolded drift-lint false-positives on
+  the v4 router template prose and blocks every new project's first push (pre-existing, newly reachable).
