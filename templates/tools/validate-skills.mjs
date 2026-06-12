@@ -83,8 +83,9 @@ function validate(dir, known) {
     if (!fm[field] && !exempt.includes(field)) errors.push(`Frontmatter missing required field '${field}' (${why})`);
   };
 
+  const leaf = dir.split("/").pop();
   if (!fm.name) errors.push("Frontmatter missing required field: 'name'");
-  else if (fm.name !== dir) errors.push(`Frontmatter name '${fm.name}' != directory '${dir}'`);
+  else if (fm.name !== leaf) errors.push(`Frontmatter name '${fm.name}' != directory '${leaf}'`);
 
   if (!fm.description) errors.push("Frontmatter missing required field: 'description'");
   else {
@@ -118,8 +119,16 @@ function validate(dir, known) {
 }
 
 if (!existsSync(SKILLS_DIR)) { console.error(`validate-skills: skills dir not found: ${SKILLS_DIR}`); process.exit(1); }
-const dirs = readdirSync(SKILLS_DIR).filter((d) => !isDirSkipped(d) && statSync(join(SKILLS_DIR, d)).isDirectory()).sort();
-const known = new Set(dirs);
+// One level of PACK nesting is allowed (e.g. platform/<skill>/SKILL.md): a directory without its own
+// SKILL.md whose children have one is a pack, and its children are validated as "<pack>/<skill>".
+const dirs = [];
+for (const d of readdirSync(SKILLS_DIR).filter((x) => !isDirSkipped(x) && statSync(join(SKILLS_DIR, x)).isDirectory()).sort()) {
+  if (existsSync(join(SKILLS_DIR, d, "SKILL.md"))) { dirs.push(d); continue; }
+  const kids = readdirSync(join(SKILLS_DIR, d)).filter((k) => !isDirSkipped(k) && statSync(join(SKILLS_DIR, d, k)).isDirectory() && existsSync(join(SKILLS_DIR, d, k, "SKILL.md")));
+  if (kids.length) dirs.push(...kids.map((k) => `${d}/${k}`));
+  else dirs.push(d); // empty dir → reported as Missing SKILL.md (fail-closed)
+}
+const known = new Set(dirs.map((d) => d.split("/").pop()));
 let errs = 0, warns = 0;
 for (const d of dirs) {
   const { errors, warnings } = validate(d, known);

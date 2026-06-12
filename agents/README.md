@@ -37,3 +37,13 @@ Copy the agent files you need into the project's `.claude/agents/` (drop the `op
 
 ## Parallelization
 Multiple Engineer instances may run in parallel **partitioned by a code-ownership boundary** (e.g. one package each) so one-owner-per-file always holds. Default to **one** instance, one slice at a time (lean first).
+
+## Composition vocabulary (v4, B36)
+Three primitives compose the build-time system — name them precisely, because conflating them produced the
+panel-sprawl anti-pattern (lenses multiplied where a *procedure* should have been reused):
+- **Skill** — a *procedure* (versioned playbook → artifact). Reuse it; don't re-derive it.
+- **Persona/agent** — a *lens* (a viewpoint with a tool allowlist + file ownership). Add one for a genuinely
+  independent perspective, never for volume — same-model lenses saturate at ~5–6 (Governance §11).
+- **Command** — a *trigger* (one keystroke routing intent to a skill: `/friction`, `/panel <class>`, …).
+A panel is: a **skill** (principle-11-review) convening a class-sized set of **personas**, fired by a
+**command**. "More rigor" means a better procedure or an independent lens — not more of the same lens.
