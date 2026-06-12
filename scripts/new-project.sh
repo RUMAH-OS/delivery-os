@@ -124,9 +124,14 @@ cp "$DOS/templates/test-harness/assert-test-database.mjs" tests/helpers/assert-t
 
 # 5b. Vendor the DOCTRINE (copied-base) so the router's delivery-os/core|discovery pointers RESOLVE
 #     (mechanism/policy §13, operating loop, DoD, governance, the discovery gate travel WITH the project).
-mkdir -p delivery-os
-cp -r "$DOS/core"      delivery-os/core
-cp -r "$DOS/discovery" delivery-os/discovery 2>/dev/null || true
+# Guard (v4 verifier Major): in the documented vendored layout, $DOS *is* ./delivery-os —
+# the cp would copy a directory into itself (delivery-os/core/core) and abort the scaffold
+# under set -e. The doctrine is already in place there; copy only when DOS lives elsewhere.
+if [ "$(cd "$DOS" && pwd)" != "$(pwd)/delivery-os" ]; then
+  mkdir -p delivery-os
+  cp -r "$DOS/core"      delivery-os/core
+  cp -r "$DOS/discovery" delivery-os/discovery 2>/dev/null || true
+fi
 
 # 6. Verify-gate (Governance §12) + the AI-OS mechanisms — installed so a project INHERITS them automatically.
 mkdir -p .claude/hooks .githooks docs/verify
