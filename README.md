@@ -2,7 +2,7 @@
 
 > A reusable **AI operating system / delivery framework**. Clone it, scaffold a project, and that project starts on day one with a delivery system whose lessons are **enforced, not documented** — verification, author≠verifier, and drift-protection fire automatically, without anyone remembering to run them. Distilled from two real projects (**Rumah Website**, **Property Lead OS**); the core **names neither** — project knowledge lives in the separate **Ecosystem Architecture** layer.
 
-**Current baseline: v3.6** (this README current as of v3.7). The architecture below is what every new project **inherits automatically** — proven end-to-end (clone GitHub `main` → `scripts/new-project.sh` → a fully-enforced project, no manual setup). Evidence: independent verification records in [`docs/verify/`](docs/verify/); the full review trail in [`proposals/`](proposals/) (start with [the architecture lock](proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md)).
+**Current baseline: v4.0** (the consolidation release — see CHANGELOG-v4.md). The architecture below is what every new project **inherits automatically** — proven end-to-end (clone GitHub `main` → `scripts/new-project.sh` → a fully-enforced project, no manual setup). Evidence: independent verification records in [`docs/verify/`](docs/verify/); the full review trail in [`proposals/`](proposals/) (start with [the architecture lock](proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md)).
 
 **Clean-room rule:** nothing in `core/`, `agents/`, `skills/`, `processes/`, `templates/`, `checklists/`, or `domain-packs/` names a specific project. The only place real projects appear is `case-studies/`.
 

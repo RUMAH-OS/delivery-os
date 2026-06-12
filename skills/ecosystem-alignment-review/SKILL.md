@@ -1,6 +1,6 @@
 ---
 name: ecosystem-alignment-review
-version: 1.0.0
+version: 1.1.0
 stability: stable
 description: >
   Cross-check a project's owned/consumed entities against the ecosystem source-of-truth registry —
