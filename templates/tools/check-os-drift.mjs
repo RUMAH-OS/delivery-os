@@ -45,7 +45,10 @@ let stamp = "?"; try { stamp = JSON.parse(read(join(ROOT, ".claude", ".verify-st
 let pin = "?"; try { pin = JSON.parse(read(join(ROOT, ".claude", ".verify-config.json"))).os_version || "?"; } catch {}
 if (pin !== "?" && stamp !== "?" && stamp !== pin)
   fails.push(`os_version stamp (${stamp}) != .verify-config.json pin (${pin}) — derived state was hand-edited or os-sync not re-run (run os-sync; never hand-edit)`);
-const routerVer = (kernel.match(/os_version\s*`([^`]+)`/) || [])[1];
+// Anchor on a version-SHAPED value (v4 round-3 finding 7): the unanchored form
+// first-matched the router's own doctrine prose ("`os_version` derives from the …"),
+// capturing prose and blocking every fresh project's first push.
+const routerVer = (kernel.match(/os_version\s*`(v\d[^`]*)`/) || [])[1];
 if (routerVer && pin !== "?" && routerVer !== pin)
   fails.push(`router §9 claims os_version \`${routerVer}\` but the .verify-config.json pin says ${pin} — a "derived" field that disagrees with its source was hand-edited (re-run render-kernel; overlays never mint OS versions — Governance §14/F1)`);
 let latest = "?"; try { latest = execSync("git describe --tags --abbrev=0", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {}
