@@ -43,19 +43,27 @@ try {
     .map((e) => {
       const f = fm(join(ROOT, ".claude", "skills", e.name, "SKILL.md"));
       const use = (f.description || "").split(/[.;]/)[0].slice(0, 64);
-      return { name: e.name, use, status: f.stability || "stable" };
+      // v4 (B35): the task→skill routing surface carries each skill's TRIGGER TIER, derived from
+      // mechanical_spine (hook > slash command > description) — rendered, so it cannot go stale.
+      const spine = (f.mechanical_spine || "").trim();
+      const trigger = !spine || /^none\b/i.test(spine) ? "description" : spine.slice(0, 48);
+      return { name: e.name, use, trigger, status: f.stability || "stable" };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 } catch {}
 
 const table = [
-  "| Skill | Use when | Status |",
-  "|---|---|---|",
-  ...skills.map((s) => `| ${s.name} | ${s.use} | ${s.status} |`),
+  "| Skill | Use when | Trigger | Status |",
+  "|---|---|---|---|",
+  ...skills.map((s) => `| ${s.name} | ${s.use} | ${s.trigger} | ${s.status} |`),
 ].join("\n");
 
 let state = {}; try { state = JSON.parse(readFileSync(join(ROOT, ".claude", ".verify-state.json"), "utf8")); } catch {}
-const derivedLine = `**Verification status (derived from disk, §12):** os_version \`${state.os_version || "untagged"}\` · skills installed: ${skills.length} · gate: \`.claude/hooks/verify-gate.mjs\` active.`;
+// v4 (B7/C2): os_version derives from the .verify-config.json PIN when present (consumers);
+// the framework itself (no pin) falls back to the os-sync stamp. Prose never decides.
+let cfg = {}; try { cfg = JSON.parse(readFileSync(join(ROOT, ".claude", ".verify-config.json"), "utf8")); } catch {}
+const osv = cfg.os_version || state.os_version || "untagged";
+const derivedLine = `**Verification status (derived from disk, §12):** os_version \`${osv}\` · skills installed: ${skills.length} · gate: \`.claude/hooks/verify-gate.mjs\` active.`;
 
 let k = readFileSync(KERNEL, "utf8");
 

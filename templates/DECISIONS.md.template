@@ -1,0 +1,23 @@
+# <PROJECT> — Decision Ledger
+
+> **Question-keyed, one row per decision.** The ledger exists so the same question is never asked twice
+> (a founder once asked the same boundary question twice because the answer lived only in a repo doc) and
+> so signatures never scatter into contradiction (two contradictory signatures were once recorded for the
+> same decision in different files). **The ledger fronts BOTH body dialects** (founder ruling F3): a row may
+> point to an ADR document **or** a proposal+founder-signature record — both are valid decision bodies.
+> Rows are append-only; a changed mind is a new row that `supersedes` the old one.
+
+## Status grammar (phase-gated; the gates demonstrably held through a production cutover)
+`OPEN` (question framed, evidence attached) → `RATIFIED` (signed verdict, date) → `IMPLEMENTED` (commit/PR) → `SUPERSEDED (by D-nnn)`
+A decision may not be acted on while `OPEN`. Executing tools may refuse until ratification is acknowledged
+(see the `decision-ratification` skill — a mechanical `--ack` flag, never memory).
+
+## Ledger
+| ID | Question (verbatim) | Status | Verdict (one line) | Signature + date | Body (ADR / proposal path) | Supersedes |
+|----|---------------------|--------|--------------------|------------------|----------------------------|------------|
+| D-001 | <the question as asked> | OPEN | — | — | <docs/adr/0001-… or docs/proposals/…> | — |
+
+## Rules
+- **Check the ledger at ask-time** — a panel or agent surfacing a decision first searches this table (duplicate asks are a defect).
+- **Pre-frame every row**: evidence (verbatim values, not summaries) + a recommended safe default + cost-if-wrong. Never pad the list — every fake decision costs founder trust.
+- Cross-project decisions are **ECRs** in the ecosystem layer; this ledger holds a pointer row only.

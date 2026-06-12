@@ -2,7 +2,7 @@
 
 > A reusable **AI operating system / delivery framework**. Clone it, scaffold a project, and that project starts on day one with a delivery system whose lessons are **enforced, not documented** — verification, author≠verifier, and drift-protection fire automatically, without anyone remembering to run them. Distilled from two real projects (**Rumah Website**, **Property Lead OS**); the core **names neither** — project knowledge lives in the separate **Ecosystem Architecture** layer.
 
-**Current baseline: v3.6** (this README current as of v3.7). The architecture below is what every new project **inherits automatically** — proven end-to-end (clone GitHub `main` → `scripts/new-project.sh` → a fully-enforced project, no manual setup). Evidence: independent verification records in [`docs/verify/`](docs/verify/); the full review trail in [`proposals/`](proposals/) (start with [the architecture lock](proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md)).
+**Current baseline: v4.0** (the consolidation release — see CHANGELOG-v4.md). The architecture below is what every new project **inherits automatically** — proven end-to-end (clone GitHub `main` → `scripts/new-project.sh` → a fully-enforced project, no manual setup). Evidence: independent verification records in [`docs/verify/`](docs/verify/); the full review trail in [`proposals/`](proposals/) (start with [the architecture lock](proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md)).
 
 **Clean-room rule:** nothing in `core/`, `agents/`, `skills/`, `processes/`, `templates/`, `checklists/`, or `domain-packs/` names a specific project. The only place real projects appear is `case-studies/`.
 
@@ -22,8 +22,8 @@ These are **mechanisms**, not conventions — they activate whether or not anyon
 
 ## 3. How a project consumes the OS
 - **Copied-base + Local-overlay.** A consumer receives the framework's generic agents/skills/tools/hooks as **base** (`.claude/base/`, never hand-edited in place) and writes its specializations as **overlay** (`.claude/overlay/`). `os-sync` merges them into `.claude/agents/` — so **a project's specializations survive a framework version bump** instead of being clobbered. *(This replaces the old flat "copy agents into `.claude/agents/`" model.)*
-- **Skills** — callable capabilities in `.claude/skills/` (discovery-interview · grill-me · migration-assessment · principle-11-review · production-readiness-review · ecosystem-alignment-review · verify-gate). `verify-gate` fires mechanically; the rest are model-dispatched **by design** (auto-firing a founder interview would be wrong).
-- **Wiki contract** — the knowledge layer ([`templates/wiki/FRONTMATTER-CONTRACT.md`](templates/wiki/FRONTMATTER-CONTRACT.md)): homeless project-local *understanding* only, `kind`+`as_of` typed, **records vs understanding** enforced; it POINTS, never restates a fact another file owns.
+- **Skills (v4)** — the earned catalog in `.claude/skills/`: an **always-on core pack** (verification · principle-11-review · executable-contracts · cross-system-reality-audit · friction-triage · gate-ledger · instruments-audit · learning-review · decision-ratification · write-back-gate · debugging-and-error-recovery · verify-gate · ecosystem-alignment-review) + phase packs (discovery; migration = legacy-migration-etv + cutover-execution) + platform packs (`skills/platform/`). Trigger hierarchy: hook > slash command (`.claude/commands/`) > description ([`skills/README.md`](skills/README.md)). *(grill-me retired; production-readiness-review folded into the panel — `skills/_archive/`.)*
+- **Knowledge layer (v4)** — three-tier memory (`memory/doctrine/` seeded from [`templates/memory/doctrine-seed.md`](templates/memory/doctrine-seed.md) · `memory/<project>/` · state always derived) + the four registries (`docs/{DECISIONS,INVARIANTS,gates,friction-log}.md`). *(The wiki layer is retired — F6; see `case-studies/2026-06-wiki-citation-survival.md`.)*
 
 ## 4. Dogfooding — the framework runs its own architecture
 Delivery OS is its own first consumer: it has a live `.claude/` with the verify-gate wired (`core.hooksPath`), and the gate has **caught real turns** on this repo (it blocked this very effort's changes until an independent verifier signed off). Every step of the v3 review was independently verified (author≠verifier); each verification repeatedly *found real defects* (a gitless gate, an `untagged` stamp, a missing wiki contract, a working-tree-only backstop) — each fixed and folded back. That fail→detect→incorporate loop is the operating model.
@@ -34,7 +34,7 @@ CLAUDE.md     the kernel (the framework's own live router)
 core/         the agnostic spine — loop, governance (incl. §12 enforcement, §13 mechanism/policy), DoD, severity
 agents/       roles — a LEAN DEFAULT that scales up (installed as copied-base; specialized via overlay)
 skills/       callable capabilities (.claude/skills) — verify-gate fires mechanically
-templates/    what the scaffolder installs: hooks/ (verify-gate, pre-push) · tools/ (os-sync, check-os-drift, render-kernel) · wiki/ · CLAUDE.md.template
+templates/    what the scaffolder installs: hooks/ (verify-gate, sibling-probe, pre-push) · tools/ (os-sync, check-os-drift, render-kernel, validate-skills, merge-pr) · commands/ · memory/ (doctrine seed) · registries · CLAUDE.md.template
 processes/ · checklists/ · domain-packs/   how we do X · red-team/release/security · opt-in bundles
 case-studies/ the source projects (the only project-specific content)
 ```

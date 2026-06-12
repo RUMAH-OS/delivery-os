@@ -37,11 +37,27 @@ if (co) {
   }
 }
 
-// --- version stamp vs latest tag (WARN only — cosmetic) ---
+// --- os_version: MUST derive from the .verify-config.json PIN — FAIL-CLOSED (v4, B7/C2) ---
+// Earned: a consumer's router §9 simultaneously claimed "derived from disk" and carried a
+// hand-minted version label two days past its own header — a hand-edit asserting it is derived
+// is itself the lint failure. The pin is the one authority; prose never is.
 let stamp = "?"; try { stamp = JSON.parse(read(join(ROOT, ".claude", ".verify-state.json"))).os_version || "?"; } catch {}
+let pin = "?"; try { pin = JSON.parse(read(join(ROOT, ".claude", ".verify-config.json"))).os_version || "?"; } catch {}
+if (pin !== "?" && stamp !== "?" && stamp !== pin)
+  fails.push(`os_version stamp (${stamp}) != .verify-config.json pin (${pin}) — derived state was hand-edited or os-sync not re-run (run os-sync; never hand-edit)`);
+// Anchor on a version-SHAPED value (v4 round-3 finding 7): the unanchored form
+// first-matched the router's own doctrine prose ("`os_version` derives from the …"),
+// capturing prose and blocking every fresh project's first push.
+const routerVer = (kernel.match(/os_version\s*`(v\d[^`]*)`/) || [])[1];
+if (routerVer && pin !== "?" && routerVer !== pin)
+  fails.push(`router §9 claims os_version \`${routerVer}\` but the .verify-config.json pin says ${pin} — a "derived" field that disagrees with its source was hand-edited (re-run render-kernel; overlays never mint OS versions — Governance §14/F1)`);
 let latest = "?"; try { latest = execSync("git describe --tags --abbrev=0", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {}
-if (latest !== "?" && stamp !== "?" && !stamp.startsWith(latest))
-  warns.push(`consumer stamped at os_version=${stamp}; latest tag is ${latest} — may be BEHIND (run os-sync to refresh)`);
+if (pin === "?") { // no pin = the framework itself (versioned by its own tags) — prefix-warn only
+  if (latest !== "?" && stamp !== "?" && !stamp.startsWith(latest))
+    warns.push(`stamped at os_version=${stamp}; latest tag is ${latest} — may be BEHIND (run os-sync to refresh)`);
+  if (routerVer && stamp !== "?" && routerVer !== stamp)
+    warns.push(`router §9 os_version \`${routerVer}\` != stamp ${stamp} — re-run render-kernel`);
+}
 
 for (const w of warns) console.error(`WARN: ${w}`);
 if (fails.length) {

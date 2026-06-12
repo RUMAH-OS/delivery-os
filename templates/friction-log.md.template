@@ -1,0 +1,24 @@
+# <PROJECT> — Friction Log
+
+> **THE operating record — the sole intake from founder reality to build priority** (Operating Loop, standing
+> beats). In the field this is the one mechanism with a **zero-wrong-answer record**: every founder complaint
+> routed through it converted into shipped structure, and 13 blind panel lenses were once out-judged by one
+> entry here. Day-1 file: it exists before the first slice, empty is fine, deleted is not.
+>
+> Intake rule: ANY founder complaint, observation, or strategy report lands here **verbatim first**, then is
+> triaged (`friction-triage` skill). A **missed skill/hook fire is also logged here as a defect** and
+> root-caused like any founder report (the missed-fire-is-a-defect rule).
+
+## Format (one entry per report)
+```
+## F-NNN — <date> — <one-line title>
+**Verbatim report:** "<exactly what the founder said/observed — never paraphrased at intake>"
+**Class:** F (friction — works but costs) | W (wrong — behaves incorrectly) | U (unmet — capability missing)
+**Diagnostics (four):** what surface · what expectation · what actually happened · what evidence
+**Root cause:** <the cause, not the symptom>
+**Fix lineage:** <slice/PR that fixes it, or a dated decision not to>
+**Closure:** founder-gated — closed only when the founder confirms (date + word)
+```
+
+## Entries
+*(none yet — the log starts empty and honest)*

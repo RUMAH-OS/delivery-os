@@ -1,0 +1,17 @@
+# <PROJECT> — Invariant Registry
+
+> **1 invariant = 1 entry = 1 mutation-probed scan.** This registry is the single home of "what must always
+> be true," and every entry is backed by a named, executable scan. Earned: one project accumulated 15
+> per-slice conformance files (5,251 lines, 323 assertions) asserting the same invariants in three places
+> with hand-copied regexes — discovering what was pinned required slice archaeology. Consolidate here instead.
+
+## Rules
+- **An invariant without a scan is a wish** (Governance §15 mechanism-over-prose). New invariant ⇒ new scan in the same PR.
+- **Every scan is mutation-probed at least once**: plant the violation → exactly the named scan goes red → restore byte-identical (record the probe date below). A guard that never tripped under sabotage is unverified.
+- Slices reference entries by ID (the slice template's "Invariants touched" field); amending an entry requires the owning signature (gates-change-by-signature).
+- Binding §0-class invariants (the project's never-regress list) live in the router's hand half AND here — the router states them; this registry binds them to scans.
+
+## Registry
+| ID | Invariant (one line) | Scan (command / CI job) | Last mutation-probe (date + evidence) | Owner / source decision |
+|----|----------------------|--------------------------|----------------------------------------|--------------------------|
+| INV-001 | <e.g. "append-only store X is never UPDATEd/DELETEd"> | `<script/scan path>` | <date · VERIFY pointer> | <D-nnn / signature> |

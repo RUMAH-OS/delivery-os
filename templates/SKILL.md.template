@@ -1,0 +1,43 @@
+---
+name: <kebab-name>                  # MUST match the directory name (validate-skills enforces)
+version: 1.0.0                      # MAJOR=output shape / required-lens change · MINOR=new criterion/technique · PATCH=wording
+stability: experimental | stable | deprecated
+description: >                      # THE ONLY RETRIEVAL SURFACE the harness reads. Third-person capability
+  <what this skill does> Use when / Invoke when / BEFORE / MANDATORY when <explicit trigger condition>.
+  # ≤1024 chars. NEVER put process steps in the description — the agent may follow the summary instead
+  # of the skill (the reference catalog's named failure mode). Name the TRIGGER, not the procedure.
+decision_class: architecture | migration | production-readiness | security | data | verification | integration | governance | none
+inputs:  [<what it needs>]
+outputs: [<the artifact(s) it emits, by path/template>]
+earned_from: "<REQUIRED — the incident/usage record that pays this skill's rent (≥2 recurrences + a named earning incident + a stable artifact shape; see skills/README.md litmus). A skill scaffolded for something done once is rejected.>"
+mechanical_spine: "<the hook/script/lint backing each non-discretionary step, or 'none — judgment-gated'. AUTHORING RULE (enforced at review): a skill whose description says MANDATORY/must-fire but names no hook here is REJECTED — descriptions request attention, hooks command it.>"
+---
+# <Skill Name>
+
+## Overview
+<2–4 lines: what this procedure achieves and the mechanism it rides.>
+
+## When to use (and NOT)
+- Use when: <…>
+- **NOT** for: <the adjacent cases this skill does not cover, and where those route instead.>
+
+## Process
+1. <numbered, mechanism-phrased steps — each step states what artifact/evidence it produces>
+2. <…>
+
+## Common rationalizations
+> **Include this section ONLY where a named rationalization incident exists** (ruling C3) — the rebuttal must
+> ship with the receipt that purchased it. No incident → DELETE this section; do not fill it with generics.
+
+| Rationalization | Reality (the receipt) |
+|---|---|
+| "<the excuse>" | <the recorded incident that falsified it> |
+
+## Red flags
+- <warning signs, each carrying its incident receipt inline — e.g. "a stale server once nearly poisoned a verdict">
+
+## Verification (of this skill's own output)
+- <how to check the artifact this skill emitted is real — commands, not prose. "Prose is not evidence.">
+
+## Changelog
+- 1.0.0 — <origin: what earned it; what it was promoted/merged from>

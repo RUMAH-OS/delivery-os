@@ -25,7 +25,7 @@ bash delivery-os/scripts/new-project.sh "My Project" "internal-admin,crm"
 git add -A && git commit -m "chore: adopt Delivery OS + scaffold project"
 ```
 
-That gives you: `.claude/agents/` (lean default + pack agents), `CODEOWNERS` (structural author≠verifier), a `CLAUDE.md` (discovery-first), and `docs/` (PROJECT-BRIEF/MISSION/NORTH-STAR stubs + project-context, master-roadmap, STATUS, project-log, release-readiness, adr/).
+That gives you (v4): `.claude/agents/` (lean default + pack agents), `CODEOWNERS` (structural author≠verifier), a `CLAUDE.md` (discovery-first, hand half + derived half), the full hook chain (verify-gate + sibling probe + drift/skill lints + committed pre-push), the **merge gate** (`scripts/merge-pr.mjs`), the always-on **skill core pack** + slash commands, the **four registries** (`docs/{DECISIONS,INVARIANTS,gates,friction-log}.md`), **three-tier memory** (`memory/doctrine/` seeded with the portfolio doctrine — the day-1 inheritance), and `docs/` (PROJECT-BRIEF/MISSION/NORTH-STAR stubs + project-context, master-roadmap, release-readiness, manifest schema, adr/). Environment hygiene ships day 1: `.gitattributes` (one line-ending truth), `.env` NEVER-COMMIT, a worktree helper (`scripts/dev-worktree.sh` — engineer sessions run isolated), the `*_test` DB guard, and a PATH-stripped hook smoke test (the gate fails **closed** on a shell without node — re-wire PATH per your machine runbook after a fresh clone). *(No wiki — retired at v4, F6.)*
 
 **Then — DISCOVERY FIRST, not roadmap (§1.5).** Tell Claude **"Install Delivery OS and initialize this repository"** (or paste [BOOTSTRAP-PROMPT.md](BOOTSTRAP-PROMPT.md)). Claude runs the **Founder Discovery Interview** and generates BRIEF/MISSION/NORTH-STAR from **your answers**, then reviews ecosystem alignment. Only after you approve those do you move to roadmap/ADRs/architecture (§2). Delivery OS is then operational.
 
@@ -64,8 +64,8 @@ bash delivery-os/scripts/new-project.sh "My Project" "internal-admin,crm"
 **B. Initial documents** (the scaffolder created stubs in `docs/`):
 1. `project-context.md` — **the business source of truth.** Who it's for, positioning, success metric, in/out of scope, the waterline (what's reusable vs variant-specific). Everything escalates against this.
 2. `master-roadmap.md` — phases → **vertical slices**. Put a *thin slice to the real target environment* in Phase 1–2.
-3. `STATUS.md` + `project-log.md` — live from day one.
-4. `release-readiness.md` — fill as you approach release.
+3. The **four registries** — `docs/DECISIONS.md` (question-keyed ledger), `docs/INVARIANTS.md` (1 invariant = 1 scan), `docs/gates.md` (evidence gates + live counters), `docs/friction-log.md` (the sole intake from founder reality) — live from day one. *(v4 replaced STATUS/project-log: unenforced status files train skimming; state is derived, history is git.)*
+4. `release-readiness.md` — fill as you approach release (durability/PITR is the non-waivable Phase-0 row).
 
 **C. Initial ADRs** (`docs/adr/`, from `0000-template.md`):
 - `0001-stack-and-hosting.md` — language/framework, hosting, CI.
@@ -135,10 +135,10 @@ git add -A && git commit -m "docs(ecosystem): register <project> + source-of-tru
 3. QA / Test               → independent validation (functional, e2e, evals, failure paths); PASS or FAIL+bugs
 4. Reviewer / Critic        → conformance + simplicity + scope-held verdict (APPROVE / request-changes)
 5. Stakeholder (human)     → acceptance walkthrough (templates/acceptance-walkthrough.md) → APPROVE
-6. Human                    → merge   →  slice is DONE
-7. Documentation           → project-log entry (commit hash + statuses) + STATUS update
+6. Human                    → merge VIA the gate (node scripts/merge-pr.mjs <pr>)  →  slice is DONE
+7. Write-back              → amend any doc/decision the slice falsified (DoD row 7); DECISIONS.md row if a decision
 ```
-Status words: Engineer says **"ready for QA"**; only QA says **"verified"**; only merge says **"done."** Defects flow author-ward (graders never patch).
+Status words: Engineer says **"ready for QA"**; only QA says **"verified"**; only merge **via the merge gate** says **"done."** Defects flow author-ward (graders never patch).
 
 **QA flow** → author≠verifier (QA owns `tests/ e2e/ evals/`); verify at **runtime**, not by reading; test the **failure paths** + abuse; determinism/evals where relevant; regressions become permanent harness/eval entries; re-verify raised conditions. (`processes/qa-and-testing.md`.)
 
@@ -202,7 +202,7 @@ Then **re-run the scaffolder's agent copy** for any changed/added agents you use
 1. **Core changes** (loop/governance/DoD) — adopt at a natural milestone boundary, not mid-slice.
 2. **New domain pack or process** — opt in when a project actually needs it; don't retrofit everything.
 3. **Breaking changes** are called out in `CHANGELOG-vN.md` with a migration note; treat a major upgrade like a slice (QA the result — does CI still pass, do the agents still load?).
-4. **Pin per project**: a project tracks one Delivery OS version at a time; upgrade is a dated entry in that project's `project-log.md`.
-5. **Never edit `delivery-os/` inside a project** — customizations live in `.claude/agents/`, `docs/`, and CI, so upgrades stay clean.
+4. **Pin per project (v4/F1)**: a project tracks one Delivery OS version at a time via `.claude/.verify-config.json → os_version`; adopt at a **named moment** (not mid-slice), re-run `os-sync` + `render-kernel` in the same change, and delete any local dialect copies of merged skills then. **A consumer never mints an OS version label** — rollback = re-pin to the previous tag. Record the adoption as a `DECISIONS.md` row.
+5. **Never edit `delivery-os/` inside a project** — customizations live in `.claude/agents/` overlays, `docs/`, and CI, so upgrades stay clean. Lessons flow back **only** via §14 OS-FEEDBACK triages (no-backflow is linted).
 
 > Improvements discovered in a project flow **back** to the Delivery OS repo (a PR there), then **out** to other projects via this upgrade path — the same way v2 was distilled from two projects.

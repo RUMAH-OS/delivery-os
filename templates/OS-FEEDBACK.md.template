@@ -1,5 +1,5 @@
 ---
-event: "<release tag | review | postmortem | compatibility-review | production-readiness | architecture-review>"
+event: "<release tag | review | review-artifact | n-merges-backstop | postmortem | compatibility-review | production-readiness | architecture-review>"
 date: "<YYYY-MM-DD>"
 triaged_by: "<who ran the triage>"
 ---
@@ -17,7 +17,7 @@ triaged_by: "<who ran the triage>"
 ## 3. Routing — for each lesson, where does it belong?
 | Lesson | Layer (project / ecosystem / Delivery OS) | Why (no-noun test · earned bar · counterfactual to a *recorded* failure) | Destination |
 |---|---|---|---|
-| <…> | <…> | <…> | <wiki / ECR / framework change + case study + version bump> |
+| <…> | <…> | <…> | <project memory / ECR / framework change + case study + version bump> |
 
 ## 4. Promotions proposed (each runs a scaled Principle-11 panel before it lands)
 <for any "Delivery OS" lesson: name the proposed framework artifact (hook/template/doctrine/skill/agent/lint/process/none) and that it must pass an independent §11 panel + the no-backflow lint. Or "None.">

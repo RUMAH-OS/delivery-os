@@ -25,9 +25,9 @@ Delivery OS keeps its durable knowledge as **append-only history**, not a projec
 | Knowledge | Home |
 |---|---|
 | Design rationale + ratified panels (the WAL) | `proposals/` (v3 R1/R2/R3 · v3.1 verification-enforcement) |
-| Lessons earned from live failures | `case-studies/` (e.g. `2026-06-10-author-verifier-not-operationalized.md`) |
-| Version deltas (provenance spine) | `CHANGELOG-v2.md` · `CHANGELOG-v3.md` |
-| The project-wiki *template* shipped to consumers | `templates/wiki/` + `FRONTMATTER-CONTRACT.md` |
+| Lessons earned from live failures | `case-studies/` (v4: `2026-06-incident-ledger.md` — the provenance of every promotion) |
+| Version deltas (provenance spine) | `CHANGELOG-v2.md` · `CHANGELOG-v3.md` · `CHANGELOG-v4.md` (+ `docs/feedback/` triages) |
+| The wiki layer | **retired at v4 (F6)** → `docs/archive/` + `case-studies/2026-06-wiki-citation-survival.md`; knowledge = three-tier memory + four registries |
 
 ## 5. Skills  — *what can be called?*  (`skills/<name>/SKILL.md` — the framework's own verbs)
 | Skill | Use when | Status |
@@ -63,13 +63,15 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 | AI-OS mapping + every deviation's burden of proof | `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md` |
 
 ## 9. Active Now  — *what is currently active?*
-**Verification status (derived from disk, §12):** os_version `v3.4` · skills installed: 7 · gate: `.claude/hooks/verify-gate.mjs` active.
-**Phase: framework maintenance. Version: v3.4.** The AI-OS review sequence (review → lock → dogfood → operationalize → inheritance) is **complete on branch `review/ai-os-hierarchy-alignment`**, awaiting founder authorization to merge → push.
-**Resolved (was adversarial-review fidelity debt):**
-- The framework **now runs its own verify-gate** (`delivery-os/.claude/`) and it has **caught real turns** (`docs/verify/VERIFY-step3-dogfood.md`, `VERIFY-framework-update.md`).
-- **AI-OS learnings are operationalized into the scaffolder and auto-inherited** by a new project — independently verified (`docs/verify/VERIFY-inheritance.md`): verify-gate · author≠verifier · base+overlay · drift-lint · version boundary · wiki contract · §13 mechanism/policy · skills · dogfooding.
-- Tags `v3.0…v3.4` exist (local). The architecture lock is `proposals/DELIVERY-OS-AI-OS-ARCHITECTURE-LOCK.md`.
-**Open (not yet done):**
-- **Not merged to `main`; not pushed to GitHub** — awaiting founder authorization.
-- **Consumers not yet adopted:** PLOS + rumah-admin still on the old model; the **PLOS compatibility review** is the next step, then rumah-admin resumes.
-- **Bounded limit (cosmetic, cannot bypass enforcement):** a newly-*added* skill is under-advertised in §5 until `render-kernel.mjs` re-runs.
+**Verification status (derived from disk, §12):** os_version `v3.8` (main) · skills installed: 7 (self-install; v4 catalog = 18 in `skills/`) · gate: `.claude/hooks/verify-gate.mjs` active.
+**Phase: the v4.0 CONSOLIDATION — built, awaiting independent ratification.** Branch `v4.0-consolidation`
+carries the founder-authorized promotion of two consumers' learning into the base: `CHANGELOG-v4.md` (the
+release packet: full #85 translation ledger + F1–F8 signatures + DO-NOT list) · three retroactive §14 triages
+in `docs/feedback/` · `VERSION` = v4.0 (tag applied at merge).
+**Open (not yet done — author≠verifier):**
+- **NOT merged, NOT pushed, NOT tagged** — the F2 consolidated ratification (an independent verification of
+  the packet against the #85 ledger) decides; the author does not self-merge.
+- **Self-install lag (stated honestly):** `.claude/{hooks,tools,skills}` + `.githooks/` still run the v3.8
+  copies — re-sync from `templates/` + re-render at ratification (CHANGELOG-v4 "Honest notes" #1).
+- **Consumer adoption by pin at named moments (F1):** PLOS at its learning-review gate firing; rumah-admin at
+  June-invoicing completion. Until re-pin, neither repo uninstalls or re-forks anything (anti-third-fork rule).

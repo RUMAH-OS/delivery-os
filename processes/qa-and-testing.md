@@ -23,6 +23,14 @@ A script in CI that **fails the build on any violation of the project's invarian
 - **Independent of the author's tests**, on a clean checkout, CI green.
 - **Regressions become permanent** harness/eval entries.
 - **Re-verify raised conditions** are actually resolved.
+- **Machine-guard preamble + run-unique tokens (v4):** any test touching a shared resource (DB, queue, port)
+  first proves the resource is its own (PID check; DB name asserted `*_test` via the scaffolded
+  `assertTestDatabase` guard) and stamps every fixture/assertion with a **run-unique token** — the same
+  shared-resource race recurred three times before tokens made cross-run collisions impossible.
+- **Self-inflicted-destruction audit (v4, K10):** under any append-only/preservation doctrine, QA explicitly
+  sweeps the UPDATE-clobber and CASCADE paths — self-inflicted data destruction is the most expensive defect
+  class on record (timestamp clobbering, draft destruction at send, CASCADE deletes through "append-only"
+  stores — all permanent, all invisible to green tests).
 
 ## Toolchain prerequisite
 Provision the runtime/DB **before** the build so the Engineer self-verifies (typecheck/lint/build/run green) before "ready for QA." (Both source projects lost a cycle to skipping this.)
