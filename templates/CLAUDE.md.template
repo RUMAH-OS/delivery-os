@@ -79,4 +79,4 @@ Consequential decision → run `principle-11-review` (Governance §11). The rout
 ## 9. Active Now  — *what is currently active?*
 **Verification status (derived, §12):** <current slice → verify_status: planned|generated|executed|verified> · **Open gates:** <…> · **Last independent review:** <VERIFY/DECISION-REVIEW path + date>.
 **Phase: discovery.** FIRST RESPONSIBILITY (before any roadmap/ADR/architecture/code): run the `discovery-interview` skill → generate + founder-approve `docs/PROJECT-BRIEF·MISSION·NORTH-STAR`, then run `ecosystem-alignment-review`; gate on `delivery-os/discovery/PROJECT-DISCOVERY-CHECKLIST.md`.
-*(After the gate clears, replace this with the current phase + live gate + what's blocked, pointing to `docs/STATUS.md`.)*
+*(After the gate clears, this section is RENDERED — phase + latest verify line from git/VERIFY frontmatter + open gates from `docs/gates.md`; hand-editing it is a drift-lint failure.)*

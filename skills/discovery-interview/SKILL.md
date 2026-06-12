@@ -31,8 +31,11 @@ A new or inherited repo, before planning. This is the project's **first responsi
 ## Honest failure
 If the founder can't answer, mark `TBD — to confirm` and list it — never invent. A weak "who is it for?" / "what is success?" must be probed (see the interview's depth rules), not smoothed.
 
-## Hand-off to grill-me
-If confidence in the load-bearing fields is low, run `grill-me` to harden the drafts before the gate.
+## Low-confidence hand-off
+If confidence in the load-bearing fields is low, push them with the interview's own depth rules (probe weak
+answers up to 3×, then an honest classified `TBD`). *(v4: the adversarial `grill-me` follow-up was retired —
+zero artifacts ever; see `skills/_archive/README.md` for its resurrection condition.)*
 
 ## Changelog
+- 1.0.1 — v4: grill-me hand-off replaced by the in-skill depth rules (X2).
 - 1.0.0 — promoted from `discovery/FOUNDER-INTERVIEW.md` + `DISCOVERY-WORKFLOW.md`.

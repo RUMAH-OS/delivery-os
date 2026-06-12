@@ -34,7 +34,7 @@ The reusable **spine stays variant-neutral** — it never imports a segment/cust
 Front-load the riskiest unknowns: ship a thin vertical slice to the **real target environment** (deploy + CI run + one real end-to-end transaction) in Phase 1–2. Request external credentials on day one. Provision the toolchain before the first build so the builder can self-verify.
 
 ## 10. Commit & scope discipline
-One slice → ≥1 dedicated commit (what + why + slice id); commit history is an artifact (referenced by hash in `project-log.md`). Hold scope — the Reviewer/Critic rejects anything "smuggled in" beyond the slice. Know your platform's deploy gotchas and keep them in the deployment runbook.
+One slice → ≥1 dedicated commit (what + why + slice id); commit history is an artifact — git IS the project log (v4: the hand-maintained log file was retired; decisions reference hashes from `DECISIONS.md`). Hold scope — the Reviewer/Critic rejects anything "smuggled in" beyond the slice. Know your platform's deploy gotchas and keep them in the deployment runbook.
 
 ## 11. Consequential decisions require independent multi-agent review
 A **single agent — including the orchestrator — may not issue a recommendation on a consequential decision.** A decision is **consequential** when it is any of:
