@@ -3,7 +3,7 @@ slice: v4.0-consolidation (the F2 consolidated ratification check)
 author: software-engineer (agent)
 verifier: qa-test (agent)
 date: 2026-06-12
-verify_status: executed
+verify_status: verified
 machine_probe: "node scripts/validate-skills.mjs && node scripts/check-no-backflow.mjs"
 test_pins_amended_by: "n/a — no tests/ e2e/ evals/ changed on this branch"
 ---
@@ -17,6 +17,11 @@ touched `scripts/new-project.sh`; the Major reproduces unchanged at HEAD.**
 Layout A passes twice — but the now-reachable acceptance surface exposed a NEW Major (finding 7): the
 scaffolded drift-lint false-positives on the v4 router template and blocks every new project's first push.
 REJECTED on finding 7.**
+
+**ROUND 4 (2026-06-12, after `917adc7`) → see §12: finding 7 CLOSED — the anchored regex passes both
+layouts' first push clean AND still catches a genuine §9 version mismatch under adversarial probing.
+All findings 1–7 closed. FINAL VERDICT: PASS — VERIFIED.** (The FAIL verdict below is the round-1
+record, kept per FAIL-history discipline; §12 supersedes it.)
 
 **VERDICT: FAIL — REJECTED (1 Major).** Everything in the packet except one finding passed independent
 verification with real execution evidence. The Major is a scaffolder crash in the **documented invocation
@@ -310,6 +315,66 @@ first-push hook invocation (`printf 'refs/heads/main <sha> …' | bash .githooks
 → exit 0 (or blocked ONLY by an honest gate, not a parse error), (c) framework self drift-lint still
 exit 0, (d) diff audit. Sections 1–4/6–7 and findings 1–6 closures stand.
 
+## 12. ROUND 4 — 2026-06-12 (after fix commit `917adc7`) — **PASS, VERIFIED**
+
+**Re-verifier: qa-test (agent). Fix author: claude-orchestrator.** Scope per §11's prescription
+(finding 7 only): diff audit + Layout A ×1 + Layout B ×1 with post-scaffold drift-lint + simulated
+first-push hook invocation, framework self-lint + standing lints, plus an adversarial regex probe.
+Independence: this verifier authored no commit on the branch; all evidence fresh-executed this session
+on clean temp dirs with run-unique project tokens.
+
+### Diff audit (`f1e53c5..917adc7`) — claim = content
+Exactly 1 file changed: `templates/tools/check-os-drift.mjs` (+4/−1). The extraction is now anchored to a
+version-shaped capture: `/os_version\s*`(v\d[^`]*)`/` (line 51), with a 3-line comment naming finding 7 as
+the earning incident. Nothing extraneous.
+
+### Layout A (documented invocation, `/tmp/v4r4A-r4a-1781273948-*`, pack `crm`) — **PASS**
+- Scaffold TRUE-EXIT=0; no `delivery-os/core/core` pollution; vendored clone `git status --porcelain` empty.
+- Scaffolded router carries BOTH lines: line 9 doctrine prose ("…`os_version` derives from the…") and
+  §9 line 88 `os_version \`v3.8-16-g917adc7\`` = the `.verify-config.json` pin.
+- Post-scaffold `node .claude/tools/check-os-drift.mjs` INSIDE the throwaway:
+  `drift-lint: OK (15 skills checked, 0 warning(s))` — **exit 0** (was exit 1 at round 3).
+- Simulated first push (git stdin protocol: `printf 'refs/heads/main <sha> refs/heads/main <40 zeros>' |
+  bash .githooks/pre-push origin <url>`): Gate 1 verify-gate silent-pass, Gate 2 drift-lint OK, Gate 3
+  `validate-skills: 15 skills — 0 error(s) — PASSED` → **PREPUSH-EXIT=0, no bypass needed**.
+
+### Layout B (sibling checkout, `/tmp/v4r4B-r4b-1781273984-*`, pack `internal-admin`) — **PASS**
+Scaffold TRUE-EXIT=0; doctrine vendored (`delivery-os/core/GOVERNANCE.md`, no `core/core`); post-scaffold
+drift-lint **exit 0**; simulated first-push hook **exit 0**. No regression.
+
+### Adversarial regex probe — the anchor did NOT blind the check
+On a copy of the Layout A throwaway (prose line 9 intact throughout):
+- **Probe 1** (§9 hand-edited to `v3.8`, pin untouched): drift-lint **exit 1** — "router §9 claims
+  os_version `v3.8` but the .verify-config.json pin says v3.8-16-g917adc7".
+- **Probe 2** (the §11 prescription: pin+stamp set to `v4.0`, router claims `v3.8`): drift-lint **exit 1**
+  — "router §9 claims os_version `v3.8` but the .verify-config.json pin says v4.0" — the captured value is
+  the genuine §9 version, not prose.
+- **Probe 2b** (end-to-end): the installed `.githooks/pre-push` under the same mismatch → exit 1,
+  "✗ push blocked by Delivery OS drift-lint" — the gate still fails closed on real drift.
+
+### Framework repo (HEAD `917adc7`)
+Self drift-lint exit 0 (7 skills) · `check-no-backflow.mjs` exit 0 · `validate-skills.mjs` exit 0
+(18 skills, 0 errors) · `bash -n scripts/new-project.sh` OK · `bash -n templates/githooks/pre-push` OK.
+
+### Round-4 verdicts
+| Item | Verdict |
+|---|---|
+| Diff audit (anchored regex only, nothing extraneous) | **PASS** |
+| Layout A ×1 (scaffold + in-throwaway drift-lint exit 0 + clean first push) | **PASS** |
+| Layout B ×1 (same) | **PASS** |
+| Adversarial probe (genuine mismatch still caught, ×2 + end-to-end hook block) | **PASS** |
+| Framework self-lint + no-backflow + validate-skills + bash -n | **PASS** |
+
+**v4.1 note (non-blocking, no finding):** the version-shaped anchor means a hand-edit of §9 to a
+NON-version-shaped value (e.g. `os_version \`untagged\`` or `\`4.0\`` without the `v`) evades the
+router-§9 redundancy check (the stamp≠pin check still holds, and render-kernel always writes the pin).
+This residual is inside the fix direction §11 ratified ("require a version-shaped capture"); consider a
+fallback FAIL when §9's derived line yields no version-shaped capture at all.
+
+**ROUND-4 VERDICT: PASS.** Finding 7 CLOSED; findings 1–6 closures and sections 1–4/6–7 stand.
+**`verify_status` flips to `verified`.** Next steps (outside this verifier's authority): Reviewer/Critic
+conformance, founder merge/tag; at tag time the scaffolded pin becomes `v4.0` per F1 (§3).
+
 ## FAIL history
 - 2026-06-12 — initial verification: REJECTED (this document, §1–§9). No prior runs.
 - 2026-06-12 — re-verification after `4c42a4e`+`50f2d40`: **REJECTED AGAIN** — Major never fixed (fix
@@ -318,3 +383,6 @@ exit 0, (d) diff audit. Sections 1–4/6–7 and findings 1–6 closures stand.
 - 2026-06-12 — round 3 after `579bdf6`: findings 1+6 **CLOSED** (guard real; Layout A passes ×2, Layout B
   ×1, all lints green) — **REJECTED on NEW finding 7 (Major)**: scaffolded drift-lint false-positives on
   the v4 router template prose and blocks every new project's first push (pre-existing, newly reachable).
+- 2026-06-12 — round 4 after `917adc7`: finding 7 **CLOSED** (anchored regex: both layouts scaffold +
+  first-push clean; adversarial probe proves genuine §9 mismatches still caught + hook still blocks) —
+  **PASS, verify_status → verified.**
