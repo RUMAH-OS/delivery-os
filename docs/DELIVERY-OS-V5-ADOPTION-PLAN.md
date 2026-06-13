@@ -9,6 +9,15 @@
 > `case-studies/2026-06-incident-ledger.md`. Source recommendations:
 > `rumah-admin/docs/DELIVERY-OS-V5-RECOMMENDATIONS-2026-06-13.md`.
 
+## Status (2026-06-13)
+**RATIFIED-WITH-CONDITIONS** by the F2 §11 panel (`docs/DECISION-REVIEW-2026-06-13-delivery-os-v5-batch.md`);
+conditions **C1–C9 folded**. Phase-0 doctrine/skills **landed** (DoD A2 rubric, Governance §15 A4/BOUNDARY/REPRO,
+OPERATING-LOOP A1/A2/A3, `skills/contract-grounding`, `checklists/test-hygiene`, `CHANGELOG-v5`). Phase-1 finishing
+(tracked): A6 gate-parser tolerance (C4, kernel slice — own verify), A3 cost instrument, REPRO/A2/A6 skill bumps,
+v5.0 tag, per-consumer pins. **A5 — DEFERRED** (C6): the engineer→verifier handoff is carried to Phase-1, not
+dropped — its token-saving is real (N20) but it needs a concrete handoff-artifact design + its own verify; promoting
+it now would be scaffolding ahead of a designed mechanism. Path corrected (C8): the skill is `skills/verification/`.
+
 ## The mapping (v4 → learning → Ruflo → v5)
 ```
 Delivery OS v4 (skills-first; verify-gate §12; §11 panels; §14 OS-feedback; §15 earned doctrine; 3-tier memory)
@@ -47,7 +56,7 @@ of these.** Each candidate below carries a self-application check proving it doe
 - **Risk (the dangerous one):** eroding §3/§12 if mis-applied. *Mitigation / SELF-CHECK (hard line):* independence stays **non-negotiable** for load-bearing/cross-system/schema/prod/money/PII slices; A2 only relaxes **trivial** slices (tests-only, tiny-UI, docs) which the gate's non-impl exemption already contemplates. A2 is a **rubric for when to spend a full independent pass, never a license to skip one where the classes require it.**
 - **Migration:** a verification-rigor rubric in `core/DEFINITION-OF-DONE.md` (class → required rigor) + an operating-loop note to parallel-batch independent verifications; update `verification-playbook` skill.
 - **Rollback:** doc/rubric revert; the gate itself is unchanged (still fires on impl changes).
-- **Target:** `core/DEFINITION-OF-DONE.md` + `core/OPERATING-LOOP.md` + `skills/verification-playbook/`.
+- **Target:** `core/DEFINITION-OF-DONE.md` + `core/OPERATING-LOOP.md` + `skills/verification/`.
 - **Self-check:** §3/§12 untouched; relaxation bounded to trivial; gate still fires. ✅
 
 ### P-A1 — Deterministic / direct-edit tier before spawning agents
@@ -77,7 +86,7 @@ of these.** Each candidate below carries a self-application check proving it doe
 - **Risk:** low.
 - **Migration:** a `checklists/test-hygiene.md` (tag-scoped teardown; cap-independent count-delta assertions on shared DBs; run-unique tokens — extends June B25); a clean-VERIFY-frontmatter rule (no inline comment on `verify_status`) in the gate/template.
 - **Rollback:** checklist/template revert.
-- **Target:** `checklists/` + `templates/OS-FEEDBACK`/VERIFY template + `skills/verification-playbook/`.
+- **Target:** `checklists/` + `templates/OS-FEEDBACK`/VERIFY template + `skills/verification/`.
 - **Self-check:** strengthens verification reliability; weakens nothing. ✅
 
 ### P-BOUNDARY — Boundary-first doctrine
