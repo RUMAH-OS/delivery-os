@@ -49,8 +49,22 @@ os_version`) at named moments — never auto. Rollback = stay on the v4 pin + do
 
 ## Phasing & remaining
 - **Landed (Phase-0, doctrine/skills/checklist):** A4, A2-rubric, A1, A6-policy, BOUNDARY, REPRO-doctrine + this changelog.
+- **v5.0 tag: MINTED** (2026-06-13, founder-authorized documented bypass — see the tag-push lesson below).
 - **Finishing (Phase-1, tracked):** the A6 gate-parser tolerance (C4, kernel change → own verified slice); the A3
   cost instrument (light tool); skill version-bumps for `deploy-vercel-supabase`/`cutover-execution`/`verification`
-  (REPRO/A2/A6 skill halves); the v5.0 git tag; per-consumer pins.
+  (REPRO/A2/A6 skill halves); **K-GATE-TAG — fix verify-gate tag-push handling** (kernel slice, own verify);
+  per-consumer pins.
+
+## v5-mint lesson (new — earned during this release; the gate found a gap in itself)
+**K-GATE-TAG — the verify-gate does not cleanly handle release-TAG pushes.** A tag push carries **no new commits**,
+so the gate's "is there a verified VERIFY *in this push*?" check cannot see the verified release artifact that is
+already on `main` (the commit the tag points to). v5.0's already-verified release (`VERIFY-delivery-os-v5-release`,
+10/10, on `main`) was blocked from tagging; minted via the **documented, logged `DELIVERY_OS_GATE_BYPASS`** with
+founder merge-gate authorization (the bypass reduced no discipline — the verification existed; it skipped a check
+that could not see it). **Fix (Phase-1 kernel slice):** make the pre-push gate, on a tag push, look at the tag's
+**target commit's tree** for a fresh verified `docs/verify/VERIFY-*.md` (a release-class VERIFY) rather than only
+the commits "in the push" — so future releases tag without a bypass. Earned-from: the v5.0 mint. Until fixed, a
+release tag uses the logged bypass with human merge-gate authorization (a stop-condition decision, never an agent's
+unilateral call).
 - **A5 (engineer→verifier handoff): DEFERRED** to Phase-1 with rationale (C6) — carried, not dropped; see the
   adoption plan's deferred ledger.
