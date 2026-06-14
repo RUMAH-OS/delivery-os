@@ -63,7 +63,7 @@ Consequential decision → run `principle-11-review` (§11). The router **points
 | AI-OS mapping + every deviation's burden of proof | `proposals/DELIVERY-OS-v3-AI-OS-ALIGNMENT.md` |
 
 ## 9. Active Now  — *what is currently active?*
-**Verification status (derived from disk, §12):** os_version `v3.8` (main) · skills installed: 7 (self-install; v4 catalog = 18 in `skills/`) · gate: `.claude/hooks/verify-gate.mjs` active.
+**Verification status (derived from disk, §12):** os_version `v3.8-7-g6f381a4` · skills installed: 8 · gate: `.claude/hooks/verify-gate.mjs` active.
 **Phase: the v4.0 CONSOLIDATION — built, awaiting independent ratification.** Branch `v4.0-consolidation`
 carries the founder-authorized promotion of two consumers' learning into the base: `CHANGELOG-v4.md` (the
 release packet: full #85 translation ledger + F1–F8 signatures + DO-NOT list) · three retroactive §14 triages
