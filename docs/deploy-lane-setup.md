@@ -35,16 +35,15 @@ node templates/tools/deploy-lane.mjs vercel-deploy-prod --plan
 
 ## Step 2 — Add the auto-mode allow-rules (the real unblock)
 
-The harness classifier — not the JSON — is what prompts today. Add these exact Bash allow-rules to
-`.claude/settings.json` so the in-scope deploy commands run without a per-action "yes". Copy-paste,
-merging into any existing `permissions.allow` array:
+The harness classifier — not the JSON — is what prompts today. Add **ONE** Bash allow-rule to
+`.claude/settings.json` — the audited wrapper. The agent only ever calls the wrapper; the wrapper
+runs `vercel deploy` / `npm run db:migrate` **internally** (child processes, not Bash tool calls), so
+the classifier only ever sees the wrapper. One rule = one one-time founder action.
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Bash(vercel deploy --prod:*)",
-      "Bash(npm run db:migrate:*)",
       "Bash(node templates/tools/deploy-lane.mjs:*)"
     ]
   }
@@ -52,12 +51,14 @@ merging into any existing `permissions.allow` array:
 ```
 
 Notes:
-- The `:*` suffix matches the command plus any trailing args (e.g. `--scope <team>`).
-- The third rule lets the operator call the audited **wrapper** without a prompt — preferred: the
-  wrapper enforces the lane and writes the audit log. The first two cover the underlying commands
-  the wrapper (and the playbook) invoke.
-- **Do NOT** add a wildcard `Bash(vercel:*)` or `Bash(npm:*)` — that would auto-approve out-of-scope
-  ops. Keep the rules narrow; the lane + the wrapper's guard denylist are the second line of defense.
+- This is the **irreducible minimum** — an agent must not self-grant prod-money-deploy permission;
+  that one standing authorization is a boundary we keep on purpose. It replaces the per-deploy "yes"
+  (∞ actions → 1 one-time action), and every deploy is audited + lane-scoped.
+- The `:*` suffix matches the wrapper plus any args. The wrapper enforces `.deploy-lane.json` scope +
+  the guard denylist and writes the audit log; out-of-scope ops are refused regardless.
+- **Do NOT** add `Bash(vercel:*)`/`Bash(npm:*)`/`Bash(vercel deploy --prod:*)` — broad rules
+  re-open out-of-scope ops AND let deploys bypass the audited wrapper. The single wrapper rule is
+  both the smallest surface and the only audited path.
 
 ---
 
