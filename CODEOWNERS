@@ -2,6 +2,11 @@
 *                    @software-engineer
 /scripts/            @software-engineer
 /templates/          @software-engineer
+# Cross-repo seam — author≠verifier holds AT THE SEAM (v6 #3). The shared
+# executable contract + the reusable gate are owned by the seam owner, so the
+# lens that designs the contract is not the lens that grades a seam change.
+/contracts/          @integration-architect
+/templates/tools/seam-gate.mjs   @integration-architect
 /core/               @owner
 /proposals/          @owner
 /docs/               @owner

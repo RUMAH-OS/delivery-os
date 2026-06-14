@@ -1,0 +1,40 @@
+{
+  "_comment": "Delivery OS — the standing deploy lane (OS v6 #7). RATIFIED ONCE per repo via the decision-ratification skill, then NEVER hand-edited casually: it is the founder's standing pre-authorization for the deployment-operator agent. Anything not declared here is OUT OF SCOPE and fails closed. The agent reads this file through templates/tools/deploy-lane.mjs; it does NOT widen it. Copy this file to the repo root as `.deploy-lane.json`, fill the targets, ratify, and add the matching .claude/settings.json allow-rules (docs/deploy-lane-setup.md) ONCE.",
+
+  "version": 1,
+  "ratified": {
+    "_comment": "Provenance of the standing authorization. Set by the founder at ratification (decision-ratification skill). The agent treats an unratified lane (by=\"\") as OUT OF SCOPE for everything.",
+    "by": "",
+    "date": "",
+    "decision_ref": ""
+  },
+
+  "actor_default": "deployment-operator",
+
+  "audit_log": "docs/deploy-lane/audit.log.jsonl",
+
+  "actions": {
+    "_comment": "Each key is a named action CLASS the founder pre-authorized. `cmd`+`args` are the exact underlying command run for an in-scope invocation; extra args passed on the CLI are APPENDED. `forward_only:true` marks a migration class the operator may run unattended; a down/rollback must NOT be declared here (it is irreversible ⇒ out of scope by design). Remove a class to revoke that authorization.",
+
+    "vercel-deploy-prod": {
+      "description": "Production deploy of the API/SPA on the Vercel+Supabase plane.",
+      "cmd": "vercel",
+      "args": ["deploy", "--prod"],
+      "targets": ["__FILL_VERCEL_PROJECT_OR_ALIAS__"],
+      "forward_only": false
+    },
+
+    "supabase-migrate-forward": {
+      "description": "Apply pending forward-only migrations to the system-of-record DB (via the session pooler, per the deploy-vercel-supabase playbook).",
+      "cmd": "npm",
+      "args": ["run", "db:migrate"],
+      "targets": ["__FILL_SUPABASE_PROJECT_REF__"],
+      "forward_only": true
+    }
+  },
+
+  "guards": {
+    "_comment": "Belt-and-braces fail-closed denylist. Even if a class is somehow declared, an underlying command matching any of these substrings is REFUSED. Irreversible/destructive ops are never in any lane.",
+    "deny_substrings": ["drop ", "migrate:down", "db:reset", "--rollback", "delete from", "truncate", "force-push", "push --force"]
+  }
+}
