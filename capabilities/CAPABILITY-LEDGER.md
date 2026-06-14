@@ -33,6 +33,27 @@
 | **Mailbox fix (PLOS)** | 56s mailbox | fix | HIGH | list-only first paint; the experience-review harness is its acceptance test (flips to PASS) |
 | **deployment-operator + audited lane (#7)** | deployment ownership confusion; per-action auth dance | agent+automation | MED | the founder-burden lane (one-time ratification) |
 
+## Maturity stage tracker (the victory-gate — updated every milestone; no early wins)
+Stage ladder: **Documented → Built → Verified → Used → Inherited → Auto-executed.** A capability still
+left of `Inherited`/`Auto-executed` is still dependent on human memory. v6 is NOT landed until the
+OS-foundational rows reach **Auto-executed in BOTH Admin and PLOS**. Current honest stage (2026-06-14):
+
+| Capability | Current stage | Gap to Auto-executed |
+|---|---|---|
+| seam-gate + contract | **Used** (Admin on-demand) | not inherited via os-inherit; not in CI/pre-push |
+| lifecycle-gate | **Used** (on-demand) | not inherited; not auto-run |
+| workflow-gate | **Used** (on-demand) | not inherited; not auto-run |
+| experience-gate | **Used** (PLOS, once) | hand-vendored not os-inherit; no cadence/pre-handoff |
+| founder-experience-reviewer | **Used (1×, manual)** | not standing; not auto-triggered |
+| experience-review (PLOS) | **Used (1×)** | PR #127 unmerged; no cadence/pre-handoff |
+| skill-router + frontmatter | **Verified** | not the real dispatch (skills not auto-routed) |
+| learning-review (OS) | **Used (1×, this milestone)** | not auto-triggered on milestone close |
+| capability ledger | **Used** | not auto-fed (no census-detector) |
+| os-inherit (upgrade path) | **Verified** | not applied to any live project |
+
+**Target end-state (the only definition of "v6 landed"):** every OS-foundational row = **Auto-executed**, in
+Admin AND PLOS, propagating to a fresh project automatically. Until then the work is not done.
+
 ## The anti-decay rule (why the system gets harder to break over time)
 Every founder-discovered issue a capability FAILED to catch becomes a new/strengthened capability row here
 (the learning-review's "which capability failed to catch this?" question + the census-detector). Coverage only
