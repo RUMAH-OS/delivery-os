@@ -1,0 +1,11 @@
+{
+  "rumah-admin": {
+    "seam-gate": "ALIVE",
+    "lifecycle-gate": "ALIVE",
+    "workflow-gate": "ALIVE",
+    "experience-gate": "ALIVE",
+    "skill-frontmatter": "ALIVE",
+    "skill-route": "ALIVE",
+    "learning-review": "ALIVE"
+  }
+}

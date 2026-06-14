@@ -20,7 +20,7 @@
 //   node capability-health.mjs --self-test          # validate-the-validator
 // =============================================================================
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -35,7 +35,7 @@ const WIRING = {
   "seam-gate": ["seam:check", "seam-gate"],
   "lifecycle-gate": ["lifecycle:check", "lifecycle-gate"],
   "workflow-gate": ["workflow:check", "workflow-gate"],
-  "experience-gate": ["experience:review", "experience-gate"],
+  "experience-gate": ["experience:review", "experience:check", "experience-gate"],
   "skill-route": ["skill:route", "skill-route", "skills:check"],
   "skill-frontmatter": ["validate-skills", "skill-frontmatter", "skills:check"],
   "census-detector": ["census-detector", "census:check"],
@@ -122,10 +122,30 @@ function measure() {
   const inert = rows.filter((r) => r.status === "INERT");
   console.error(`capability-health · project=${proj} · ${rows.length} capabilities (evidence-backed)`);
   for (const r of rows) console.error(`  [${r.status.padEnd(7)}] ${r.name.padEnd(18)} — ${r.evidence}`);
-  if (inert.length) {
-    console.error(`FAIL: ${inert.length} capability(ies) inherited/present but INERT (nothing runs them): ${inert.map((r) => r.name).join(", ")}`);
-    process.exit(1);
+
+  // --- PERMANENT REPORTING: diff vs the last snapshot → what MOVED / what REGRESSED ---
+  // Evidence-only: statuses come from classify() (real wiring), never hand-set. The snapshot
+  // is the prior committed measurement; --write-snapshot records the new one after a change.
+  const RANK = { MISSING: 0, INERT: 1, ALIVE: 2 };
+  const snapPath = opt("--snapshot", join(DOS, "capabilities", "health-snapshot.json"));
+  let snap = {}; try { snap = JSON.parse(readFileSync(snapPath, "utf8")); } catch {}
+  const moved = [], regressed = [];
+  for (const r of rows) {
+    const prev = (snap[proj] || {})[r.name];
+    if (prev === undefined) continue;
+    if (RANK[r.status] > RANK[prev]) moved.push(`${r.name}: ${prev} → ${r.status}`);
+    else if (RANK[r.status] < RANK[prev]) regressed.push(`${r.name}: ${prev} → ${r.status}`);
   }
+  console.error(`MOVED (improved since last snapshot): ${moved.length ? moved.join(" · ") : "none"}`);
+  console.error(`REGRESSED (worse since last snapshot): ${regressed.length ? regressed.join(" · ") : "none"}`);
+  if (argv.includes("--write-snapshot")) {
+    snap[proj] = Object.fromEntries(rows.map((r) => [r.name, r.status]));
+    writeFileSync(snapPath, JSON.stringify(snap, null, 2) + "\n");
+    console.error(`snapshot updated: ${snapPath}`);
+  }
+
+  if (regressed.length) { console.error(`FAIL: ${regressed.length} capability(ies) REGRESSED (was operating, now not).`); process.exit(1); }
+  if (inert.length) { console.error(`FAIL: ${inert.length} INERT (inherited/present but nothing runs them): ${inert.map((r) => r.name).join(", ")}`); process.exit(1); }
   console.error(`PASS: every measured capability is wired-to-run (ALIVE) in this project.`);
   process.exit(0);
 }

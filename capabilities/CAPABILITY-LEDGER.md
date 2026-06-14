@@ -63,10 +63,10 @@ OS-foundational rows reach **Auto-executed in BOTH Admin and PLOS**. Current hon
 | workflow-gate | **Auto-executed (Admin CI)** ✅ | PLOS pending |
 | os-inherit (upgrade path) | **Used (applied to Admin)** ✅ | not yet applied to PLOS |
 | skill-router + frontmatter | **Inherited (Admin); Verified — NOT auto-dispatched** | no real routing happens in work (tested only); needs a routing invocation hook + log |
-| learning-review (OS) | **Inherited (Admin); Used 1× MANUAL** | not auto-triggered on milestone close (inert as a recurring loop) |
+| learning-review (OS) | **Auto-executed (Admin CI)** ✅ — fail-closed gate (commits-since-retro); currently RED = overdue (28>25), the loop demanding its retrospective | PLOS pending; the gate fires but a human still authors the retro |
 | census-detector (#10) | **Verified — INERT** | wired into NO CI/hook; never actually runs (corrected from an earlier "Used" over-claim) |
 | file-lesson / cross-project census | **Verified** | not yet invoked in a real project's flow |
-| experience-gate | **Inherited (Admin); Used (PLOS 1×)** | no Admin UI surface to exercise; PLOS standing pending |
+| experience-gate | **Auto-executed (Admin CI)** ✅ — boots the app, judges Admin's real read surfaces (13–487ms, all within budget) every push | PLOS standing pending |
 | founder-experience-reviewer | **Used 1× manual** | not standing; not auto-triggered |
 | experience-review (PLOS) | **Used 1×** | merged #127, but no cadence/pre-handoff (on-demand) |
 | capability ledger | **Used (manual)** | not auto-fed (census-detector inert) |
