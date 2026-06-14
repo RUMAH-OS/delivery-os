@@ -9,7 +9,7 @@ description: >
   something → a strengthened capability). A milestone is not closed until this has run and fed the ledger.
 kind: execution
 capabilities: [post-milestone-learning-review, convert-lesson-to-capability, feed-capability-ledger, anti-decay-capability-strengthening, assumptions-ledger, post-failure-review]
-triggers: [run the post-milestone learning review, what did we learn this milestone, which founder pains repeated, which capability failed to catch this, convert lessons into capabilities, close out the milestone retro]
+triggers: [run the post-milestone learning review, what did we learn this milestone, which founder pains repeated, which capability failed to catch this, convert lessons into capabilities, convert lessons into skills and tooling, turn what we learned into skills, close out the milestone retro]
 decision_class: governance
 class: OS-foundational
 inputs:  [the milestone's commits, VERIFY docs (incl. FAIL sections), decision records, founder-experience reports, permission-refusal moments, the founder's own pain reports]
