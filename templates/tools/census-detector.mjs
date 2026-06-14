@@ -46,19 +46,23 @@ function census(signals) {
   for (const s of signals) {
     if (!s || !s.pattern) continue;
     const key = norm(s.pattern);
-    const e = byPattern.get(key) || { pattern: s.pattern, sources: new Set(), triaged: false, capability: null };
+    const e = byPattern.get(key) || { pattern: s.pattern, sources: new Set(), projects: new Set(), triaged: false, capability: null };
     if (s.source) e.sources.add(norm(s.source));
+    if (s.project) e.projects.add(norm(s.project));
     if (s.capability) { e.triaged = true; e.capability = s.capability; }
     byPattern.set(key, e);
   }
   const candidates = [], watch = [], triaged = [];
   for (const e of byPattern.values()) {
-    const n = e.sources.size;
-    if (e.triaged) triaged.push({ ...e, n });
-    else if (n >= THRESHOLD) candidates.push({ ...e, n });
-    else if (n >= 2) watch.push({ ...e, n });
+    const n = e.sources.size, p = e.projects.size;
+    // CROSS-PROJECT recurrence (>=2 projects) is a promote-to-OS signal even below the raw
+    // count threshold: a lesson hitting two projects is generalizable (Admin learns from PLOS).
+    const crossProject = p >= 2;
+    if (e.triaged) triaged.push({ ...e, n, p });
+    else if (n >= THRESHOLD || crossProject) candidates.push({ ...e, n, p, crossProject });
+    else if (n >= 2) watch.push({ ...e, n, p });
   }
-  candidates.sort((a, b) => b.n - a.n);
+  candidates.sort((a, b) => (b.p - a.p) || (b.n - a.n));
   return { candidates, watch, triaged };
 }
 
@@ -74,7 +78,7 @@ if (candidates.length === 0) {
 }
 
 console.error(`FAIL: ${candidates.length} un-triaged recurring pattern(s) MUST become a capability (extraction over accumulation):`);
-for (const c of candidates) console.error(`  CANDIDATE (${c.n}×): ${c.pattern}`);
+for (const c of candidates) console.error(`  CANDIDATE (${c.n}× · ${c.p} project${c.p === 1 ? "" : "s"})${c.crossProject ? " [CROSS-PROJECT → promote to delivery-os]" : ""}: ${c.pattern}`);
 if (APPEND && existsSync(APPEND)) {
   const stamp = candidates.map((c) => `| (census) ${c.pattern} | recurred ${c.n}× across distinct sources | (triage) | **AUTO** | census-detector: un-triaged >=${THRESHOLD}× recurrence — convert to a capability |`).join("\n");
   appendFileSync(APPEND, `\n<!-- census-detector auto-appended candidates -->\n${stamp}\n`);
