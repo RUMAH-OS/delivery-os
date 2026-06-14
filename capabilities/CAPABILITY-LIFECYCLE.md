@@ -33,12 +33,23 @@ The signals corpus is shared + **project-tagged**. A pattern that appears in **�
 belongs in the OS, not re-solved twice. That is the mechanical form of *"Admin learns from PLOS, PLOS learns from
 Admin, future projects learn from both."*
 
-## Ownership / scope (unchanged, reinforced)
+## Ownership / scope (founder-ratified 2026-06-15 — PLOS is a product, not a proving ground)
 - **delivery-os = canonical OS** — the only home of built capabilities, the only ledger, the only propagation path.
-- **Admin / PLOS = proving grounds** — they DISCOVER lessons (file-lesson), PROVE capabilities by driving real
-  surfaces, and CONSUME via os-inherit. They do not become the permanent home of OS knowledge.
-- **Future projects = inherit** — a fresh project runs the sync and starts with the accumulated learning of all
-  prior projects. The OS remembers, so people don't have to.
+- **Admin = THE proving ground** — new/immature capabilities are deliberately built, used, and matured HERE against
+  Admin's real surfaces until the maturity progression is proven. Admin may hold partially-complete v6 work.
+- **PLOS = a product; it RECEIVES mature capabilities only** — never a discovery ground. NO half-migrations into
+  PLOS while a capability's behavior is still being figured out. PLOS inherits a capability via os-inherit ONLY
+  after it is Built → Verified → **Used in Admin** → maturity-progression-validated → behavior-proven → in-OS.
+- **Future projects = inherit** — a fresh project runs the sync and starts with the accumulated, MATURE learning.
+
+## The mandatory sequence before any major PLOS propagation
+```
+Capability → Build → Verify → USE IN ADMIN → validate maturity progression → prove the intended behavior
+   → add to delivery-os foundation (in-OS) → THEN inherit into PLOS
+```
+The bar is **evidence the capability genuinely OPERATES (in Admin), not evidence it can be copied.** A capability
+that is only "verified" or only "copied into a project" has not earned PLOS. PLOS receives maturity, never
+discovery.
 
 ## The standing test (re-run every milestone)
 The loop is operating only when: a real lesson this milestone was **filed → flagged → queued → built in
