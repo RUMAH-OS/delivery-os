@@ -38,18 +38,21 @@ Stage ladder: **Documented → Built → Verified → Used → Inherited → Aut
 left of `Inherited`/`Auto-executed` is still dependent on human memory. v6 is NOT landed until the
 OS-foundational rows reach **Auto-executed in BOTH Admin and PLOS**. Current honest stage (2026-06-14):
 
-| Capability | Current stage | Gap to Auto-executed |
+| Capability | Current stage | Gap to Auto-executed everywhere |
 |---|---|---|
-| seam-gate + contract | **Used** (Admin on-demand) | not inherited via os-inherit; not in CI/pre-push |
-| lifecycle-gate | **Used** (on-demand) | not inherited; not auto-run |
-| workflow-gate | **Used** (on-demand) | not inherited; not auto-run |
-| experience-gate | **Used** (PLOS, once) | hand-vendored not os-inherit; no cadence/pre-handoff |
+| seam-gate + contract | **Auto-executed (Admin CI)** ✅ | PLOS not yet inherited/auto-run |
+| lifecycle-gate | **Auto-executed (Admin CI)** ✅ | PLOS pending |
+| workflow-gate | **Auto-executed (Admin CI)** ✅ | PLOS pending |
+| os-inherit (upgrade path) | **Used (applied to Admin)** ✅ | not yet applied to PLOS |
+| skill-router + frontmatter | **Inherited + Used (Admin)** | not the real auto-dispatch yet |
+| learning-review (OS) | **Inherited (Admin) · Used (1×)** | not auto-triggered on milestone close |
+| experience-gate | **Inherited (Admin) · Used (PLOS 1×)** | no Admin UI surface to exercise; PLOS standing pending |
 | founder-experience-reviewer | **Used (1×, manual)** | not standing; not auto-triggered |
 | experience-review (PLOS) | **Used (1×)** | PR #127 unmerged; no cadence/pre-handoff |
-| skill-router + frontmatter | **Verified** | not the real dispatch (skills not auto-routed) |
-| learning-review (OS) | **Used (1×, this milestone)** | not auto-triggered on milestone close |
 | capability ledger | **Used** | not auto-fed (no census-detector) |
-| os-inherit (upgrade path) | **Verified** | not applied to any live project |
+
+**Admin is the first project to reach Auto-executed for the gate family** (vendored + CI-wired, self-contained).
+**v6 lands when the same is true in PLOS** + the standing reviews/auto-triggers exist. PLOS is the remaining proving ground.
 
 **Target end-state (the only definition of "v6 landed"):** every OS-foundational row = **Auto-executed**, in
 Admin AND PLOS, propagating to a fresh project automatically. Until then the work is not done.
