@@ -61,15 +61,21 @@ OS-foundational rows reach **Auto-executed in BOTH Admin and PLOS**. Current hon
 | lifecycle-gate | **Auto-executed (Admin CI)** ✅ | PLOS pending |
 | workflow-gate | **Auto-executed (Admin CI)** ✅ | PLOS pending |
 | os-inherit (upgrade path) | **Used (applied to Admin)** ✅ | not yet applied to PLOS |
-| skill-router + frontmatter | **Inherited + Used (Admin)** | not the real auto-dispatch yet |
-| learning-review (OS) | **Inherited (Admin) · Used (1×)** | not auto-triggered on milestone close |
-| experience-gate | **Inherited (Admin) · Used (PLOS 1×)** | no Admin UI surface to exercise; PLOS standing pending |
-| founder-experience-reviewer | **Used (1×, manual)** | not standing; not auto-triggered |
-| experience-review (PLOS) | **Used (1×)** | PR #127 unmerged; no cadence/pre-handoff |
-| capability ledger | **Used** | not auto-fed (no census-detector) |
+| skill-router + frontmatter | **Inherited (Admin); Verified — NOT auto-dispatched** | no real routing happens in work (tested only); needs a routing invocation hook + log |
+| learning-review (OS) | **Inherited (Admin); Used 1× MANUAL** | not auto-triggered on milestone close (inert as a recurring loop) |
+| census-detector (#10) | **Verified — INERT** | wired into NO CI/hook; never actually runs (corrected from an earlier "Used" over-claim) |
+| file-lesson / cross-project census | **Verified** | not yet invoked in a real project's flow |
+| experience-gate | **Inherited (Admin); Used (PLOS 1×)** | no Admin UI surface to exercise; PLOS standing pending |
+| founder-experience-reviewer | **Used 1× manual** | not standing; not auto-triggered |
+| experience-review (PLOS) | **Used 1×** | merged #127, but no cadence/pre-handoff (on-demand) |
+| capability ledger | **Used (manual)** | not auto-fed (census-detector inert) |
 
-**Admin is the first project to reach Auto-executed for the gate family** (vendored + CI-wired, self-contained).
-**v6 lands when the same is true in PLOS** + the standing reviews/auto-triggers exist. PLOS is the remaining proving ground.
+**Honesty correction (2026-06-15, from the Capability-Health investigation):** the gate family is genuinely
+**Auto-executed (Admin CI)**, artifact-backed. But census-detector, learning-review, skill-router, and file-lesson
+are **built+verified yet NOT operating** (inert / manual / tested-only) — and there is **no runtime telemetry**, so
+"Used" must be evidence-backed (a real invocation), not asserted. **v6 is NOT landed:** the right-hand columns are
+green only for the Admin gate family. Remaining: wire the inert capabilities to auto-run, apply os-inherit to PLOS,
+and add the 3 telemetry logs (gate-runs · skill-routes · founder-issues) so health is measured, not narrated.
 
 **Target end-state (the only definition of "v6 landed"):** every OS-foundational row = **Auto-executed**, in
 Admin AND PLOS, propagating to a fresh project automatically. Until then the work is not done.
