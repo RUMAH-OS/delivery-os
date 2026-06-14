@@ -11,6 +11,23 @@
 `in-OS` (canonical in delivery-os) → `propagated` (every project inherits via the upgrade path).
 **Class:** `OS-foundational` = inherited by every project · `project-earned` = stays local (earned per project).
 
+## THE single canonical path (founder-ratified 2026-06-14 — no parallel mechanisms)
+**delivery-os is the source of truth. PLOS consumes. Future projects inherit automatically.** One path:
+```
+delivery-os (canonical: contracts + gates + skills + agents)
+   → os-sync   (agents, base+overlay)   +   os-inherit (tools/contracts/skills, vendored + drift-checked)
+      → a project is SELF-CONTAINED (gates run in its CI, no OS mounted)
+         → a fresh project inherits the whole foundation by running the same sync
+```
+There is exactly ONE propagation mechanism (os-sync + os-inherit) and ONE capability ledger (this file).
+- **Admin** has consumed it (vendored `.claude/os/`, gates auto-execute in CI) — the proof it operates.
+- **PLOS** consumes the SAME path. PLOS's local queue `property-lead-os/docs/capability-backlog.md` (CAP-1…7) and its
+  `docs/v6-adoption-status.md` "Inheritance ledger gap" feed THIS ledger; **that documented gap ("delivery-os does
+  not yet propagate skills/gates/learning-loops") is CLOSED by os-inherit** — so PLOS's "Move 2 = promote into
+  delivery-os" is satisfied by *running os-inherit*, not by building a second promotion. Convergence, not duplication.
+- PLOS-domain CAP rows worth promoting to OS-foundational once proven: CAP-1 founder-ready DoD gate + CAP-2 Jarvis
+  product-reality review (overlap the existing founder-experience-reviewer/experience-gate — reconcile, don't fork).
+
 ## Verified capabilities (proven; chain status)
 | Capability | Founder reality that earned it | Kind | Class | Status | Canonical home / provenance |
 |---|---|---|---|---|---|
