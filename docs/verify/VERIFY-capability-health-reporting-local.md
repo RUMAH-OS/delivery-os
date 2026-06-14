@@ -1,3 +1,11 @@
+---
+verify_status: verified
+author: claude-opus main build session 2026-06-15
+verifier: qa-test subagent (independent, 2026-06-15)
+independence_basis: recorded-distinct-invocation
+date: 2026-06-15
+---
+
 # VERIFY — capability-health snapshot/diff (permanent reporting) OPERATES (local, independent)
 
 - **date:** 2026-06-15
