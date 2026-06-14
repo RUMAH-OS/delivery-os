@@ -40,6 +40,7 @@ There is exactly ONE propagation mechanism (os-sync + os-inherit) and ONE capabi
 | founder-experience-reviewer (#9) | the founder was the FIRST user of broken surfaces | agent | OS-foundational | **in-OS** (proven in PLOS PR #127) | `.claude/agents/founder-experience-reviewer.md` |
 | experience-review harness | 56s mailbox discovered by founder, not system | automation | OS-foundational | **verified** (PLOS PR #127) → promote the pattern to OS | PLOS `scripts/experience-review.mjs` (vendored gate) |
 | **OS upgrade path (os-inherit)** | proven capabilities were trapped in one project — depending on memory/discipline | automation | OS-foundational | **verified** (independent QA; sync/check/drift/missing all proven) — the `In OS → every project inherits` link now EXISTS | `capabilities/os-foundation.manifest.json` + `templates/tools/os-inherit.mjs` |
+| **capability-health** (governance; validate-the-validator) | a system can REPORT green while the behavior isn't happening (the maturity-matrix lesson) | gate | OS-foundational | **verified** (measures wired-vs-INERT reality; mutation-proven to FOLLOW real CI wiring; `--self-test` re-proves its own accuracy) — proven in Admin: 3 gates ALIVE, 4 INERT (honest) | `templates/tools/capability-health.mjs` |
 
 ## Open backlog (candidates — feed the chain forward)
 | Item | Founder reality | Kind | Priority | Why |
