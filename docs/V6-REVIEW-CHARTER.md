@@ -80,6 +80,37 @@ env-token-migration actions / cross-repo coordinations / decisions for a represe
 invoice delivery); v6 must drop it toward "open URL → click → expect X". (ii) **Materially smoother** execution per
 §0. If shipping is not noticeably smoother, v6 has not solved the problem.
 
+## 9. DIRECTIONAL MANDATE (locked, definitive — not an optional experiment)
+**Central problem v6 exists to fix: knowledge accumulates faster than capability.** v5 became excellent at memory,
+documentation, doctrine, reviews, process, verification artifacts — and weak at turning lessons into skills, agent
+capabilities, automation, reusable workflows, executable knowledge. **v6 must correct that imbalance.**
+- **Target routing for every lesson:** `→ skill · → agent responsibility · → automation · → workflow · → wiki
+  playbook · → REMOVAL of obsolete process`. NOT the v5 default (`→ memory · → CLAUDE.md · → kernel · → process`).
+- **Challenge every accumulated asset** (rule, doc, memory, kernel section, checklist, doctrine item): *Can this
+  become a skill? an agent responsibility? automation? a wiki page? — and what can now be REMOVED?*
+- **Direction (mandated, substantial):** **skill-first · agent-first · wiki-first**, inspired by the strongest
+  ideas in Ruflo, Agent Skills, and other best-in-class systems — adopt aggressively where they beat us.
+  Concretely: less reliance on massive CLAUDE.md / growing kernels / accumulated process; more skills, specialized
+  agents, workflow ownership, automation, wiki-driven knowledge, capability extraction.
+- **PRESERVE (v5 strengths, non-negotiable):** memory · learning · verification (author≠verifier, the gate) ·
+  boundaries · determinism. Replace unnecessary *process* with *capability* — never weaken these.
+
+## 10. Dedicated review tracks (run as parallel specialist streams)
+Skills Architecture · Agent Architecture · Knowledge Architecture · Workflow Architecture · Integration
+Architecture · Automation Architecture · AI-Systems Architecture. Each studies the SOTA externally
+(skill-first / wiki-first architectures · specialization models · capability-extraction mechanisms · orchestration
+& workflow-ownership patterns · execution frameworks) and proposes the v6 design for its domain.
+
+## 11. THE SINGLE SUCCESS CRITERION + COMPLETION DEFINITION
+**Success = "Does the system become easier to operate as it learns?"** NOT documentation quality, NOT doctrine
+quality, NOT test count. If the answer is no, v6 failed.
+**DONE = IMPLEMENTED, not reviewed.** The effort is complete only when the findings are actually implemented across
+the OS (delivery-os) AND existing repositories (Admin, PLOS) have a clear, executed v5→v6 migration path (incl. the
+migration/update agent). *Earlier is not success. Implementation is success.*
+
 ## Status
-**CHARTER LOCKED 2026-06-14.** Awaiting founder's sequencing choice (milestone-first vs review-first). When the
-review runs it executes this charter as a multi-agent workflow; founder is the merge-gate.
+**CHARTER LOCKED + COMPLETE 2026-06-14** (no further pre-review edits — refinement happens IN the review). Sequencing:
+**A (milestone-first)** chosen; review-PREP ingest of Admin/PLOS/delivery-os COMPLETE (3 corpora gathered, hypothesis
+strongly corroborated with a sharper edge: the gap is the cross-*repo* seam, intra-repo workflow validation works).
+The full multi-agent review (tracks per §10) + implementation run after the invoice-delivery milestone is
+Founder-Ready, using that finished slice as the measured baseline.
