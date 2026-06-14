@@ -1,0 +1,20 @@
+// Append-only lesson-signal corpus (census-detector input). One JSON object per line.
+// learning-review + the gates APPEND {pattern, source} when a lesson is observed; add
+// "capability" when it has been converted (=> triaged). census-detector flags any pattern
+// recurring across >=3 distinct sources with NO capability yet. // and # lines are ignored.
+{"pattern":"founder is the first to discover an experience failure","source":"mailbox 56s load","capability":"founder-experience-reviewer + experience-gate (Track B)"}
+{"pattern":"founder is the first to discover an experience failure","source":"Room unavailable","capability":"founder-experience-reviewer + experience-gate (Track B)"}
+{"pattern":"founder is the first to discover an experience failure","source":"Advisor/ASK offline-but-input-enabled","capability":"founder-experience-reviewer + experience-gate (Track B)"}
+{"pattern":"capability built and verified but not auto-executed (not operating)","source":"experience-gate on-demand","capability":"os-inherit + Admin CI auto-exec; maturity-stage tracker"}
+{"pattern":"capability built and verified but not auto-executed (not operating)","source":"seam/lifecycle/workflow:check on-demand","capability":"os-inherit + Admin CI auto-exec; maturity-stage tracker"}
+{"pattern":"capability built and verified but not auto-executed (not operating)","source":"learning-review documented not triggered","capability":"os-inherit + Admin CI auto-exec; maturity-stage tracker"}
+{"pattern":"component-correct but workflow/lifecycle-incorrect","source":"LC-1 contract.reinstated missing inverse","capability":"lifecycle-gate (#16)"}
+{"pattern":"component-correct but workflow/lifecycle-incorrect","source":"HTML/text + missing-notice seam mismatch (FV-4/FV-5)","capability":"seam-gate (#2)"}
+{"pattern":"component-correct but workflow/lifecycle-incorrect","source":"Invoice->Delivery->Outcome cross-repo round-trip","capability":"workflow-gate (#16 cross-repo)"}
+{"pattern":"proven capability trapped in one project, not inherited","source":"gates Admin-local via sibling import","capability":"os-inherit upgrade path + os-foundation.manifest"}
+{"pattern":"proven capability trapped in one project, not inherited","source":"experience-gate PLOS hand-vendored","capability":"os-inherit upgrade path + os-foundation.manifest"}
+{"pattern":"proven capability trapped in one project, not inherited","source":"learning-review only in Admin","capability":"os-inherit upgrade path + os-foundation.manifest"}
+{"pattern":"skill exists but is not routed or invoked (founder recall required)","source":"14 Admin skills present, no dispatch","capability":"skill-router + frontmatter contract (#6/#8)"}
+{"pattern":"skill exists but is not routed or invoked (founder recall required)","source":"learning-review present but never run","capability":"skill-router + learning-review invoked on the v6 milestone"}
+{"pattern":"parallel sessions build divergent v6 infra (two ledgers / two propagation mechanisms)","source":"PLOS docs/capability-backlog vs delivery-os ledger","capability":"single canonical path convergence (one ledger, one os-inherit)"}
+{"pattern":"parallel sessions build divergent v6 infra (two ledgers / two propagation mechanisms)","source":"PLOS Move-2 promotion vs os-inherit","capability":"single canonical path convergence (one ledger, one os-inherit)"}
