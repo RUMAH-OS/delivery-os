@@ -191,6 +191,13 @@ const REGISTRY = {
     required: ["signingId", "contractId", "tenantId", "propertyId", "party", "variant", "expiresAt"],
     optional: [],
   },
+  // POST /contracts/:id/terminate with notifyTenant:true (operator opt-in). Requests a tenant-facing
+  // termination confirmation — PLOS drafts, a human approves, Workspace sends (prepare→approve→send).
+  // REFS only; PLOS resolves the recipient via tenantId→Contact. NOT auto-fired on every termination.
+  "termination.send_requested": {
+    required: ["contractId", "tenantId", "propertyId", "terminatedOn"],
+    optional: ["reason", "noticeGivenOn"],
+  },
 };
 
 // =============================================================================
