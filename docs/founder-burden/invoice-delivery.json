@@ -1,0 +1,55 @@
+{
+  "_comment": "OS v6 #5 — the REAL v5 founder-burden baseline for the invoice-delivery milestone (the v6 benchmark slice). Counts are DERIVED from V6-FOUNDER-VALIDATION-FRICTION-LOG.md + the session reality. This is the number v6 must beat: the founder-burden-gate FAILS unless a re-measured `current.count` drops below `baseline.count`. The `current` block below is the PROJECTED v6 illustration (see current.notes) — NOT a measurement; the real v6 re-measure happens when the next milestone actually runs through the deploy-lane + seam-gate. Shape = templates/.founder-burden.json.",
+
+  "milestone": "invoice-delivery",
+
+  "baseline": {
+    "count": 12,
+    "recorded_from": "v5 invoice-delivery milestone — session 2026-06-12..13 (Admin→PLOS first live invoice send). Derived from V6-FOUNDER-VALIDATION-FRICTION-LOG.md (FV-1..FV-5) + session reality.",
+    "breakdown": {
+      "terminal_command": 0,
+      "env_token_migration_action": 2,
+      "per_action_authorization": 4,
+      "cross_repo_coordination": 2,
+      "manual_setup_step": 0,
+      "live_validation_defect_found": 4
+    },
+    "notes": [
+      "per_action_authorization = 4: the deploy/migration auth dance. FV-3 records the harness denying agent execution 3x even WITH founder authorization present (0029 migration x2, a general 'proceed' x1), plus the forward-migration 'yes' to run 0027/0028 — each a separate mid-task round-trip the founder had to grant. Source: FV-3 + session (migrate 0027/0028, the deploy, blocked 0029 x2).",
+      "env_token_migration_action = 2: (1) the founder ran the prod forward migrations against the SoR; (2) the Vercel promotion that initially missed the API surface (a manual promote/redeploy action). Source: session reality (prod migration run + Vercel promotion gap).",
+      "cross_repo_coordination = 2: (1) FV-4 HTML-vs-text seam mismatch relayed between Admin (emitted notice.body as HTML) and PLOS (sends text/plain); (2) FV-5 send_requested carried no Admin notice — the founder/agent had to coordinate the notice/send-notice seam across the two repos. Source: FV-4 + FV-5.",
+      "live_validation_defect_found = 4: defects the FOUNDER discovered at live validation (the most expensive point): FV-1 ASK appears non-functional; FV-2 ASK reports offline while exposing an active input; the portfolio PII leak surfaced during validation; the send-notice mismatch observed at first live-send prep. Source: FV-1, FV-2 + session (PII leak, send-notice mismatch).",
+      "terminal_command + manual_setup_step = 0: deliberately NOT double-counted — the founder's command-running and setup for this milestone is already captured under env_token_migration_action and per_action_authorization above. Kept honest, not inflated.",
+      "TOTAL baseline = 12 founder actions. This is the v5 number v6 must beat for the invoice-delivery milestone to count as a burden reduction."
+    ]
+  },
+
+  "current": {
+    "count": 3,
+    "measured_from": "PROJECTED v6 (illustrative — NOT a measurement). Shows the gate would register the drop once deploy-lane (#7) + seam-gate (#2) are in the path. Re-measure for real on the next live milestone run.",
+    "breakdown": {
+      "terminal_command": 0,
+      "env_token_migration_action": 2,
+      "per_action_authorization": 1,
+      "cross_repo_coordination": 0,
+      "manual_setup_step": 0,
+      "live_validation_defect_found": 0
+    },
+    "notes": [
+      "per_action_authorization 4 -> 1: the standing audited deploy-lane (#7, .deploy-lane.json ratified ONCE by the founder) removes the per-action auth dance — the deployment-operator runs in-scope deploys/forward-migrations with no per-action prompt. The remaining 1 is the one-time lane ratification itself (amortized across all future deploys).",
+      "cross_repo_coordination 2 -> 0: the executable seam contract (#1) + fail-closed seam-gate (#2) catch the HTML/text + missing-notice mismatches in CI before live, so the founder never relays them between repos.",
+      "live_validation_defect_found 4 -> 0 (for seam-class): the seam-gate + founder-experience-reviewer (#9, UI-state<->backend) catch FV-1/2/4/5-class defects before handoff, not at the founder's live validation.",
+      "env_token_migration_action 2 -> 2 (illustrative hold): prod migrations + promotion are still real actions; the lane makes them no-prompt but they remain counted founder-owned env actions. v6 does not falsely zero these.",
+      "PROJECTED TOTAL = 3 < baseline 12 => the founder-burden-gate would PASS, registering a -9 founder-action drop. Illustrative only; the binding number comes from the real re-measure."
+    ]
+  },
+
+  "categories": [
+    { "id": "terminal_command", "label": "Founder ran a terminal command", "source": "charter §8 + friction log" },
+    { "id": "env_token_migration_action", "label": "Founder set an env var / minted a token / ran a migration", "source": "charter §8 + FV-3" },
+    { "id": "per_action_authorization", "label": "A per-action 'yes, do X' the agent needed mid-task", "source": "FV-3" },
+    { "id": "cross_repo_coordination", "label": "Founder relayed/coordinated state between repos", "source": "FV-4 / FV-5" },
+    { "id": "manual_setup_step", "label": "A manual one-off setup step the founder performed", "source": "charter §8" },
+    { "id": "live_validation_defect_found", "label": "Founder discovered a defect during live validation (FV-1/2 class)", "source": "FV-1 / FV-2" }
+  ]
+}

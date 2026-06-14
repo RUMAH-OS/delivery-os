@@ -1,0 +1,66 @@
+{
+  "_comment": "Delivery OS v6 #5 — the per-milestone FOUNDER-BURDEN record (template/schema). The success metric the founder ratified is 'the founder no longer experiences the problem' — operationalized here as a COUNT of founder actions per milestone. v6 is working only if `current.count` drops below the recorded `baseline.count`. The founder-burden-gate reads a record of this shape and FAILS CLOSED if current >= baseline. One record per milestone, in docs/founder-burden/<milestone>.json. Scaffold a new one with: node templates/tools/founder-burden-gate.mjs <out.json> --record <milestone>.",
+
+  "milestone": "<milestone-name>",
+
+  "baseline": {
+    "count": 0,
+    "recorded_from": "<which version/session this baseline was measured from, e.g. 'v5 invoice-delivery milestone (session 2026-06-12..13)'>",
+    "breakdown": {
+      "terminal_command": 0,
+      "env_token_migration_action": 0,
+      "per_action_authorization": 0,
+      "cross_repo_coordination": 0,
+      "manual_setup_step": 0,
+      "live_validation_defect_found": 0
+    },
+    "notes": []
+  },
+
+  "current": {
+    "count": 0,
+    "measured_from": "<which version/session re-measured this, e.g. 'v6 next milestone run'>",
+    "breakdown": {
+      "terminal_command": 0,
+      "env_token_migration_action": 0,
+      "per_action_authorization": 0,
+      "cross_repo_coordination": 0,
+      "manual_setup_step": 0,
+      "live_validation_defect_found": 0
+    },
+    "notes": []
+  },
+
+  "categories": [
+    {
+      "id": "terminal_command",
+      "label": "Founder ran a terminal command",
+      "source": "charter §8 (founder-burden) + friction log"
+    },
+    {
+      "id": "env_token_migration_action",
+      "label": "Founder set an env var / minted a token / ran a migration",
+      "source": "charter §8 + FV-3 (prod migration runs)"
+    },
+    {
+      "id": "per_action_authorization",
+      "label": "A per-action 'yes, do X' the agent needed mid-task (round-trip)",
+      "source": "FV-3 (per-action deploy/migration auth dance)"
+    },
+    {
+      "id": "cross_repo_coordination",
+      "label": "Founder relayed / coordinated state between repos",
+      "source": "FV-4/FV-5 (Admin↔PLOS seam mismatches relayed by founder)"
+    },
+    {
+      "id": "manual_setup_step",
+      "label": "A manual one-off setup step the founder performed",
+      "source": "charter §8 (manual steps)"
+    },
+    {
+      "id": "live_validation_defect_found",
+      "label": "Founder discovered a defect during live validation (FV-1/2 class)",
+      "source": "FV-1/FV-2 (found by founder in minutes at the most expensive point)"
+    }
+  ]
+}
