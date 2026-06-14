@@ -22,12 +22,12 @@
 | experience-gate (Track B floor) | 56s mailbox · Room offline · ASK offline-but-input-enabled | gate | OS-foundational | **in-OS** | `templates/tools/experience-gate.mjs` |
 | founder-experience-reviewer (#9) | the founder was the FIRST user of broken surfaces | agent | OS-foundational | **in-OS** (proven in PLOS PR #127) | `.claude/agents/founder-experience-reviewer.md` |
 | experience-review harness | 56s mailbox discovered by founder, not system | automation | OS-foundational | **verified** (PLOS PR #127) → promote the pattern to OS | PLOS `scripts/experience-review.mjs` (vendored gate) |
+| **OS upgrade path (os-inherit)** | proven capabilities were trapped in one project — depending on memory/discipline | automation | OS-foundational | **verified** (independent QA; sync/check/drift/missing all proven) — the `In OS → every project inherits` link now EXISTS | `capabilities/os-foundation.manifest.json` + `templates/tools/os-inherit.mjs` |
 
 ## Open backlog (candidates — feed the chain forward)
 | Item | Founder reality | Kind | Priority | Why |
 |---|---|---|---|---|
-| **Upgrade path for skills+tools** (extend os-sync beyond agents) | proven capabilities are Admin/PLOS-local; a NEW project inherits none of them | automation | **HIGH** | This is the broken half of the chain — "every project inherits" is not true today. Without it, every project re-earns the gates by hand. |
-| **Mandatory post-milestone learning-review** (promote + enforce) | lessons stay as prose / aren't systematically converted | skill+gate | **HIGH** | the feedback engine of the chain (this turn: promoted to OS, made mandatory, backlog-feeding) |
+| **APPLY the upgrade path to Admin + PLOS** (run os-inherit; repoint sibling-imports → vendored `.claude/os/tools/`; wire `os-inherit check` into CI/pre-push) | the mechanism exists but the live projects don't consume it yet | automation | **HIGH** | makes Admin/PLOS self-contained (gates run in their CI — closes #11) and byte-current with the OS; turns the proven mechanism into actual inheritance |
 | **census-detector (#10)** | a ≥3× repeated pattern stays manual, never auto-extracted | automation | HIGH | auto-appends candidates to THIS ledger (extraction over accumulation, mechanized) |
 | **Standing experience-review wiring (PLOS)** | the reviewer runs on-demand, not on every change + cadence | automation+gate | HIGH | makes discovery automatic (the system is the first user, never the founder) |
 | **Mailbox fix (PLOS)** | 56s mailbox | fix | HIGH | list-only first paint; the experience-review harness is its acceptance test (flips to PASS) |

@@ -1,0 +1,23 @@
+{
+  "_comment": "OS-FOUNDATIONAL capabilities — the set every project inherits automatically via the upgrade path (os-inherit.mjs). This is the 'In OS -> OS Upgrade Path -> Every Project Inherits' link of the capability chain (capabilities/CAPABILITY-LEDGER.md). A capability is NOT complete until it is listed here and a project's `os-inherit sync` brings it in + `os-inherit check` keeps it byte-current. Agents propagate via os-sync (base+overlay); tools/contracts/skills propagate via os-inherit (vendored, drift-checked) so a project is self-contained (works in CI without the OS mounted).",
+  "manifestVersion": "v1",
+  "tools": [
+    "templates/tools/seam-gate.mjs",
+    "templates/tools/lifecycle-gate.mjs",
+    "templates/tools/workflow-gate.mjs",
+    "templates/tools/experience-gate.mjs",
+    "templates/tools/skill-frontmatter.mjs",
+    "templates/tools/skill-route.mjs"
+  ],
+  "contracts": [
+    "contracts/admin-plos-seam-v1.mjs"
+  ],
+  "skills": [
+    "learning-review"
+  ],
+  "agents": [
+    "integration-architect",
+    "founder-experience-reviewer"
+  ],
+  "agentsNote": "agents propagate via os-sync (base+overlay merge), not os-inherit; listed here for a complete view of the OS foundation."
+}
