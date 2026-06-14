@@ -115,6 +115,14 @@ const REGISTRY = {
     required: ["contractId", "tenantId", "propertyId", "terminatedOn"],
     optional: ["reason"],
   },
+  // POST /contracts/:id/terminate, clearing branch (terminatedOn=null). The INVERSE
+  // of contract.terminated — emitted when a termination is cleared so a consumer that
+  // marked the contract ended can undo it. Closes the reversible-lifecycle gap LC-1
+  // (terminate had a fact, reinstate did not → silent consumer drift). REFS only.
+  "contract.reinstated": {
+    required: ["contractId", "tenantId", "propertyId"],
+    optional: [],
+  },
   // signing-public.ts L106 (the public last-sign handler — the ONLY emitter
   // outside admin.ts). A binding contract is fully signed (once per contract,
   // existence-guarded; intentions never emit). templateVersion nullable.

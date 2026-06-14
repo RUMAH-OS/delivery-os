@@ -46,6 +46,24 @@ boundary-first. **Net test for every asset: it must SUBTRACT a rule/step while c
 | 13 | skill-lifecycle **hook runner** (hooks.pre/post) | convention | delivery-os | M | automation lives in one external hook |
 | 14 | §6 agents **derived index** + drift-lint | automation | all | L | §6 hand-typed, disagrees with disk |
 | 15 | semantic/auto-synced **memory retrieval** seam | automation | delivery-os | L | hand-curated MEMORY.md index |
+| 16 | **lifecycle-completeness validation** (the Product-Reality / Workflow track inspects WHOLE business lifecycles, not just events) | gate+agent | all | H | LC-1 root: per-event seam-gate (#2) proves every component correct yet cannot prove a *lifecycle* correct — a missing inverse transition (`contract.reinstated`) is invisible to event-shape validation |
+
+## Lifecycle-completeness validation (#16) — the Product-Reality / Workflow track
+**Founder mandate (2026-06-14):** *validate complete business lifecycles, not only individual events.* A founder
+does not think in events; they think in business reality (a contract is active → terminated → reinstated). The
+system must stay correct across the **whole** lifecycle, not only at individual event boundaries. This is a
+distinct dimension from the per-event seam-gate (#2): #2 proves each event's *shape*; #16 proves the *set* of
+events faithfully mirrors the reversible real-world process (every state transition an operator/founder/customer
+can perform has a correct, round-tripping representation and downstream effect). Owned jointly by
+**integration-architect** (the seam side) and **founder-experience-reviewer** (#9, the real-surface side); it runs
+as a workflow-scoped check, not a component check. LC-1 (`contract.reinstated` absent) is the seed evidence.
+
+**The lifecycles it must inspect end-to-end** (each as a real operator/founder/customer would experience it):
+contract creation · contract extension · contract signing · contract termination · contract reinstatement ·
+invoice creation · invoice delivery · payment follow-up · customer communication. For each: enumerate every state
++ transition (including the *reversible/undo* ones), and assert the lifecycle is correct and complete — not just
+that each event validates. **Net test:** business workflows drive the architecture; an event exists because a real
+workflow needs it — never "because we can."
 
 ## New agents (responsibility map)
 - **integration-architect** (NEW) — the cross-repo seam end-to-end (contract + producer golden fixture + seam-gate); CODEOWNERS binds the seam dir so author≠verifier holds at the seam.
