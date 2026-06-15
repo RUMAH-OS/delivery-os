@@ -113,3 +113,46 @@ node ..\delivery-os\tools\route\os-sync.mjs            # agents base+overlay
 
 ## Hard precondition (unchanged): N≥2 proof before cutover
 This is the target layout. Physically moving Admin's brain into `C:\rumah\delivery-os` waits until a SECOND app (PLOS) inherits the core + runs green + one capability is demonstrably reused (can't validate "reused everywhere" at N=1).
+
+---
+
+## CLARIFICATION — `.claude/os` is a runtime projection, NEVER a second brain (2026-06-15)
+**Rule 0: NOTHING in `.claude/os` is a source of truth. Ever. The source of truth is always `delivery-os`.**
+`.claude/os` contains ONLY the EXECUTABLE bytes an app's CI must run self-contained, the pin receipt, and the app's own emitted telemetry. The KNOWLEDGE/DOCTRINE (the bulk of a mature brain) is NEVER projected — it lives only in `delivery-os` and is consulted from `OS_ROOT` during agent-work (where the OS is mounted), never needed by app CI.
+
+### Per-category classification
+| Category | In `.claude/os`? | Classification | Source of truth |
+|---|---|---|---|
+| agents | base = **read-only projection** (`.claude/os/agents/`); app overlay = **local app-owned** (`.claude/agents/`, NOT under os/) | 2 + 4 | delivery-os/agents |
+| skills | only the INHERITED SUBSET the CI validates = **read-only projection**; not-yet-promoted = **local** (`.claude/skills/`) | 2 + 4 | delivery-os/skills |
+| wiki | **NOT projected** — OS-only, consulted from OS_ROOT on demand | — | delivery-os/wiki |
+| lessons | **NOT projected** — OS-only (promoted); app EMITS raw lessons UP via telemetry/signals | — | delivery-os/lessons |
+| governance | DOCS **NOT projected** (OS-only); the enforcing TOOLS = projection (`tools/`) | 2 (tools only) | delivery-os/governance |
+| trust | **NOT projected** — model OS-only; scores runtime-computed in OS | — | delivery-os/trust |
+| adoption | **NOT projected** — model OS-only | — | delivery-os/adoption |
+| routing | router TOOLS = projection (`tools/`); the MODEL OS-only | 2 (tools only) | delivery-os/routing |
+| telemetry | YES (`.claude/os/telemetry/`) = **runtime-generated cache + app-emitted local** (gitignored); flows UP | 3 + 4 | the app emits; OS aggregates |
+| capabilities | LEDGER **NOT projected** (OS-only); the executable gates = projection (`tools/`) | 2 (tools only) | delivery-os/capabilities |
+| operating-principles | **NOT projected** — OS-only doctrine | — | delivery-os/operating-principles |
+
+### The four buckets (where each thing lives)
+- **(1) Source of truth — ONLY `delivery-os`** (all categories). Never `.claude/os`.
+- **(2) Read-only projection — `.claude/os/`** = `tools/` (gates/routers/health/frontmatter) + `contracts/` + `skills/` (inherited subset) + `agents/` (base merge) + `INHERITED.json` (pin+digest+sha256). Drift-locked, never hand-edited; `os-inherit check` fail-closes on any byte change.
+- **(3) Runtime-generated cache — `.claude/os/telemetry/`** = the app's emitted selection/usage signals (gitignored); the only thing the app WRITES under `os/`; flows UP to OS aggregated telemetry.
+- **(4) Local application-owned data — NOT under `.claude/os/`** = `.claude/agents/` (app overlays) + `.claude/skills/` (not-yet-promoted) + `docs/` (domain). These flow UP via the promotion gate.
+
+### Exact expected structure of `admin/.claude/os`
+```
+admin/.claude/os/
+├── INHERITED.json        # (2) pin receipt: osVersion + foundation-digest + per-file sha256
+├── tools/                # (2) the executable .mjs the app's CI runs self-contained (gates/routers/health)
+├── contracts/            # (2) vendored seam contract(s) the app produces/consumes against
+├── skills/               # (2) ONLY the inherited subset the app's skills:check validates
+├── agents/               # (2) the base+overlay MERGE result (os-sync output) — read-only
+└── telemetry/            # (3)+(4) app-emitted signals, GITIGNORED, runtime-only, flows UP
+```
+NOT present (lives only in delivery-os): wiki, lessons, governance docs, operating-principles, capability ledger, trust/adoption/routing/autonomy MODELS, reviews, learning, knowledge-graph.
+
+### The verifiable invariant (so we can confirm alignment over time)
+Today (measured): `.claude/os` = **116K / 12 files ≈ 6%** of `delivery-os` (**1.9M / 252 files**). **`.claude/os` size is bounded by what the app EXECUTES, decoupled from total OS KNOWLEDGE.** As the brain grows 10× (more wiki/lessons/skills/knowledge-graph — the knowledge bulk), `.claude/os` stays roughly FLAT (only the executable tool subset + the handful of skills the app actually uses). **If `.claude/os` ever grows proportionally with `delivery-os`, that is the alarm that it is becoming a second brain.**
+**Proposed fail-closed gate (`projection-shape-check`):** `.claude/os` may contain ONLY {INHERITED.json, tools/, contracts/, skills/, agents/, telemetry/}; if a KNOWLEDGE category (wiki/lessons/governance-docs/principles/ledger/models/knowledge-graph) ever appears under `.claude/os/`, fail closed. This mechanically prevents the second-brain.
