@@ -154,3 +154,13 @@ agent-health (USED=Active / IDLE=Dormant) + the slice-records + the selection lo
 Status column is evidence-derived (ALIVE/USED → Active; INERT/IDLE → Dormant), never hand-set.
 Applies to: G4 learning · Auto-Exec · Founder-Away-Mode · capability propagation · PLOS integrations ·
 all future agents + roadmap work.
+
+## G10 — Knowledge & Skill System (knowledge must become EXECUTABLE; founder principle 2026-06-15)
+> A lesson never used hasn't changed behavior; a wiki never referenced isn't intelligence; a skill never
+> triggered can't be trusted. Optimize for knowledge ADOPTION, not accumulation. Question: "Did the
+> system USE what it learned?"
+- **Status:** Not Started (design next). Builds on G4 (lesson capture) + reuses skill-route (#8 = injection retriever) + skill-frontmatter (#6 = skill contract) + the agent-health telemetry pattern.
+- **Target flow:** Incident → Lesson → Wiki Entry → Skill Extraction → Trigger Registration → Agent Usage → Outcome → Score → Retain/Improve/Retire.
+- **Required:** (1) every verified lesson → Wiki knowledge (Context·Symptoms·Root Cause·Detection·Resolution·Verification·Related Capabilities·Related Skills) + ≥1 candidate Skill (Purpose·Triggers·Applicability·Execution Guidance·Expected Outcome·Confidence). (2) **skill-health** telemetry per skill: trigger/use/success/failure/false-positive/last-exec/last-outcome/confidence + **Trust Score** (trigger freq · successful usage · failure prevention · outcome quality · FP rate · recency). (3) **DORMANT SKILL** class (exists but not exercised in the expected window) — reported. (4) **Skill injection**: task context → skill-route retrieves highest-confidence relevant skills → injected into the agent. (5) **Skill Usage Evidence** mandatory report section (per skill: triggered/used/success/fail/prevented-incident/confidence/trust; + Top/Dormant/Most-Valuable/Least-Trusted).
+- **Completion (a lesson is complete only when):** converted to wiki + ≥1 skill · triggered in real work · used by agents · measured · proven to influence behavior. (DORMANT skill ≠ complete.)
+- **Honest harness boundary (state in every report):** skill-route can SELECT relevant skills deterministically (retrieval), but INJECTION into a spawned agent is orchestrator-assembled (like agent dispatch) — not autonomous. True auto-injection shares the A3 dispatch-runner dependency (G9).
