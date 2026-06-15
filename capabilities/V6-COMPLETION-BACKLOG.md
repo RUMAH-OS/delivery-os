@@ -47,7 +47,8 @@
 - **Validation/Completion:** these already self-test + catch regressions; "operational + enforced" = they RUN at the G2 trigger points and block. Folds into G1/G2.
 
 ## G4 — Learning-Review Enforcement (the system actually learns)
-- **Status:** In Progress (learning:check gate in CI, fail-closed, currently RED; no retro produced; census/file-lesson INERT)
+- **Status:** **Proven (2026-06-15)** — `learning:check` now structural (validateRetroStructure: requires what-worked / what-failed / which-capability-failed-to-catch / Lessons→Candidates with ≥1 `- X → Y`) — a hollow retro can't clear it. `slice:close --milestone` fail-closes without a valid retro (Trigger B; block-demo'd, exit 8). **The lesson→capability loop OPERATES** (was INERT): at the G4 milestone close it filed **14 retro lessons → signals** (file-lesson, idempotent) + ran census-detector (idempotent `--append`) end-to-end. The overdue `docs/RETROSPECTIVE-2026-06-15.md` (6 sections, C1–C7) greens the gate by evidence. Independent QA 5/5 + no-loophole finding (`docs/verify/VERIFY-learning-enforcement-local.md`). **Honest boundary:** Layer-A enforcement wiring = Auto-Exec **A5 PRESENT + OPERATING**; NOT A3 autonomous (gated G9).
+- **(historical) Status:** In Progress (learning:check gate in CI, fail-closed, currently RED; no retro produced; census/file-lesson INERT)
 - **Owner:** documentation (retrospective) + the OS (census-detector/file-lesson wiring) → qa-test
 - **Build:** (a) tie the gate to MILESTONE close (not only commit-count) and require the retrospective as a verified output; (b) wire `census-detector` into a hook/CI so ≥3× patterns auto-append capability candidates to the ledger; (c) wire `file-lesson` so a lesson converts to an upstream candidate.
 - **Dependencies:** census-detector + file-lesson exist (verified, INERT) — need wiring; the overdue retro must be RUN once to green the gate.
@@ -132,3 +133,24 @@ A fresh project runs the inheritance, and from that moment **cannot** complete a
 - Evidence: # autonomous executions · # successful · # failed · human approval required (yes/no) · runtime traces supporting the claim.
 
 **Honesty rule:** in THIS harness the main loop (orchestrator) spawns agents — so the agent-orchestration layer is NOT autonomous; only the CI/pre-push gates execute without a human per-run. Do not claim "Operationally Proven" autonomy for agent work while a human/orchestrator is in the dispatch chain. The learning stage is Not Proven until G4 lands.
+
+## Capability Adoption Evidence (STANDING — mandatory in every completion report; TOP-PRIORITY principle 2026-06-15)
+> Founder principle: "exists" is NOT success — "USED" is success. A capability is complete only when
+> Built → Triggerable → Automatically exercised → Measured → Proven useful → Able to influence behavior.
+> Optimize the OS for capability ADOPTION + operational usage, not accumulation. The question is no
+> longer "Did we build it?" — it is "Is the OS actively using it?"
+
+**For EVERY capability / subsystem / agent / workflow / learning + autonomy + enforcement mechanism, report:**
+- **Status:** Built · Proven · **Active** (triggered + exercised) · **Dormant** (built + functional but NOT triggered/exercised) · Retired.
+- **Usage:** trigger (how + who/what triggers it) · frequency · last execution · # executions · # success · # failure · outcome generated.
+- **Impact:** what changed because of it? · would the system behave differently if it were removed?
+
+**DORMANT is a first-class, explicitly-reported status.** A built-but-untriggered capability MUST be
+listed as DORMANT (not hidden under "built"). Core: a capability never triggered delivers no value; never
+exercised cannot be trusted; one that doesn't change behavior is not yet part of the OS.
+
+**Generator/inputs (not memory):** capability-health (ALIVE=Active wired-to-run / INERT=Dormant) +
+agent-health (USED=Active / IDLE=Dormant) + the slice-records + the selection log + CI/hook wiring. The
+Status column is evidence-derived (ALIVE/USED → Active; INERT/IDLE → Dormant), never hand-set.
+Applies to: G4 learning · Auto-Exec · Founder-Away-Mode · capability propagation · PLOS integrations ·
+all future agents + roadmap work.
