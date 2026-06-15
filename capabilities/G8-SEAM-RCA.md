@@ -47,3 +47,13 @@ Headline asymmetry: **Admin fail-closed against canonical; PLOS fail-open agains
 - **SKIP:** the stale Admin header comment; over-refactoring the working stateless client.
 - **Staging:** G8 may propagate the *mechanism* (os-inherit reaching PLOS) first, but **G8 is not CLOSED until the MUST set is green on PLOS's real drain and QA has independently re-run the gate on BOTH sides.** Negative test: a crafted HTML/PII/missing-notice batch must FAIL `bad_contract` in PLOS where today it silently accepts.
 - **Honest caveat:** risks demonstrated by code path (read-only), not a live failing run; QA to confirm with a crafted batch before/after.
+
+## 7. Live-status finding (2026-06-15) — NOT-LIVE
+Evidence verdict: PLOS is NOT consuming live Admin events anywhere that matters.
+- No scheduler/poller (drain fires only on a human gesture: drain button / Room on-mount briefing). `route.ts:2` "Founder-triggered ONLY (NO scheduler/cron)"; route-scope test asserts no cron/interval/pg_cron.
+- `.env:22` ADMIN_EVENTS_URL=http://localhost:8787 (not prod). No vercel.json / .vercel / prod env → not deployed. Token is a local dev-user JWT.
+- Docs: consumer "STOPS at durable, deduped consumption … not actioned … events feed = FUTURE contract"; live Room runs on projections.
+**Therefore the fail-open seam is LATENT, not an active prod data risk.** Decision: G8 seam MUST-set
+(vendor + repoint drain to validateSeamBatch + PLOS seam:check) is a HARD PRECONDITION before PLOS is
+pointed at prod (the missing prod-URL + prod-token + deploy are the trigger to require it). Sequence:
+G5 → G4 → G8(seam MUST-set + propagation) before any production integration.
