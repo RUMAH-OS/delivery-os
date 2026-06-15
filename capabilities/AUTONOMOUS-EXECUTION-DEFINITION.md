@@ -58,11 +58,29 @@ said **no**, and the synthesis sides with the adversarial seat on the NOUN:
 > - **AUTOMATION, not autonomy (relabel everywhere):** A/B/C auto-select/inject/route — Required-for-Landed as
 >   automation, the majority of the value, but NOT the autonomy claim. Stop calling them "autonomous."
 
-## The founder trade to sign (the contradiction must be resolved, not averaged)
-**Option 1 — Autonomy is a 5th landed pillar (earn the OS noun):** D/F/H/J ("Autonomous Operation," graded by
-AUTO-EXEC-CRITERIA §C) join the landed definition; "AI Operating System" is claimable only when they're GREEN.
-**Option 2 — Conscious defer (don't claim the noun yet):** D/F/H/J stay post-landed; AUTO-EXEC-CRITERIA becomes
-the standing target for *when* the OS noun is earned; until then the honest label is "landed V6 delivery model
-/ orchestration layer," explicitly **not** "AI Operating System." The founder accepts that trade in writing.
-**Not acceptable:** leaving both docs on disk so the project implies autonomy is handled while the pre-registered
-target sits unmet one file over. Pick one; sign it.
+## RESOLVED (founder-ratified 2026-06-15) — Option 2: separate the two claims
+- **V6 Landed = the 4 pillars** (Mechanism · Ecosystem · Adoption · Founder Experience). **Autonomy is NOT a
+  V6 blocker.** When the 4 pillars are GREEN+durable, the V6 roadmap is complete.
+- **"AI Operating System" is the SEPARATE, stronger claim**, earned POST-V6 by passing the **Founder Absence
+  Test** below. `AUTO-EXEC-CRITERIA.md` is the standing quantitative target for that claim — NOT a V6 blocker,
+  no longer a contradiction. Until the test passes, the honest label is "landed V6 delivery model / orchestration
+  layer," not "AI Operating System."
+
+## The Founder Absence Test — the POST-V6 milestone that earns "AI Operating System"
+Rationale it is post-V6, not a V6 blocker: it DEPENDS on all 4 pillars (can't run unattended safely until the
+mechanism is proven, the ecosystem works, adoption makes specialists do real work, and the founder can verify);
+it is maximum blast-radius on an unproven base; and it is a distinct capability (A6 away-mode runner) with its
+own acceptance test.
+- **Setup:** founder ratifies a bounded objective/work-list + envelope (kill-switch · count/cost/wall-clock caps
+  · ADR-006/007 boundaries · no irreversible/outward actions · author≠verifier preserved) → leaves.
+- **During:** the runner progresses the pre-approved gated work within guardrails; skills + knowledge used;
+  reports generated per step; **halt-on-red, never silent-skip.**
+- **Return:** founder reconstructs the ENTIRE story from the standing reports alone (who/what/why/skills/
+  knowledge/all-gates-green) — no detective work (the Founder Experience pillar, applied to an absence).
+- **PASS:** a real absence window · ≥K pre-approved items completed · every gate enforced · kill-switch
+  available+honored · zero boundary crossings · founder verifies from reports. = earns the "AI Operating System" claim.
+- **HONEST HARNESS CEILING (state in the claim):** today only the main loop spawns agents, so the away-mode
+  runner executes pre-approved **scripted + gated steps + validations + reporting** unattended (cron/scheduled)
+  — it does NOT spawn specialist AGENTS out-of-loop. So the test proves **"unattended bounded operation the
+  founder can verify,"** NOT "specialist agents working solo while away." The "AI OS" claim is scoped to
+  unattended BOUNDED operation; true out-of-loop specialist work needs a future runtime beyond this harness.

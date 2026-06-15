@@ -50,17 +50,20 @@ read is not a landed OS.
   control** (the founder can stop / redirect / override — kill-switch + ratification exercised on real work).
 - **Blocking:** YES. PASS = the founder's repeated sign-off, not a tool's green.
 
+## "V6 Landed" vs "AI Operating System" — RESOLVED (founder-ratified 2026-06-15)
+The earlier contradiction (this doc excluding autonomy vs `AUTO-EXEC-CRITERIA.md` pre-registering it) is
+resolved by SEPARATING the two claims — not by softening either:
+- **V6 LANDED = the 4 pillars above (Mechanism · Ecosystem · Adoption · Founder Experience).** Autonomous
+  execution is **NOT a blocker for V6 Landed.** When the 4 pillars are GREEN + durable, the V6 roadmap is complete.
+- **"AI Operating System" is a SEPARATE, STRONGER claim**, earned POST-V6 via a concrete **Founder Absence
+  Test** (the autonomy cluster D/F/H/J — see `AUTONOMOUS-EXECUTION-DEFINITION.md`). Until that test passes, the
+  honest label is **"landed V6 delivery model / orchestration layer," not "AI Operating System."**
+
 ## EXCLUSIONS (conscious, not oversights)
-- **Autonomous self-spawning execution (I)** is OUT of the landed definition: the harness only lets the main
-  loop spawn agents; the founder ruled self-spawning is not the success criterion.
-- **⚠ UNRESOLVED — CONTRADICTION FLAGGED 2026-06-15 (autonomy board):** this doc reclassified the **A6 away-mode
-  envelope (D/F/H/J — unattended bounded operation)** as "post-landed optional." The adversarial board seat
-  showed that is a **goalpost-move** vs the earlier pre-registered `AUTO-EXEC-CRITERIA.md` ("do not soften
-  Operationally"), and that D/F/H/J are **NOT harness-blocked** (only I is). Per `AUTONOMOUS-EXECUTION-DEFINITION.md`,
-  the honest position is that the **"AI Operating System" noun is not earned until D/F/H/J land.** This is an
-  **open founder trade** (5th pillar "Autonomous Operation" vs conscious-defer-and-don't-claim-the-noun) — do
-  NOT treat autonomy as settled until the founder signs it. Until then this is a **landed V6 delivery model /
-  orchestration layer**, not an "AI Operating System."
+- **Autonomous self-spawning execution (I)** is OUT permanently: the harness only lets the main loop spawn
+  agents; the founder ruled self-spawning is not the success criterion.
+- **Autonomous operation (D/F/H/J)** is OUT of the V6-Landed definition but is the **post-V6 milestone** that
+  earns the "AI Operating System" claim (Founder Absence Test). Conscious defer, founder-ratified — not a softened bar.
 - **Causal/DECISIVE influence (ablation)** is OPTIONAL rigor; TRUST-level (cited@hash + fingerprint) is the
   default bar for "influence." Founder may elect ablation later.
 
