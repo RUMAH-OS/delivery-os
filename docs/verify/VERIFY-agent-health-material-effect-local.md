@@ -189,6 +189,45 @@ were addressed. Verifier ran each check itself; results verbatim:
 **Result: all 3 checks PASS. BUG-1 and BUG-2 are RESOLVED.** verify_status remains
 `verified`. Not committed.
 
+## batch-parallel signal confirmation (2026-06-15)
+
+Independent verification (author != verifier) of the new exported pure fn
+`batchParallel(selections)` — the AUTHORITATIVE parallel signal that counts
+router-logged parallel batches (mtime undercounts same-message dispatches). Q5 now
+reports both the authoritative batch count and the mtime lower-bound. Verifier ran each
+check itself against the REAL module; results verbatim.
+
+1. **Self-test (check 1)** — `node templates/tools/agent-health.mjs --self-test` →
+   exit 0, all 16 cases PASS, including the new
+   `PASS  batch-parallel (got 1/2, want 1/2)` AND the existing
+   `PASS  parallel-rate (got 1/2, want 1/2)`. PASS.
+2. **Import-drive `batchParallel` from the real module (check 2)** — `import { batchParallel }`
+   from the real `./templates/tools/agent-health.mjs` (import-safe per BUG-1 fix), no
+   library copy. Truth table:
+
+   | input | output |
+   |---|---|
+   | `[{parallelBatch:"A",chosen:"x"},{parallelBatch:"A",chosen:"y"},{parallelBatch:"B",chosen:"z"}]` | `{batches:2, parallelBatches:1}` |
+   | `[]` | `{batches:0, parallelBatches:0}` |
+   | records with no `parallelBatch` field (`[{chosen:"x"},{chosen:"y"}]`) | `{batches:0, parallelBatches:0}` (ignored) |
+
+   All three match expectation exactly. PASS.
+3. **End-to-end, mutation-proven (check 3)** — verifier-authored temp selection log
+   (2 records sharing batch `P1`, 1 record batch `P2`) + temp telemetry dir, run with
+   `--selections <temp> --telemetry <temp>`. Q5 printed verbatim:
+   `authoritative (router batches): 1/2 batches dispatched >1 agent in parallel`.
+   MUTATION: changed the second `P1` record's batch to a distinct `P3` (all 3 now unique)
+   and re-ran → Q5 printed `authoritative (router batches): 0/3 batches dispatched >1
+   agent in parallel`. The number FOLLOWS the verifier's log (1/2 → 0/3), not hard-coded.
+   PASS.
+4. **Without `--selections` (check 4)** — same temp telemetry, no `--selections`. Q5
+   printed ONLY `mtime lower-bound: 0/1 spawn-seconds had >1 agent (undercounts; see
+   caveat)` under the `Q5 — parallel:` header; NO `authoritative` line; exit 0, no crash.
+   PASS.
+
+**Result: all 4 checks PASS. The authoritative batch-parallel signal is real and
+follows the input.** verify_status remains `verified`. Not committed.
+
 ## Cleanliness
 
 - Production code: unchanged by the verifier. The only working-tree modification

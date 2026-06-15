@@ -122,13 +122,25 @@ function installedAgents(agentsDir) {
   return set;
 }
 
-// parallel = spawn-moments (rounded to the second) that launched >1 agent
+// parallel = spawn-moments (rounded to the second) that launched >1 agent.
+// HONEST CAVEAT: mtime UNDERCOUNTS — agents dispatched in one message can land in
+// adjacent seconds. The authoritative signal is the router's logged parallelBatch
+// (see batchParallel) when a selection log is present.
 function parallelRate(records) {
   const bySec = {};
   for (const r of records) { const s = Math.floor(r.at / 1000); bySec[s] = (bySec[s] || 0) + 1; }
   const moments = Object.values(bySec);
   const parallelMoments = moments.filter((n) => n > 1).length;
   return { moments: moments.length, parallelMoments };
+}
+
+// AUTHORITATIVE parallel signal: a batch (≥1 selection sharing a parallelBatch id) with
+// >1 routed agent was dispatched in parallel. pure: counts batches + parallel ones.
+export function batchParallel(selections) {
+  const byBatch = {};
+  for (const s of selections) { const b = s && s.parallelBatch; if (!b) continue; (byBatch[b] = byBatch[b] || []).push(s.chosen); }
+  const batches = Object.values(byBatch);
+  return { batches: batches.length, parallelBatches: batches.filter((a) => a.length > 1).length };
 }
 
 // THE MILESTONE REPORT — answers the founder's 7 agent-orchestration questions from evidence.
@@ -185,8 +197,12 @@ function measure() {
   } else {
     console.error(`  (no selection log at ${selectionsPath || "--selections <path>"} — selection rationale not yet captured for this window)`);
   }
-  // Q5 — parallel where appropriate
-  console.error(`Q5 — parallel: ${par.parallelMoments}/${par.moments} spawn-moments launched >1 agent (${par.moments ? Math.round((par.parallelMoments / par.moments) * 100) : 0}%)`);
+  // Q5 — parallel where appropriate. Authoritative = router-logged batches; mtime is a
+  // lower-bound fallback (it undercounts same-message batches landing in adjacent seconds).
+  const bp = batchParallel(selections);
+  console.error(`Q5 — parallel:`);
+  if (selections.length) console.error(`  authoritative (router batches): ${bp.parallelBatches}/${bp.batches} batches dispatched >1 agent in parallel`);
+  console.error(`  mtime lower-bound: ${par.parallelMoments}/${par.moments} spawn-seconds had >1 agent (undercounts; see caveat)`);
   // Q6 — material effect
   if (wantMaterial) {
     console.error(`Q6 — material effect: ${decisiveTotal}/${total} invocations DECISIVE (${materialRate}%) · ` +
@@ -195,7 +211,8 @@ function measure() {
   console.error(`--- system signals ---`);
   console.error(`  selection: ${selectionDeterministic ? "DETERMINISTIC (agent-route present + self-consistency-gated)" : "MODEL-DRIVEN (no agent-router)"}`);
   console.error(`  measured:  YES (this report reads roster + telemetry + transcripts + selection log)`);
-  console.error(`SUMMARY: ${used.length} used · ${idle.length} idle(never-chosen) · selection=${selectionDeterministic ? "deterministic" : "model-driven"} · parallel=${par.parallelMoments > 0 ? "yes" : "NEVER"} · material=${wantMaterial ? `${materialRate}% decisive` : "not measured (--no-material)"}`);
+  const anyParallel = bp.parallelBatches > 0 || par.parallelMoments > 0;
+  console.error(`SUMMARY: ${used.length} used · ${idle.length} idle(never-chosen) · selection=${selectionDeterministic ? "deterministic" : "model-driven"} · parallel=${anyParallel ? `yes (${bp.parallelBatches} router batch(es))` : "NEVER"} · material=${wantMaterial ? `${materialRate}% decisive` : "not measured (--no-material)"}`);
   process.exit(0);
 }
 
@@ -224,6 +241,11 @@ function selfTest() {
   const parOk = par.moments === 2 && par.parallelMoments === 1;
   if (!parOk) fail++;
   console.error(`  ${parOk ? "PASS" : "FAIL"}  parallel-rate (got ${par.parallelMoments}/${par.moments}, want 1/2)`);
+  // batchParallel: batch "A" with 2 agents = parallel; batch "B" with 1 = serial
+  const bp = batchParallel([{ parallelBatch: "A", chosen: "x" }, { parallelBatch: "A", chosen: "y" }, { parallelBatch: "B", chosen: "z" }]);
+  const bpOk = bp.batches === 2 && bp.parallelBatches === 1;
+  if (!bpOk) fail++;
+  console.error(`  ${bpOk ? "PASS" : "FAIL"}  batch-parallel (got ${bp.parallelBatches}/${bp.batches}, want 1/2)`);
   if (fail) { console.error(`FAIL: agent-health MISCLASSIFIED ${fail} known case(s).`); process.exit(1); }
   console.error(`PASS: agent-health classifies all known states correctly — it measures reality.`);
   process.exit(0);

@@ -52,6 +52,7 @@ There is exactly ONE propagation mechanism (os-sync + os-inherit) and ONE capabi
 | **Standing experience-review wiring (PLOS)** | the reviewer runs on-demand, not on every change + cadence | automation+gate | HIGH | makes discovery automatic (the system is the first user, never the founder) |
 | **Mailbox fix (PLOS)** | 56s mailbox | fix | HIGH | list-only first paint; the experience-review harness is its acceptance test (flips to PASS) |
 | **deployment-operator + audited lane (#7)** | deployment ownership confusion; per-action auth dance | agent+automation | MED | the founder-burden lane (one-time ratification) |
+| **cross-repo seam-contract hash check (Admin↔PLOS)** | api-integration agent review (2026-06-15): the seam contract is vendored per-repo with NO mechanism ensuring both copies are identical bytes; a new valid event type Admin ships would be silently REJECTED by a stale PLOS copy until it hits prod | gate | MED | the seam-gate proves producer↔contract conformance within a repo, but nothing proves Admin's contract == PLOS's contract; os-sync the contract + fail CI on a vendored-hash mismatch |
 
 ## Maturity stage tracker (the victory-gate — updated every milestone; no early wins)
 Stage ladder: **Documented → Built → Verified → Used → Inherited → Auto-executed.** A capability still
