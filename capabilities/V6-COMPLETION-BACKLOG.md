@@ -63,7 +63,8 @@
 - **Completion:** "passes technically but weak as product" is a measurable, regression-catchable, fail-closed signal.
 
 ## G6 — Agent-Selection Validation (prove routing is automatic, not Claude-forced)
-- **Status:** In Progress (deterministic scoring proven; selection log partly hand-written; no regression suite)
+- **Status:** **Proven** (2026-06-15) — `route:suite` (27 fixture task→expected cases, NO Claude in loop) runs in CI after agents:check; regression-catch proven (neutralize a trigger → exit 1); **confidence margin is load-bearing** (FLOOR hard-fail / MIN_MARGIN warn) + an ambiguity set proves the router DETECTS uncertainty instead of confidently misrouting; `route:provenance` cross-checks logged-vs-spawned (honestly flags the stand-in divergence); `agent-route --log` now records margin+confident. Independent QA 6/6 (`docs/verify/VERIFY-agent-selection-validation-local.md`). Answers "right agents selected automatically without Claude forcing it": high-confidence → trust router; low-confidence → flagged for orchestrator decision (not silently misrouted). Seed misroute (governance-design→lead-architect) fixed + locked as a regression case (margin 25).
+- **(historical) Status:** In Progress (deterministic scoring proven; selection log partly hand-written; no regression suite)
 - **Owner:** qa-reviewer (suite design) → software-engineer (build) → qa-test
 - **Build:** (a) a task→expected-agent **regression suite** (~30 real backlog phrasings → expected specialist) run in CI with NO Claude in the loop, asserting `routeTask()` picks correctly; (b) make the spawn path write the selection log via `agent-route --log` (machine-produced, not hand-appended); (c) agent-health cross-checks logged selection == the meta.json agentType actually spawned.
 - **Dependencies:** agent-route ✅, agents:check ✅.
