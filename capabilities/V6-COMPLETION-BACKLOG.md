@@ -185,3 +185,7 @@ all future agents + roadmap work.
 **Capability Evidence Table:** `| Capability | Built | Triggered | Used | Outcome Produced | Trust Score |` — Built weakest, Outcome strongest.
 
 **Evidence sources (generated, not asserted):** capability-health (ALIVE=triggered-in-CI / INERT=dormant) · agent-health (USED/IDLE + decisive=influence) · skill-health [G10, pending] (skill trigger/use/trust) · slice-records (outcome) · selection log (routing decisions). Where no telemetry exists (skills today), the item is reported DORMANT/UNMEASURED — never inferred Operational.
+
+## G11 — Skill Usage Proof (board outcome 2026-06-15; see SKILL-PROOF-ARCHITECTURE.md)
+- **Status:** Designed (board review complete). Honest verdict: full 6-level proof NOT achievable by telemetry alone — L1–2 PROVEN, L3 attested (content-bound citation), L5 PROVEN for execution skills (artifact-fingerprint), L4/L6 proxy-only unless ablation. Every record stamped `evidence-strength`; trust = evidence ledger (NOT a gameable scalar); UNMEASURED fails closed; cadence field guards one-shot-skill dormancy mis-flagging.
+- **Smallest slice:** one execution skill end-to-end (skill-route --log + skill-health.mjs + citation/fingerprint verifier + marker convention). Build before scaling. Gated like G10; auto-injection shares the A3 dependency (G9).
