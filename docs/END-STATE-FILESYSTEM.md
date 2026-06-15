@@ -1,5 +1,7 @@
 # V6 End-State Filesystem — board-recommended layout (2026-06-15)
 
+> **RATIFIED 2026-06-15 — founder closed the architecture discussion.** This is the LOCKED intended end-state + future migration target. Source-of-Truth=Delivery-OS · Projection=.claude/os · Domain=Application. Roadmap unchanged; prove in Admin before any large-scale PLOS migration.
+
 > Destination-only (no roadmap/timing). The board's concrete physical structure for "single OS, apps consume it."
 
 ## The honest headline (adversarial seat — must be stated plainly)

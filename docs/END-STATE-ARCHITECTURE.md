@@ -1,5 +1,7 @@
 # V6 End-State Architecture — the destination (2026-06-15)
 
+> **RATIFIED 2026-06-15 — founder closed the architecture discussion.** This is the LOCKED intended end-state + future migration target. Source-of-Truth=Delivery-OS · Projection=.claude/os · Domain=Application. Roadmap unchanged; prove in Admin before any large-scale PLOS migration.
+
 > Founder-defined DESTINATION. NOT a roadmap change, NOT a migration now, NOT a delay to G4. The current
 > backlog + G-sequence stand. This document fixes where v6 is ultimately heading + the board's honest
 > refinement of how to make that destination sound. Migration is sequence steps 8–14 (after v6 proven).
