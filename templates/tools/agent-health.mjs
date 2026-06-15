@@ -18,15 +18,26 @@
 //   - measured:  this tool existing == agent usage is now measured (it was not before)
 //
 //   node agent-health.mjs --agents <dir> --telemetry <subagents-dir> [--router <path>]
+//   node agent-health.mjs --agents <dir> --telemetry <d1> --telemetry <d2> ...   (UNION; repeatable)
+//   node agent-health.mjs --agents <dir> --telemetry-glob '<...>/*/subagents'    (UNION; glob-expanded)
 //   node agent-health.mjs --self-test
+//
+// TELEMETRY WINDOW = the UNION of all resolved subagents dirs. The corpus is split across
+// MULTIPLE per-session dirs (~/.claude/projects/<project>/<session>/subagents); reading ONE
+// (e.g. most-recent) makes the rest of the window invisible and false-flags used agents as
+// idle. --telemetry is repeatable and/or --telemetry-glob expands to every matching dir;
+// records are deduped by file path so an overlapping dir is never double-counted.
 // =============================================================================
 
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
 
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
+// collect ALL values for a repeatable flag (e.g. --telemetry a --telemetry b)
+const optAll = (k) => { const out = []; for (let i = 0; i < argv.length; i++) if (argv[i] === k && argv[i + 1]) out.push(argv[i + 1]); return out; };
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DOS = join(HERE, "..", "..");
 
@@ -114,6 +125,89 @@ function readTelemetry(telemetryDir, { material = true } = {}) {
   return out;
 }
 
+// read the telemetry corpus from the UNION of multiple subagents dirs. Records are
+// deduped by absolute .meta.json path, so overlapping/duplicate dirs never double-count.
+// This is THE window: usage from every session dir is visible at once.
+export function readTelemetryUnion(telemetryDirs, { material = true } = {}) {
+  const out = [];
+  const seen = new Set();
+  for (const dir of (telemetryDirs || [])) {
+    if (!dir || !existsSync(dir)) continue;
+    let files;
+    try { files = readdirSync(dir); } catch { continue; }
+    for (const f of files) {
+      if (!/\.meta\.json$/.test(f)) continue;
+      const p = resolve(dir, f);
+      if (seen.has(p)) continue;
+      seen.add(p);
+      try {
+        const t = parseAgentType(readFileSync(p, "utf8"));
+        if (!t) continue;
+        let verdict = null;
+        if (material) { const jsonl = join(dir, f.replace(/\.meta\.json$/, ".jsonl")); verdict = classifyVerdict(finalAssistantText(jsonl)); }
+        out.push({ agentType: t, at: statSync(p).mtimeMs, verdict });
+      } catch {}
+    }
+  }
+  return out;
+}
+
+// expand a glob whose ONLY wildcard segment(s) are single '*' path components
+// (e.g. '<base>/*/subagents'). Resolves '~' to homedir. Returns existing dirs only.
+// Deliberately tiny: enough for the project sessions glob, no '**' / charclass support.
+export function expandTelemetryGlob(glob) {
+  if (!glob) return [];
+  let g = String(glob).replace(/\\/g, "/");
+  if (g === "~" || g.startsWith("~/")) g = homedir().replace(/\\/g, "/") + g.slice(1);
+  const parts = g.split("/");
+  // seed roots: handle absolute (POSIX '/...' or Windows 'C:/...') and relative
+  let roots = [parts[0] === "" ? "/" : parts[0]];
+  for (let i = 1; i < parts.length; i++) {
+    const seg = parts[i];
+    if (seg === "") continue;
+    const next = [];
+    for (const r of roots) {
+      if (seg === "*") {
+        try { for (const e of readdirSync(r)) { const c = join(r, e); try { if (statSync(c).isDirectory()) next.push(c); } catch {} } } catch {}
+      } else {
+        const c = (r === "/" ? "/" + seg : join(r, seg));
+        if (existsSync(c)) next.push(c);
+      }
+    }
+    roots = next;
+  }
+  // keep only directories, dedup
+  const out = [];
+  const seen = new Set();
+  for (const r of roots) { try { if (statSync(r).isDirectory() && !seen.has(r)) { seen.add(r); out.push(r); } } catch {} }
+  return out;
+}
+
+// resolve the full set of telemetry dirs (the UNION window) from CLI inputs.
+// explicitDirs: every --telemetry value (repeatable). globPattern: --telemetry-glob.
+// Default glob = the project sessions glob, so a bare invocation already unions all sessions.
+// Returns { dirs, basis } — basis is an honest description of how the window was assembled.
+export function resolveTelemetryDirs(explicitDirs, globPattern) {
+  const dirs = [];
+  const seen = new Set();
+  const add = (d) => { const r = resolve(d); if (!seen.has(r)) { seen.add(r); dirs.push(r); } };
+  const ex = (explicitDirs || []).filter(Boolean);
+  for (const d of ex) add(d);
+  let basisGlob = null;
+  // glob applies when explicitly given OR when no --telemetry dirs were supplied (default window)
+  if (globPattern) { basisGlob = globPattern; for (const d of expandTelemetryGlob(globPattern)) add(d); }
+  else if (!ex.length) {
+    const def = join(homedir(), ".claude", "projects", "c--Users-brian-RUMAH-rumah-admin", "*", "subagents");
+    basisGlob = def; for (const d of expandTelemetryGlob(def)) add(d);
+  }
+  const present = dirs.filter((d) => existsSync(d));
+  let basis;
+  if (ex.length && basisGlob) basis = `union of ${present.length} dir(s): ${ex.length} explicit --telemetry + glob ${basisGlob}`;
+  else if (ex.length) basis = `union of ${present.length} explicit --telemetry dir(s)`;
+  else basis = `union of ${present.length} dir(s) from glob ${basisGlob}`;
+  return { dirs: present, basis };
+}
+
 function installedAgents(agentsDir) {
   const set = new Set();
   if (agentsDir && existsSync(agentsDir)) {
@@ -146,13 +240,17 @@ export function batchParallel(selections) {
 // THE MILESTONE REPORT — answers the founder's 7 agent-orchestration questions from evidence.
 function measure() {
   const agentsDir = opt("--agents", join(DOS, ".claude", "agents"));
-  const telemetryDir = opt("--telemetry", null);
+  const telemetryDirsArg = optAll("--telemetry");
+  const telemetryGlob = opt("--telemetry-glob", null);
   const routerPath = opt("--router", join(DOS, "templates", "tools", "agent-route.mjs"));
   const selectionsPath = opt("--selections", null); // agent-route's selection log (the "why", #3)
   const wantMaterial = !argv.includes("--no-material");
 
+  // THE WINDOW = union of all resolved subagents dirs (every --telemetry + --telemetry-glob,
+  // default = project sessions glob). UNMEASURED only if the union is empty.
+  const { dirs: telemetryDirs, basis: telemetryBasis } = resolveTelemetryDirs(telemetryDirsArg, telemetryGlob);
   const installed = installedAgents(agentsDir);
-  const records = readTelemetry(telemetryDir, { material: wantMaterial });
+  const records = readTelemetryUnion(telemetryDirs, { material: wantMaterial });
   const counts = {}, decisive = {}, byVerdict = {};
   for (const r of records) {
     counts[r.agentType] = (counts[r.agentType] || 0) + 1;
@@ -162,7 +260,7 @@ function measure() {
   // HONESTY: no telemetry dir given ≠ "every agent is idle". Without evidence, usage is
   // UNMEASURED, not zero — reporting IDLE here would narrate, not measure (the exact failure
   // this whole system exists to prevent).
-  const measuredUsage = !!telemetryDir && existsSync(telemetryDir);
+  const measuredUsage = telemetryDirs.length > 0;
 
   // union of installed + actually-invoked (an invoked built-in with no .md still shows)
   const names = [...new Set([...installed, ...Object.keys(counts)])].sort();
@@ -186,6 +284,7 @@ function measure() {
   const idle = rows.filter((r) => r.status === "IDLE");
 
   console.error(`═══ agent-orchestration health · ${measuredUsage ? `${total} invocations measured` : "usage NOT MEASURED (no --telemetry)"} ═══`);
+  if (measuredUsage) console.error(`  telemetry window: ${telemetryBasis}`);
   if (!measuredUsage) console.error(`  (pass --telemetry <subagents dir> to measure usage/material-effect; roster below is INSTALLED-only)`);
   // Q1 available · Q2 selected · Q4 how often · Q7 never chosen — the roster
   console.error(`Q1/Q2/Q4/Q7 — roster (available · selected · how often · never chosen):`);
@@ -256,6 +355,47 @@ function selfTest() {
   const bpOk = bp.batches === 2 && bp.parallelBatches === 1;
   if (!bpOk) fail++;
   console.error(`  ${bpOk ? "PASS" : "FAIL"}  batch-parallel (got ${bp.parallelBatches}/${bp.batches}, want 1/2)`);
+  // multi-dir UNION: 2 temp subagents dirs; counts must SUM across both, deduped by path.
+  // dirA: qa-test×2, software-engineer×1 ; dirB: qa-test×1, lead-architect×1.
+  // Expect union total=5, qa-test=3, software-engineer=1, lead-architect=1.
+  let unionOk = false, unionMsg = "";
+  try {
+    const tmp = mkdtempSync(join(tmpdir(), "agent-health-union-"));
+    const dirA = join(tmp, "sessA", "subagents");
+    const dirB = join(tmp, "sessB", "subagents");
+    mkdirSync(dirA, { recursive: true }); mkdirSync(dirB, { recursive: true });
+    const meta = (t) => `{"agentType":"${t}","description":"x","toolUseId":"u"}`;
+    writeFileSync(join(dirA, "a1.meta.json"), meta("qa-test"));
+    writeFileSync(join(dirA, "a2.meta.json"), meta("qa-test"));
+    writeFileSync(join(dirA, "a3.meta.json"), meta("software-engineer"));
+    writeFileSync(join(dirB, "b1.meta.json"), meta("qa-test"));
+    writeFileSync(join(dirB, "b2.meta.json"), meta("lead-architect"));
+    // pass dirA TWICE to also prove dedup-by-path doesn't double-count
+    const recs = readTelemetryUnion([dirA, dirB, dirA], { material: false });
+    const c = {}; for (const r of recs) c[r.agentType] = (c[r.agentType] || 0) + 1;
+    unionOk = recs.length === 5 && c["qa-test"] === 3 && c["software-engineer"] === 1 && c["lead-architect"] === 1;
+    unionMsg = `total ${recs.length}, qa-test ${c["qa-test"]}, software-engineer ${c["software-engineer"]}, lead-architect ${c["lead-architect"]}`;
+    rmSync(tmp, { recursive: true, force: true });
+  } catch (e) { unionMsg = `threw ${e && e.message}`; }
+  if (!unionOk) fail++;
+  console.error(`  ${unionOk ? "PASS" : "FAIL"}  telemetry UNION across 2 dirs sums + dedups (got ${unionMsg}; want total 5, qa-test 3, software-engineer 1, lead-architect 1)`);
+
+  // expandTelemetryGlob: build base/<sess>/subagents under temp, glob base/*/subagents → 2 dirs
+  let globOk = false, globMsg = "";
+  try {
+    const tmp = mkdtempSync(join(tmpdir(), "agent-health-glob-"));
+    const base = join(tmp, "projects", "proj");
+    mkdirSync(join(base, "s1", "subagents"), { recursive: true });
+    mkdirSync(join(base, "s2", "subagents"), { recursive: true });
+    mkdirSync(join(base, "notasession"), { recursive: true }); // no subagents → excluded
+    const hits = expandTelemetryGlob(join(base, "*", "subagents"));
+    globOk = hits.length === 2;
+    globMsg = `${hits.length} dir(s)`;
+    rmSync(tmp, { recursive: true, force: true });
+  } catch (e) { globMsg = `threw ${e && e.message}`; }
+  if (!globOk) fail++;
+  console.error(`  ${globOk ? "PASS" : "FAIL"}  expandTelemetryGlob('base/*/subagents') (got ${globMsg}, want 2 dir(s))`);
+
   if (fail) { console.error(`FAIL: agent-health MISCLASSIFIED ${fail} known case(s).`); process.exit(1); }
   console.error(`PASS: agent-health classifies all known states correctly — it measures reality.`);
   process.exit(0);
