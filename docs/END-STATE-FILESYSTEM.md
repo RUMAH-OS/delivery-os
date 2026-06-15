@@ -1,0 +1,115 @@
+# V6 End-State Filesystem — board-recommended layout (2026-06-15)
+
+> Destination-only (no roadmap/timing). The board's concrete physical structure for "single OS, apps consume it."
+
+## The honest headline (adversarial seat — must be stated plainly)
+**"Zero copies on disk" is physically impossible** if an app's fail-closed gates must run in CI: a gate is code, code must be present to execute, so every mechanism (submodule checkout / npm `node_modules` / workspace symlink) materializes the OS bytes in each app. The achievable goal — and what the founder actually wants — is:
+
+> **Single SOURCE of truth + ZERO HAND-MAINTAINED copies + drift-checked.** The OS is authored ONCE in `C:\rumah\delivery-os`; each app carries a mechanically-generated, checksum-verified PROJECTION (`.claude/os/`) that no human edits and that fail-closes if it diverges. The *intelligence* lives once; the *bytes* are projected. That is "no duplicated learning" — not "no bytes on disk."
+
+## 1. Where Delivery-OS lives — `C:\rumah\delivery-os` (its own git repo, the single source)
+```
+C:\rumah\
+├── delivery-os\          ← THE single source of truth (one repo = one brain)
+├── rumah-admin\          ← app (carries a drift-locked projection)
+├── property-lead-os\     ← app
+├── content-os\           ← app (future)
+└── ecosystem-architecture\  ← portfolio facts (separate concern; not the OS)
+```
+
+## 2. Delivery-OS internal layout (the brain)
+```
+C:\rumah\delivery-os\
+├── VERSION  CLAUDE.md  CODEOWNERS  CHANGELOG\
+├── manifest\            os-foundation.manifest.json · manifest.schema.json   (the inheritance set)
+├── agents\             base\ · overlay\ · domain\        (roles; base+overlay split preserved)
+├── skills\             <skill>/SKILL.md · platform\ · _archive\   (earned procedures)
+├── capabilities\       CAPABILITY-LEDGER · LIFECYCLE · AUTO-EXEC-CRITERIA · SKILL-PROOF-ARCH · signals.jsonl
+├── governance\         GOVERNANCE · DEFINITION-OF-DONE · OPERATING-LOOP · SEVERITY
+├── operating-principles\  PRINCIPLES.md (A2 fail-closed, A4 read-canonical-first, Waterline…)
+├── learning\           LEARNING-LOOP · promotion-gate.md (≥2-app reuse) · census\
+├── lessons\            _inbox\ (app-submitted, unpromoted) · promoted\ (passed the gate)
+├── wiki\               reusable cross-app knowledge pages (proven ≥2-app)
+├── reviews\            principle-11\ · readiness\ · decision-reviews\ (OS-level)
+├── trust\              TRUST-MODEL.md          adoption\   ADOPTION-MODEL.md
+├── telemetry\          aggregated cross-app signals (derived only)
+├── routing\            ROUTING-MODEL.md · kernel.tmpl.md (renders app CLAUDE.md sections)
+├── autonomy\           AUTONOMY-MODEL.md       founder-experience\  FOUNDER-READY-GATE · founder-burden\
+├── knowledge-graph\    GRAPH-MODEL.md · graph.json (lesson↔skill↔capability↔agent)
+├── contracts\          admin-plos-seam-v1.mjs (executable cross-system seams)
+├── tools\              gates\ · health\ · route\ · inherit\ · learning\ · deploy\   (the .mjs — was templates/tools)
+│                       (inherit\ adds: foundation-digest.mjs + multi-consumer-xcheck.mjs — NEW)
+├── templates\          app-skeleton\ · CLAUDE.md.tmpl · githooks\ · commands\ (scaffolding copied ONCE at init)
+└── docs\               END-STATE-ARCHITECTURE · END-STATE-FILESYSTEM · V6-* · archive\
+```
+
+## 3. Application tree (Admin / PLOS / Content-OS — same skeleton, different domain nouns)
+```
+C:\rumah\rumah-admin\
+├── CLAUDE.md            ← THIN manifest (§7 below)
+├── package.json  tsconfig.json  CODEOWNERS
+├── src\                domain code (Admin: invoices/tenants/owners/contracts/signatures)
+├── tests\  migrations\  scripts\
+├── workflows\          ← NEW: the founder's end-to-end workflows (invoicing run, signing re-send)
+├── admin-ui\           domain SPA
+├── docs\               PROJECT-BRIEF/MISSION/NORTH-STAR · adr\ · decision-reviews\ · verify\ · migration\ · slices\
+└── .claude\
+    ├── os\             ← DERIVED PROJECTION of the OS (drift-locked, NEVER hand-edited; runtime never reads it beyond execute)
+    │   ├── INHERITED.json   (osVersion pin + foundation-digest + per-file sha256)
+    │   ├── agents\ · skills\ · tools\ · contracts\   (the inherited subset, byte-current)
+    │   └── telemetry\       (raw per-app stream → flows UP to OS telemetry\)
+    ├── agents\         app-AUTHORED overlays only (often empty)
+    ├── skills\         app-AUTHORED, not-yet-promoted domain skills only
+    └── hooks\          app-local hooks that call .claude/os/tools/*
+```
+**GONE from each app:** any `.delivery-os/` flattened brain copy (the anti-pattern); hand-maintained CLAUDE.md §4/§5/§6/§8/§9; OS tools authored app-side.
+
+## 4. Reference mechanism — board DECISION (honest split resolved on deployment reality)
+The integration seat recommended **git submodule** (exact-sha pin); the adversarial seat **rejected it for THIS stack**: Vercel build sandboxes do NOT fetch submodules, and submodule auth/Windows is a solo-founder foot-gun; monorepo is rejected too (silent fan-out + lock-in vs the "avoid lock-in" invariant). **Decision: keep the `os-inherit` vendor+SHA model, elevated to full scale** — it is the only mechanism that runs **self-contained on Vercel/GitHub CI with no submodule-fetch, no registry, no symlinks**, and its one virtue gap (exact pin) is already delivered by `INHERITED.json`'s SHA manifest.
+- **Single source:** canonical lives ONLY in `C:\rumah\delivery-os`. The app's `.claude/os/` is a SHA-verified projection, never an authority.
+- **Local dev:** apps resolve the sibling `..\delivery-os` (the founder already has it).
+- **If a named artifact is ever required:** publish the OS as an **exact-pinned** npm package consumed via lockfile (npm becomes the os-inherit transport). NEVER a `^`/`~` range (silent fan-out). Monorepo and branch-tracking submodule are rejected.
+
+## 5–6. What stays in the app vs moves to the OS (ownership boundary)
+| Concern | APPLICATION owns | DELIVERY-OS owns |
+|---|---|---|
+| Code/UI/tests/migrations/workflows | ✓ (domain) | tools' self-tests; test-harness template |
+| Contracts | the types it PRODUCES (`src/contracts`) | the executable seam contract (vendored to apps) |
+| Agents | app-authored overlays only | all definitions + base/overlay split |
+| Skills | not-yet-promoted domain skills | all earned/reusable skills |
+| Governance / operating-principles | app CODEOWNERS | the doctrine + rules |
+| Lessons / wiki | raw at point-of-learning | promoted reusable lessons + wiki pages |
+| Capabilities / trust / adoption / routing / autonomy / knowledge-graph | consumes + emits telemetry | the models + ledgers |
+| Telemetry | raw per-app stream | aggregated cross-app |
+| Founder-experience | runs the gate | the gate + methodology |
+| Tools (.mjs) | EXECUTES vendored copies | AUTHORS them |
+| Business truth / ADRs / decisions / evidence | ✓ | OS-level decision reviews only |
+| Version pin | `.claude/os/INHERITED.json` | `VERSION` + `manifest\` |
+Rule: *strip the domain nouns; if it still teaches a second app → OS; the noun-bound remainder stays app-side.* Default tie-breaker: **promote AND preserve** (LOST=0).
+
+## 7. What remains in CLAUDE.md (thin manifest, ~1 screen; size-budget gated)
+Identity · Mission · North-Star+invariants (domain, trimmed) · **OS-loader block** (OS_ROOT=`C:\rumah\delivery-os` + pinned osVersion + foundation-digest + vendored-mirror path) · "what-to-load by reference to the manifest@pin" · application manifest (domain surface) · agent entry point ("ask the OS") · **Active-Now** (the only substantive inline content). §4/§5/§6/§8/§9 are RENDERED from the OS, not hand-listed.
+
+## 8–10. Reference · upgrade · dedup
+- **Reference:** `OS_ROOT` + pin in CLAUDE.md; `.claude/os/` = the SHA-verified projection.
+- **Upgrade propagation:** `os-inherit sync --from <OS_ROOT> --into .` → updates the projection + `INHERITED.json` in ONE reviewable, per-app, deliberate commit. Rollback = `git revert` that commit. No app moves until it runs the step (blast-radius isolated).
+- **Dedup/anti-fork:** `os-inherit check` fail-closes on any byte drift between projection and canonical + the foundation-digest cross-check. **Real gap to close: `os:check` is currently NOT in CI** (drift caught only at pre-push) — add it so a hand-edited projection can't pass CI.
+
+## 11. Historical v5/v6 preservation during migration
+Promote-AND-preserve → Knowledge-Lost=0 (audit table: Artifact·Before·Migrated·Archived·Lost; LOST=0 gate). Preserve as first-class payload: earned-from provenance, git history, per-app trust telemetry. Precedent: `PLOS-V6-MIGRATION-AUDIT.md`. Adversarially verified, not self-attested.
+
+## 12. Physical organization of skills/wiki/agents/governance/trust — see §2 (each is a top-level OS folder).
+
+## 13. When the OS upgrades, what changes inside an app
+**Only:** the projection bytes under `.claude/os/` + `INHERITED.json` (pin+digest) — regenerated by `os-inherit sync`, like a lockfile. Domain code untouched. The human decision is one line: the new pin.
+
+## 14. Brand-new app, near-zero setup
+```
+copy the templates\app-skeleton\ tree  (src/tests/migrations/workflows/CLAUDE.md.tmpl)
+node ..\delivery-os\tools\inherit\os-inherit.mjs sync --from ..\delivery-os --into .
+node ..\delivery-os\tools\route\os-sync.mjs            # agents base+overlay
+```
++ one-line CLAUDE.md OS-loader block (OS_ROOT + pin). The app now inherits every manifest-listed gate/contract/skill/agent at a pinned, drift-gated version, and runs green self-contained.
+
+## Hard precondition (unchanged): N≥2 proof before cutover
+This is the target layout. Physically moving Admin's brain into `C:\rumah\delivery-os` waits until a SECOND app (PLOS) inherits the core + runs green + one capability is demonstrably reused (can't validate "reused everywhere" at N=1).
