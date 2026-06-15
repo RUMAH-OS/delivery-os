@@ -228,6 +228,41 @@ check itself against the REAL module; results verbatim.
 **Result: all 4 checks PASS. The authoritative batch-parallel signal is real and
 follows the input.** verify_status remains `verified`. Not committed.
 
+## UNMEASURED honesty fix confirmation (2026-06-15)
+
+Independent verification (author != verifier) of an HONESTY fix: previously, running
+without `--telemetry` reported every agent as IDLE (false — absence of data is not
+idle). Now, with no telemetry dir given/found, agents show `UNMEAS`, the header/Q6/
+SUMMARY all say usage is NOT MEASURED; when telemetry IS supplied, behavior is
+unchanged. Verifier ran each check itself; results verbatim.
+
+1. **Self-test (check 1)** — `node templates/tools/agent-health.mjs --self-test` →
+   exit 0, all 16 cases PASS (logic unchanged). PASS.
+2. **No telemetry → honest UNMEASURED (check 2)** —
+   `node templates/tools/agent-health.mjs --agents ../rumah-admin/.claude/agents` →
+   header `═══ agent-orchestration health · usage NOT MEASURED (no --telemetry) ═══`;
+   every roster row `[UNMEAS ] ... installed (usage not measured)`;
+   `Q6 — material effect: NOT MEASURED (no --telemetry)`. Crucially: NO row says IDLE
+   and SUMMARY does NOT claim "N idle". exit 0. SUMMARY verbatim:
+   `SUMMARY: usage NOT MEASURED (pass --telemetry) · selection=deterministic · parallel=NEVER · material=not measured`
+   PASS.
+3. **Telemetry present → real measurement intact (check 3)** — same `--agents` plus
+   `--telemetry "C:/Users/brian/.claude/projects/c--Users-brian-RUMAH-rumah-admin/1286afbe-844a-4659-aba8-464e67f7c037/subagents"`
+   and `--selections ../rumah-admin/.claude/os/telemetry/agent-selections.jsonl` →
+   123 invocations measured; roster shows USED rows with counts (e.g. `qa-test 68× (55%)`);
+   real measured material %. SUMMARY verbatim:
+   `SUMMARY: 10 used · 0 idle(never-chosen) · selection=deterministic · parallel=yes (2 router batch(es)) · material=82% decisive`
+   A real measured number, NOT "not measured". PASS.
+4. **Bad/nonexistent `--telemetry` path → UNMEASURED, no crash, no false-idle (check 4)** —
+   `... --agents ../rumah-admin/.claude/agents --telemetry C:/nonexistent/path` →
+   treated as not-measured: header "usage NOT MEASURED", every row `[UNMEAS ]`,
+   Q6 "NOT MEASURED", SUMMARY `usage NOT MEASURED (pass --telemetry)`. No crash, no
+   false IDLE. exit 0. PASS.
+
+**Result: all 4 checks PASS. The false-IDLE-on-no-telemetry honesty defect is fixed;
+real measurement under `--telemetry` is intact.** verify_status remains `verified`.
+Not committed.
+
 ## Cleanliness
 
 - Production code: unchanged by the verifier. The only working-tree modification

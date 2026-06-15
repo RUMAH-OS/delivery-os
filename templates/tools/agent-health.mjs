@@ -159,12 +159,17 @@ function measure() {
     if (r.verdict) { byVerdict[r.verdict] = (byVerdict[r.verdict] || 0) + 1; if (isMaterial(r.verdict)) decisive[r.agentType] = (decisive[r.agentType] || 0) + 1; }
   }
 
+  // HONESTY: no telemetry dir given ≠ "every agent is idle". Without evidence, usage is
+  // UNMEASURED, not zero — reporting IDLE here would narrate, not measure (the exact failure
+  // this whole system exists to prevent).
+  const measuredUsage = !!telemetryDir && existsSync(telemetryDir);
+
   // union of installed + actually-invoked (an invoked built-in with no .md still shows)
   const names = [...new Set([...installed, ...Object.keys(counts)])].sort();
   const total = records.length;
   const rows = names.map((n) => {
     const invocations = counts[n] || 0;
-    const status = classifyAgent(n, { installed: installed.has(n), invocations });
+    const status = !measuredUsage ? "UNMEAS" : classifyAgent(n, { installed: installed.has(n), invocations });
     const share = total ? Math.round((invocations / total) * 100) : 0;
     const dec = decisive[n] || 0;
     const decRate = invocations ? Math.round((dec / invocations) * 100) : 0;
@@ -180,13 +185,15 @@ function measure() {
   const used = rows.filter((r) => r.status === "USED");
   const idle = rows.filter((r) => r.status === "IDLE");
 
-  console.error(`═══ agent-orchestration health · ${total} invocations measured ═══`);
+  console.error(`═══ agent-orchestration health · ${measuredUsage ? `${total} invocations measured` : "usage NOT MEASURED (no --telemetry)"} ═══`);
+  if (!measuredUsage) console.error(`  (pass --telemetry <subagents dir> to measure usage/material-effect; roster below is INSTALLED-only)`);
   // Q1 available · Q2 selected · Q4 how often · Q7 never chosen — the roster
   console.error(`Q1/Q2/Q4/Q7 — roster (available · selected · how often · never chosen):`);
   for (const r of rows) {
     const decCol = wantMaterial ? `  decisive ${r.dec}/${r.invocations} (${r.decRate}%)` : `  decisive n/a (--no-material)`;
     const ev = r.status === "USED" ? `${String(r.invocations).padStart(3)}× (${String(r.share).padStart(2)}%)${decCol}`
       : r.status === "IDLE" ? `  0×  — INSTALLED BUT NEVER CHOSEN (Q7)`
+      : r.status === "UNMEAS" ? `  installed (usage not measured)`
       : `${String(r.invocations).padStart(3)}× (${String(r.share).padStart(2)}%)  invoked built-in (no .md)`;
     console.error(`  [${r.status.padEnd(7)}] ${r.name.padEnd(26)} ${ev}`);
   }
@@ -203,16 +210,19 @@ function measure() {
   console.error(`Q5 — parallel:`);
   if (selections.length) console.error(`  authoritative (router batches): ${bp.parallelBatches}/${bp.batches} batches dispatched >1 agent in parallel`);
   console.error(`  mtime lower-bound: ${par.parallelMoments}/${par.moments} spawn-seconds had >1 agent (undercounts; see caveat)`);
-  // Q6 — material effect
-  if (wantMaterial) {
+  // Q6 — material effect (only meaningful when usage is measured)
+  if (wantMaterial && measuredUsage) {
     console.error(`Q6 — material effect: ${decisiveTotal}/${total} invocations DECISIVE (${materialRate}%) · ` +
       `breakdown ${Object.entries(byVerdict).map(([k, v]) => `${k}:${v}`).join(" ")}`);
+  } else if (wantMaterial) {
+    console.error(`Q6 — material effect: NOT MEASURED (no --telemetry)`);
   }
   console.error(`--- system signals ---`);
   console.error(`  selection: ${selectionDeterministic ? "DETERMINISTIC (agent-route present + self-consistency-gated)" : "MODEL-DRIVEN (no agent-router)"}`);
-  console.error(`  measured:  YES (this report reads roster + telemetry + transcripts + selection log)`);
+  console.error(`  measured:  ${measuredUsage ? "YES (roster + telemetry + transcripts + selection log)" : "PARTIAL — roster + selection log only (no --telemetry → usage/material unmeasured)"}`);
   const anyParallel = bp.parallelBatches > 0 || par.parallelMoments > 0;
-  console.error(`SUMMARY: ${used.length} used · ${idle.length} idle(never-chosen) · selection=${selectionDeterministic ? "deterministic" : "model-driven"} · parallel=${anyParallel ? `yes (${bp.parallelBatches} router batch(es))` : "NEVER"} · material=${wantMaterial ? `${materialRate}% decisive` : "not measured (--no-material)"}`);
+  const usageStr = measuredUsage ? `${used.length} used · ${idle.length} idle(never-chosen)` : `usage NOT MEASURED (pass --telemetry)`;
+  console.error(`SUMMARY: ${usageStr} · selection=${selectionDeterministic ? "deterministic" : "model-driven"} · parallel=${anyParallel ? `yes (${bp.parallelBatches} router batch(es))` : "NEVER"} · material=${wantMaterial ? (measuredUsage ? `${materialRate}% decisive` : "not measured") : "not measured (--no-material)"}`);
   process.exit(0);
 }
 
