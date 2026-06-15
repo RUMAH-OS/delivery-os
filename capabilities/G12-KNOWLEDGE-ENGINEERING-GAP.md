@@ -121,8 +121,30 @@ chooses to enforce. The purpose: make drift back toward `Founder → Claude → 
 is not ownership. Ownership is proven only when the role-area telemetry shows the agent ACTUALLY does the work
 (the area moves toward its target), measured every slice/milestone by the standing Operating-Model Check.
 
+## Operating-Model Check — v2 roadmap (founder: "expand over time")
+Today the check measures **WHO** owns the work (Claude vs agents). The founder wants it to also measure
+**WHERE execution knowledge is SOURCED FROM** — because the end-state is not "Claude writes less," it is
+`Knowledge → Skills → Agents → Execution`. v2 adds a **knowledge-source** dimension, classifying each
+knowledge access by origin:
+- **Markdown** (raw `Read` of a `.md` — the unobservable legacy path; target: shrinks over time)
+- **Wiki / Knowledge Units** (retrieved via `knowledge-route` — observable, citable)
+- **Skills** (skill-route dispatch)
+- **Runtime telemetry** (selection/health logs)
+Target trend: raw-markdown sourcing **declines**, Knowledge-Layer + skill sourcing **rises** — proving the
+operating model is actually inverting, not just relabeling. (Blocked until knowledge access is fully seam-
+routed; raw Reads are unobservable, so this measures the *migration* off raw markdown.)
+
 ## G12 status
-Measurement + standing check: **BUILT + VERIFIED + WIRED** (this slice). The OWNERSHIP MOVE itself
-(knowledge-engineer agent owning Documentation + Knowledge Management) is the **open** work, gated on founder
-ratification of the new agent. Proof = the two RED areas trend toward GREEN on the standing check, with the
-agent showing adoption evidence (USED + material-effect), author≠verifier preserved on promoted knowledge.
+- **P1 Built + routable + reviewed:** ✅ `knowledge-engineer` agent created (`.claude/agents/knowledge-engineer.md`),
+  author≠verifier baked in (firmest in the roster — reviewer-critic APPROVE-WITH-NITS), agent-route selects it
+  decisively for KU/promotion/dedup/memory/ADR-draft tasks (41.5 vs documentation 3.0). Registered in router §6.
+- **P2 Used (next session):** the harness registers spawnable agent types at session start, so the FIRST real
+  dispatch of `knowledge-engineer` happens NEXT session (honest constraint — Built≠Used). The first knowledge
+  task then routes through it as the adoption proof.
+- **P3 author≠verifier:** preserved — it drafts/maintains, never self-certifies; promoted knowledge is
+  independently verified (adversarial wrong-KU test pending P2).
+- **P4 Measured shift (the load-bearing proof):** Documentation + Knowledge Management trend RED→GREEN on the
+  standing Operating-Model Check over slices/milestones (movement, not a one-time proof).
+- **P5 Enforced:** report-only today; `--block` available; knowledge tasks route to knowledge-engineer.
+Measurement + standing check + the owning agent: **BUILT + VERIFIED + WIRED + ROUTABLE.** The OWNERSHIP MOVE
+(the two RED areas actually going GREEN) is the open runtime work, proven over time by the standing check.
