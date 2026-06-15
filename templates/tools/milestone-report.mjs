@@ -55,6 +55,36 @@ export function skillHealthArgs(projectDir, telemetryGlob) {
   return args;
 }
 
+// Resolve the project-side operating-model-check.mjs (app-side: <project>/scripts/operating-model-check.mjs).
+// Returns the absolute path if present, else null (a project without it → graceful skip, same posture
+// as skill-health). EXPORTED for --self-test.
+export function resolveOperatingModelPath(projectDir) {
+  const p = join(projectDir, "scripts", "operating-model-check.mjs");
+  return existsSync(p) ? p : null;
+}
+
+// pure: render the operating-model markdown-ish table from the tool's --json payload. Mirrors the
+// founder's six-area | Area | Claude | Agents | Target | Status | shape with the calls-not-lines
+// caveat. Honest about UNMEASURED. EXPORTED for --self-test (rendering asserted without spawning).
+export function renderOperatingModelFromJson(json) {
+  let data;
+  try { data = typeof json === "string" ? JSON.parse(json) : json; }
+  catch { return "operating-model-check: UNPARSEABLE output (reporting-only; not faked)."; }
+  if (!data || data.measured === false) {
+    return "⛔ UNMEASURED — no transcripts in the corpus (fail-closed in the tool; reporting-only here, never a fake Green).";
+  }
+  const ICONS = { GREEN: "✅ GREEN", YELLOW: "🟡 YELLOW", RED: "🔴 RED", UNMEASURED: "⛔ UNMEASURED", "TOOL-AUTOMATED": "⚙ TOOL-AUTOMATED", "NO-DATA": "· NO-DATA" };
+  const lines = ["| Area | Claude | Agents | Target | Status |", "|---|---|---|---|---|"];
+  for (const r of data.areas || []) {
+    const claudeCell = r.status === "TOOL-AUTOMATED" ? `TOOL-AUTOMATED (${(r.claudeCount || 0) + (r.agentCount || 0)} hand-edits)` : `${r.claudeCount} (${r.claudePct}%)`;
+    const agentCell = r.status === "TOOL-AUTOMATED" ? "—" : `${r.agentCount} (${r.agentPct}%)`;
+    lines.push(`| ${r.area} | ${claudeCell} | ${agentCell} | ${r.target} | ${ICONS[r.status] || r.status} |`);
+  }
+  if (data.overall) lines.push("", `Overall hand-authored mutation split: Claude ${data.overall.claudePct}% · Agents ${data.overall.agentPct}%.`);
+  lines.push("_Caveat: counts are tool CALLS (Write/Edit/NotebookEdit + coordination), not lines._");
+  return lines.join("\n");
+}
+
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -181,6 +211,27 @@ function run() {
     console.log(`→ skill-health (reporting only): ${skillSummary}`);
   }
 
+  // 5) operating-model-check — OPERATING-MODEL CHECK — REPORTING ONLY (never fails the verdict) ----
+  // The founder's recurring review question: is the orchestrator a ROUTER and the specialist agents the
+  // OWNERS of build/maintenance? operating-model-check is app-side today (<project>/scripts/operating-model-
+  // check.mjs); resolve it under --project. Absent → graceful skip with a logged note (same posture as the
+  // skill-health skip). The tool fail-closes to UNMEASURED on an empty corpus — that is HONEST output,
+  // surfaced verbatim here, NEVER a milestone failure (reporting-only) and NEVER an overallVerdict input.
+  let omSummary;
+  const omPath = resolveOperatingModelPath(projectDir);
+  if (!omPath) {
+    omSummary = "operating-model-check: SKIPPED (no scripts/operating-model-check.mjs in project)";
+    section("═══ OPERATING-MODEL CHECK ═══", omSummary);
+  } else {
+    // shell out for the machine JSON (STDOUT) and render — mirrors how the trio/skill-health are run.
+    const om = runNode(omPath, ["--json"], projectDir);
+    const table = renderOperatingModelFromJson(om.out);
+    section("═══ OPERATING-MODEL CHECK ═══", table);
+    // The tool exits 1 on UNMEASURED — that is HONEST reporting, not a milestone failure here.
+    omSummary = /UNMEASURED/.test(table) ? "UNMEASURED (no transcript corpus)" : "role-distribution snapshot emitted (reporting-only)";
+    console.log(`→ operating-model-check (reporting only): ${omSummary}`);
+  }
+
   // OVERALL VERDICT ----------------------------------------------------------------------
   const verdict = overallVerdict({ capOk, expRan, expOk });
   console.log(`\n═══ OVERALL VERDICT: ${verdict} ═══`);
@@ -188,6 +239,7 @@ function run() {
   console.log(`  agent-health:      ${agentSummary}  (reporting only)`);
   console.log(`  founder-experience: ${expRan ? (expOk ? "PASS" : "FAIL") : "SKIPPED"}  (decisive when run)`);
   console.log(`  skill-health:      ${skillSummary}  (reporting only)`);
+  console.log(`  operating-model:   ${omSummary}  (reporting only)`);
   if (verdict === "FAIL") {
     console.log(`FAIL-CLOSED: ${!capOk ? "capability-health regressed/INERT" : "experience:check failed"} — the system is NOT verified as operating.`);
     process.exit(1);
@@ -231,10 +283,33 @@ function selfTest() {
   ok("skillHealthArgs omits --telemetry-glob when none given", !baseArgs.includes("--telemetry-glob"));
   const globArgs = skillHealthArgs(dir, "C:/x/*/subagents");
   ok("skillHealthArgs forwards --telemetry-glob when given", globArgs.includes("--telemetry-glob") && globArgs.includes("C:/x/*/subagents"));
+
+  // OPERATING-MODEL CHECK wiring (section 5, reporting-only) ------------------------------
+  // (a) the section is unconditionally emitted AND never an overallVerdict input.
+  ok("run() emits the '═══ OPERATING-MODEL CHECK ═══' section header", selfSrc.includes('section("═══ OPERATING-MODEL CHECK ═══"'));
+  ok("operating-model-check is reporting-only (never an overallVerdict input)", !/overallVerdict\([^)]*(om|operating)/i.test(selfSrc));
+  // (b) graceful skip: a project WITHOUT scripts/operating-model-check.mjs resolves to null
+  ok("resolveOperatingModelPath → null when scripts/operating-model-check.mjs absent (graceful skip)", resolveOperatingModelPath(dir) === null);
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  writeFileSync(join(dir, "scripts", "operating-model-check.mjs"), "// stub\n");
+  ok("resolveOperatingModelPath → path when scripts/operating-model-check.mjs present", resolveOperatingModelPath(dir) === join(dir, "scripts", "operating-model-check.mjs"));
+  // (c) the renderer produces the founder's 6-column table from a JSON payload, with the caveat
+  const omJson = { measured: true, areas: [
+    { area: "Build Work", claudeCount: 2, agentCount: 8, claudePct: 20, agentPct: 80, target: "Agent-led", status: "GREEN" },
+    { area: "Reporting", claudeCount: 0, agentCount: 0, target: "Agent-led", status: "TOOL-AUTOMATED" },
+  ], overall: { claudePct: 20, agentPct: 80 } };
+  const omTable = renderOperatingModelFromJson(omJson);
+  ok("renderOperatingModelFromJson emits the | Area | Claude | Agents | Target | Status | header", omTable.includes("| Area | Claude | Agents | Target | Status |"));
+  ok("renderOperatingModelFromJson renders a measured area row", /\| Build Work \| 2 \(20%\) \| 8 \(80%\) \| Agent-led \| ✅ GREEN \|/.test(omTable));
+  ok("renderOperatingModelFromJson renders TOOL-AUTOMATED honestly (not a Red)", /\| Reporting \| TOOL-AUTOMATED \(0 hand-edits\) \| — \|/.test(omTable));
+  ok("renderOperatingModelFromJson carries the calls-not-lines caveat", /counts are tool CALLS/i.test(omTable));
+  // (d) UNMEASURED is honest, never a fake Green
+  ok("renderOperatingModelFromJson UNMEASURED stays UNMEASURED", /UNMEASURED/.test(renderOperatingModelFromJson({ measured: false })));
+  ok("renderOperatingModelFromJson tolerates unparseable input (no crash)", /UNPARSEABLE/.test(renderOperatingModelFromJson("{not json")));
   rmSync(dir, { recursive: true, force: true });
 
   if (fail) { console.error(`FAIL: milestone-report self-test failed on ${fail} case(s) — the milestone gate cannot be trusted.`); process.exit(1); }
-  console.error(`PASS: overallVerdict() fail-closed logic holds AND skill-usage-evidence section is wired (graceful-skip + reporting-only).`);
+  console.error(`PASS: overallVerdict() fail-closed logic holds AND skill-usage-evidence + operating-model-check sections are wired (graceful-skip + reporting-only).`);
   process.exit(0);
 }
 
