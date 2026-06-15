@@ -17,8 +17,9 @@
 //   "capability": "<ledger row / how it was addressed>"? }  // capability present => triaged
 // =============================================================================
 
-import { readFileSync, existsSync, appendFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { readFileSync, existsSync, appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const argv = process.argv.slice(2);
@@ -66,22 +67,105 @@ function census(signals) {
   return { candidates, watch, triaged };
 }
 
-const signals = loadSignals(SIGNALS);
-const { candidates, watch, triaged } = census(signals);
+// =============================================================================
+// IDEMPOTENT append — re-runs MUST be no-ops.
+// =============================================================================
+// Before appending, READ the target ledger and collect the norm(pattern) of every row
+// already auto-appended (keyed by the same norm() used for census aggregation). We skip any
+// candidate whose normalized pattern already appears. So running census --append 100× appends
+// each distinct pattern exactly once. The existing marker comment is kept; rows are keyed by
+// norm(pattern), recovered from the row text via a stable "(census) <pattern> |" shape.
+export function existingCandidateKeys(ledgerText) {
+  const keys = new Set();
+  for (const line of String(ledgerText || "").split(/\r?\n/)) {
+    // match an auto-appended row: "| (census) <pattern> | recurred ..."
+    const m = line.match(/^\|\s*\(census\)\s*(.+?)\s*\|\s*recurred\b/);
+    if (m) keys.add(norm(m[1]));
+  }
+  return keys;
+}
 
-console.error(`census-detector · ${signals.length} signal(s) · threshold ${THRESHOLD}× distinct sources · triaged ${triaged.length} · watch ${watch.length}`);
-for (const w of watch) console.error(`  watch (${w.n}×): ${w.pattern}`);
+// Build the row text for a candidate (kept stable for existingCandidateKeys to recover).
+export function candidateRow(c, threshold) {
+  return `| (census) ${c.pattern} | recurred ${c.n}× across distinct sources | (triage) | **AUTO** | census-detector: un-triaged >=${threshold}× recurrence — convert to a capability |`;
+}
 
-if (candidates.length === 0) {
-  console.error(`PASS: no un-triaged pattern has recurred >=${THRESHOLD}× — every recurring lesson is a capability (or below threshold).`);
+// Append only the candidates not already present. Returns the list actually appended.
+export function appendCandidates(ledgerPath, candidates, threshold) {
+  if (!existsSync(ledgerPath)) return [];
+  const existing = existingCandidateKeys(readFileSync(ledgerPath, "utf8"));
+  const fresh = candidates.filter((c) => !existing.has(norm(c.pattern)));
+  if (!fresh.length) return [];
+  const stamp = fresh.map((c) => candidateRow(c, threshold)).join("\n");
+  appendFileSync(ledgerPath, `\n<!-- census-detector auto-appended candidates -->\n${stamp}\n`);
+  return fresh;
+}
+
+function run() {
+  const signals = loadSignals(SIGNALS);
+  const { candidates, watch, triaged } = census(signals);
+
+  console.error(`census-detector · ${signals.length} signal(s) · threshold ${THRESHOLD}× distinct sources · triaged ${triaged.length} · watch ${watch.length}`);
+  for (const w of watch) console.error(`  watch (${w.n}×): ${w.pattern}`);
+
+  if (candidates.length === 0) {
+    console.error(`PASS: no un-triaged pattern has recurred >=${THRESHOLD}× — every recurring lesson is a capability (or below threshold).`);
+    process.exit(0);
+  }
+
+  console.error(`FAIL: ${candidates.length} un-triaged recurring pattern(s) MUST become a capability (extraction over accumulation):`);
+  for (const c of candidates) console.error(`  CANDIDATE (${c.n}× · ${c.p} project${c.p === 1 ? "" : "s"})${c.crossProject ? " [CROSS-PROJECT → promote to delivery-os]" : ""}: ${c.pattern}`);
+  if (APPEND && existsSync(APPEND)) {
+    const appended = appendCandidates(APPEND, candidates, THRESHOLD);
+    if (appended.length) console.error(`  -> appended ${appended.length} NEW candidate(s) to ${APPEND} (the ONE canonical ledger); ${candidates.length - appended.length} already present (idempotent skip).`);
+    else console.error(`  -> no new candidates to append — all ${candidates.length} already present in ${APPEND} (idempotent no-op).`);
+  }
+  process.exit(1);
+}
+
+// =============================================================================
+// --self-test (proves idempotency; no external corpus needed)
+// =============================================================================
+function selfTest() {
+  const rf = readFileSync;
+  let fail = 0;
+  const ok = (label, cond) => { if (!cond) fail++; console.error(`  ${cond ? "PASS" : "FAIL"}  ${label}`); };
+  console.error("census-detector --self-test:");
+
+  // census aggregation: 3 distinct sources, un-triaged → candidate
+  const sigs = [
+    { pattern: "Push exits clean with no upstream", source: "a" },
+    { pattern: "push exits clean with no upstream", source: "b" }, // norm-equal pattern, distinct source
+    { pattern: "push exits clean   with no upstream", source: "c" },
+  ];
+  const { candidates } = census(sigs);
+  ok("3 distinct sources of a norm-equal pattern → 1 candidate", candidates.length === 1);
+  ok("candidate counts 3 distinct sources", candidates[0] && candidates[0].n === 3);
+
+  // idempotent append: append twice → exactly one row.
+  const dir = mkdtempSync(join(tmpdir(), "census-st-"));
+  const ledger = join(dir, "LEDGER.md");
+  writeFileSync(ledger, "# Ledger\n| existing | row | here | x | y |\n");
+
+  const a1 = appendCandidates(ledger, candidates, THRESHOLD);
+  const a2 = appendCandidates(ledger, candidates, THRESHOLD);
+  const rows = rf(ledger, "utf8").split(/\r?\n/).filter((l) => /^\|\s*\(census\)/.test(l));
+  ok("first append writes 1 candidate row", a1.length === 1);
+  ok("second append writes 0 (idempotent)", a2.length === 0);
+  ok("ledger contains exactly 1 census row after 2 appends", rows.length === 1);
+
+  // 100× re-run → still exactly one row.
+  for (let i = 0; i < 100; i++) appendCandidates(ledger, candidates, THRESHOLD);
+  const rows100 = rf(ledger, "utf8").split(/\r?\n/).filter((l) => /^\|\s*\(census\)/.test(l));
+  ok("100 re-runs → still exactly 1 census row", rows100.length === 1);
+
+  if (fail) { console.error(`FAIL: ${fail} census-detector self-test assertion(s) failed.`); process.exit(1); }
+  console.error("PASS: census-detector self-test green (aggregation + idempotent append).");
   process.exit(0);
 }
 
-console.error(`FAIL: ${candidates.length} un-triaged recurring pattern(s) MUST become a capability (extraction over accumulation):`);
-for (const c of candidates) console.error(`  CANDIDATE (${c.n}× · ${c.p} project${c.p === 1 ? "" : "s"})${c.crossProject ? " [CROSS-PROJECT → promote to delivery-os]" : ""}: ${c.pattern}`);
-if (APPEND && existsSync(APPEND)) {
-  const stamp = candidates.map((c) => `| (census) ${c.pattern} | recurred ${c.n}× across distinct sources | (triage) | **AUTO** | census-detector: un-triaged >=${THRESHOLD}× recurrence — convert to a capability |`).join("\n");
-  appendFileSync(APPEND, `\n<!-- census-detector auto-appended candidates -->\n${stamp}\n`);
-  console.error(`  -> appended ${candidates.length} candidate(s) to ${APPEND} (the ONE canonical ledger).`);
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  if (argv.includes("--self-test")) selfTest();
+  else run();
 }
-process.exit(1);
