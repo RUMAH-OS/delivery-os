@@ -164,3 +164,24 @@ all future agents + roadmap work.
 - **Required:** (1) every verified lesson → Wiki knowledge (Context·Symptoms·Root Cause·Detection·Resolution·Verification·Related Capabilities·Related Skills) + ≥1 candidate Skill (Purpose·Triggers·Applicability·Execution Guidance·Expected Outcome·Confidence). (2) **skill-health** telemetry per skill: trigger/use/success/failure/false-positive/last-exec/last-outcome/confidence + **Trust Score** (trigger freq · successful usage · failure prevention · outcome quality · FP rate · recency). (3) **DORMANT SKILL** class (exists but not exercised in the expected window) — reported. (4) **Skill injection**: task context → skill-route retrieves highest-confidence relevant skills → injected into the agent. (5) **Skill Usage Evidence** mandatory report section (per skill: triggered/used/success/fail/prevented-incident/confidence/trust; + Top/Dormant/Most-Valuable/Least-Trusted).
 - **Completion (a lesson is complete only when):** converted to wiki + ≥1 skill · triggered in real work · used by agents · measured · proven to influence behavior. (DORMANT skill ≠ complete.)
 - **Honest harness boundary (state in every report):** skill-route can SELECT relevant skills deterministically (retrieval), but INJECTION into a spawned agent is orchestrator-assembled (like agent dispatch) — not autonomous. True auto-injection shares the A3 dispatch-runner dependency (G9).
+
+## Adoption Evidence — UNIFIED MANDATORY STANDARD (supersedes earlier sections; 2026-06-15)
+> Founder principle: not proof it was BUILT — proof it is ALIVE. Every report (completion · capability ·
+> learning · wiki · skill · roadmap) MUST answer one question per item: **"Did this actually affect
+> reality?"** If it can't be proven from evidence, it is NOT operational regardless of implementation.
+> EVIDENCE ONLY — no inferred usage; if never triggered/used, state that explicitly.
+
+**Mandatory Adoption Evidence Table** (every report):
+`| Item | Exists | Triggered | Used | Influenced Behavior | Outcome Verified | Trust Score | Status |`
+- Exists: implemented + available. Triggered: activated by a real workflow (auto or manual). Used: actually consumed by an agent/workflow. Influenced Behavior: demonstrably changed reasoning/routing/decisions/validation/execution. Outcome Verified: evidence it altered an outcome / prevented a failure / improved quality/correctness. Trust Score: from real usage evidence, NOT existence. Status: Operational · Partial · **Dormant** · Untrusted · Retired.
+
+**Mandatory Dormant section** (Dormant Capabilities / Skills / Wiki):
+`| Item | Last Triggered | Last Used | Trust Score | Dormant Duration | Recommended Action |` — "never triggered"/"never used" stated explicitly.
+
+**Skill Evidence Table:** `| Skill | Trigger Count | Usage Count | Decisions Influenced | Failures Prevented | Last Used | Trust Score |` — a skill is proven only Triggered→Used→Influenced→Outcome.
+
+**Wiki Evidence Table:** `| Wiki Topic | Retrieved | Referenced By Agents | Skills Generated | Decisions Influenced | Last Used |` — purpose is behavior change, not storage.
+
+**Capability Evidence Table:** `| Capability | Built | Triggered | Used | Outcome Produced | Trust Score |` — Built weakest, Outcome strongest.
+
+**Evidence sources (generated, not asserted):** capability-health (ALIVE=triggered-in-CI / INERT=dormant) · agent-health (USED/IDLE + decisive=influence) · skill-health [G10, pending] (skill trigger/use/trust) · slice-records (outcome) · selection log (routing decisions). Where no telemetry exists (skills today), the item is reported DORMANT/UNMEASURED — never inferred Operational.
