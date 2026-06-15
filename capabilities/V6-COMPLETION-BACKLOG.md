@@ -24,7 +24,8 @@
 ---
 
 ## G1 — Slice Delivery Gate  (covers: Slice governance · Delivery evidence · Reporting cadence)
-- **Status:** Not Started
+- **Status:** **Proven** (2026-06-15) — built, independently verified 12/12, **dogfooded** (closed itself through its own gate). Anti-tamper proven: gate re-runs capability-health + digest-compares (forged digest → BLOCK; live-FAIL-not-trusted → BLOCK); UI-facing N/A fraud → BLOCK (re-derived from diff); fail-closed on eval error/empty-stdin; single logged bypass. `docs/verify/VERIFY-slice-delivery-gate-local.md`. **Follow-up (open):** tooling paths (`scripts/`, `.claude/`) are NONIMPL per the shared isImpl model, so a pure-tooling slice isn't force-gated — decide whether OS-tooling changes should require a slice-record (add to `impl_extra`). Product `src/**` changes ARE gated.
+- **(historical) Status:** Not Started
 - **Owner:** lead-architect (design) → software-engineer (build) → qa-test (verify)
 - **Problem:** slices complete with no unified evidence; PR/merge flow absent (direct commits to `dev`); capability-health/agent-health/experience run only when the operator remembers.
 - **Build:** a `slice:close` command + a pre-push hook that REFUSES a push touching impl unless a `docs/slices/SLICE-<name>.md` exists for the slice, schema-valid, containing: slice name · commit hash · PR ref · merge ref · **capability-health result** · **agent-health result** · **founder-experience result (when UI-facing)** · verify-doc ref. The health results must be written BY the command (machine-produced), not hand-typed — this is also how Reporting Cadence stops being memory-dependent (the trio runs at slice close, telemetry available locally).
