@@ -1,12 +1,15 @@
 # V6 Landed in Practice — the canonical, final definition (2026-06-15)
 
-> Founder-ratified definition. This is the ONE definition of "V6 Landed in Practice." It is not to be
-> re-litigated. "V6 mechanism built" ≠ "V6 landed in practice." V6 is landed in practice ONLY when ALL FOUR
-> pillars are true AND durable (sustained over ≥M milestones of real product work). A technically correct
-> system is not automatically an operationally usable OS — the founder must be able to operate, understand,
-> and trust it.
+> Founder-ratified definition (AMENDED 2026-06-16). **"V6 Complete" is ADMIN-INTERNAL.** It does NOT require
+> PLOS. **PLOS is FROZEN** — no inheritance, propagation, rollout, or PLOS-adoption work begins until V6 is
+> genuinely complete + reviewed inside Admin. PLOS inheritance/propagation/adoption are **NOT blockers** for
+> declaring the Admin V6 operating model complete. "V6 mechanism built" ≠ "V6 complete in practice": the
+> founder must be able to operate, understand, and trust it on Admin's own real runtime.
 
-## The FOUR pillars (all four required; the 4th was the missing one)
+## A) V6 COMPLETE (inside Admin) — the THREE Admin-internal pillars (all required + durable)
+> These are the entire definition of "V6 complete." None requires PLOS. Achievable inside Admin.
+
+## (FUTURE — see section B) Ecosystem / PLOS rollout is NOT part of V6 completion.
 
 ### Pillar 1 — MECHANISM COMPLETE  ✅ (done)
 The enforced operating model is built + independently verified (author≠verifier).
@@ -16,27 +19,22 @@ The enforced operating model is built + independently verified (author≠verifie
 - **Missing:** none material (the G9 away-mode envelope is consciously out — see Exclusions).
 - **Blocking:** No (complete).
 
-### Pillar 2 — ECOSYSTEM PROOF  🔴
-The model is proven in a SECOND app, not just N=1 Admin; knowledge propagates + is reused across apps.
-- **Evidence exists:** Admin-side seam hash-checked; runner composes the routers.
-- **Missing (PASS bars):** G8.1 seam single-sourcing (PLOS imports the vendored contract, drain calls
-  `validateSeamBatch`, a known-bad event FAILs in PLOS, CI `seam:check`); G8.2 PLOS inherits + runs the full
-  gate suite GREEN (cannot complete a slice without delivery evidence); E2 update-propagation + multi-consumer
-  cross-check (KU bump propagates byte-current; stale consumer FAILs); E3 cross-system reuse (a shared KU
-  authored once, retrieved+cited@hash in PLOS on real work).
-- **Blocking:** YES. Highest priority.
+### Pillar 2 — MECHANISM ADOPTION (Admin) 🔴 — the OS is USED on Admin's OWN engineering work
+Over sustained real Admin ENGINEERING work (NOT demos, NOT product), the machinery is what actually happens.
+- **Evidence exists:** mechanism + the first real Mechanism-Adoption event (G8.1 seam single-sourcing — a
+  specialist owned real Admin engineering through the runner, with a skill cited).
+- **Missing (PASS bars, measured by the standing checks over a window of ≥N real Admin engineering slices):**
+  - specialist ownership: contribution-weighted Claude **build** share trending down; specialists off-idle
+    owning their turf on Admin engineering (ownership-gate PASS, not TOKEN).
+  - skills: ≥K skills at HABITUALLY-PARTICIPATES (organic-to-Admin-engineering, ≥2 distinct real slices, cited@hash).
+  - knowledge: ≥K KUs at HABITUALLY-PARTICIPATES (cited@hash) on Admin engineering.
+  - dispatch + auto-injection are the STANDING path for Admin's own work (conformance + coverage ratio).
+- **Honest scope:** this is **Mechanism Adoption** (the OS adopted by Admin's engineering). **PRODUCT Adoption**
+  (specialists owning real *customer* work) is NOT achievable in Admin (Admin does no product) → it is section B
+  (rollout), NOT a V6-completion blocker.
+- **Blocking for V6-complete:** YES (Mechanism Adoption only).
 
-### Pillar 3 — ADOPTION PROOF  🔴
-Over SUSTAINED real product work (in PLOS), the intended operating model is what actually happens.
-- **Evidence exists:** mechanism + initial proving-only events (Admin dogfood).
-- **Missing (PASS bars, measured by the standing checks over a window of ≥N real product slices):**
-  - specialist ownership: contribution-weighted Claude **build** share ≤10%; all 3 specialists (FE/DB/API)
-    off-idle owning their turf (ownership-gate PASS, not TOKEN).
-  - skills: ≥K skills at HABITUALLY-PARTICIPATES (organic, ≥2 distinct real slices, cited@hash).
-  - knowledge: ≥K KUs at HABITUALLY-PARTICIPATES (organic, cited@hash).
-- **Blocking:** YES. (Cannot be demonstrated in Admin — requires real PLOS product execution over time.)
-
-### Pillar 4 — FOUNDER EXPERIENCE / OPERATING REALITY  🔴 (the pillar that was missing)
+### Pillar 3 — FOUNDER EXPERIENCE / OPERATING REALITY  🔴 (the pillar that was missing)
 The founder can OPERATE, UNDERSTAND, and TRUST the OS — a technically-correct system that the founder can't
 read is not a landed OS.
 - **Evidence exists (mechanisms):** ownership-gate Required/Actual/Contribution; dispatch-log (what was
@@ -53,11 +51,18 @@ read is not a landed OS.
 ## "V6 Landed" vs "AI Operating System" — RESOLVED (founder-ratified 2026-06-15)
 The earlier contradiction (this doc excluding autonomy vs `AUTO-EXEC-CRITERIA.md` pre-registering it) is
 resolved by SEPARATING the two claims — not by softening either:
-- **V6 LANDED = the 4 pillars above (Mechanism · Ecosystem · Adoption · Founder Experience).** Autonomous
-  execution is **NOT a blocker for V6 Landed.** When the 4 pillars are GREEN + durable, the V6 roadmap is complete.
-- **"AI Operating System" is a SEPARATE, STRONGER claim**, earned POST-V6 via a concrete **Founder Absence
-  Test** (the autonomy cluster D/F/H/J — see `AUTONOMOUS-EXECUTION-DEFINITION.md`). Until that test passes, the
-  honest label is **"landed V6 delivery model / orchestration layer," not "AI Operating System."**
+- **V6 COMPLETE = the 3 Admin-internal pillars above (Mechanism · Mechanism-Adoption · Founder-Experience),
+  durable in Admin's runtime.** PLOS is NOT required. Autonomous execution is NOT a blocker.
+- **"AI Operating System" is a SEPARATE, STRONGER claim**, earned POST-V6 via the **Founder Absence Test**
+  (autonomy D/F/H/J — `AUTONOMOUS-EXECUTION-DEFINITION.md`). Until then: "landed V6 delivery model," not "AI OS."
+
+## B) FUTURE ROLLOUT — PLOS FROZEN (NOT part of V6 completion; begins ONLY after V6 complete + reviewed)
+> Founder-locked 2026-06-16: no inheritance/propagation/rollout/PLOS-adoption work until V6 is complete inside
+> Admin. **None of these is a V6-completion blocker.**
+- **Ecosystem proof (N=2 / reusable):** G8.1 PLOS-side + G8.2 PLOS inherits + runs the full gate suite green.
+- **E2 update-propagation** (multi-consumer cross-check) + **E3 cross-system reuse** (a shared KU cited in PLOS).
+- **Product Adoption:** specialists own real *customer* work; skills+knowledge habitual in real product execution.
+These prove the OS is *reusable across the ecosystem* — a stronger claim than "V6 complete in Admin," pursued later.
 
 ## EXCLUSIONS (conscious, not oversights)
 - **Autonomous self-spawning execution (I)** is OUT permanently: the harness only lets the main loop spawn
@@ -68,13 +73,14 @@ resolved by SEPARATING the two claims — not by softening either:
   default bar for "influence." Founder may elect ablation later.
 
 ## Ratifiable thresholds (set once, then fixed)
-N (real product slices = "sustained") · M (milestones = "durable/normal") · K (skills/KUs = "habitual count")
-· Claude-build-share target ≤10%. Proposed: N≥10, M≥3, K≥3, ≤10%. (Founder to confirm/adjust.)
+N (real Admin engineering slices = "sustained") · M (milestones = "durable") · K (skills/KUs = "habitual count")
+· Claude-build-share trending down. Proposed: N≥10, M≥3, K≥3. (Founder to confirm/adjust.)
 
-## THE canonical statement
-> **V6 is LANDED IN PRACTICE when, durably over ≥M milestones of real product work in a second app (PLOS):
-> (1) the mechanism is built+verified [done], (2) the ecosystem runs the same machine with cross-app
-> knowledge propagation+reuse, (3) specialists habitually own the work and skills+knowledge are habitually
-> retrieved+cited@hash in normal execution (not demos), and (4) the founder can operate, understand, and
-> trust the OS from its standing reports alone — without playing detective — and can control it.**
-> Mechanism-built is necessary but never sufficient. Autonomous self-spawning is explicitly out of scope.
+## THE canonical statement (amended 2026-06-16 — Admin-internal)
+> **V6 is COMPLETE when, durably over ≥M milestones of real ADMIN ENGINEERING work: (1) the mechanism is
+> built+verified [done], (2) the OS is ADOPTED by Admin's own engineering — specialists own the work, skills
+> + knowledge are habitually retrieved+cited@hash, dispatch+injection are the standing path (Mechanism
+> Adoption), and (3) the founder can operate, understand, and trust the OS from its standing reports alone —
+> without playing detective — and can control it.** No PLOS required. Mechanism-built is necessary but never
+> sufficient. **Ecosystem reuse (PLOS), Product Adoption, and autonomous self-spawning are explicitly OUT of
+> "V6 complete"** — they are later, separate claims (section B + the AI-OS Founder Absence Test).
