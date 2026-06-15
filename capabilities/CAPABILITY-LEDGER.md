@@ -40,7 +40,9 @@ There is exactly ONE propagation mechanism (os-sync + os-inherit) and ONE capabi
 | founder-experience-reviewer (#9) | the founder was the FIRST user of broken surfaces | agent | OS-foundational | **in-OS** (proven in PLOS PR #127) | `.claude/agents/founder-experience-reviewer.md` |
 | experience-review harness | 56s mailbox discovered by founder, not system | automation | OS-foundational | **verified** (PLOS PR #127) → promote the pattern to OS | PLOS `scripts/experience-review.mjs` (vendored gate) |
 | **OS upgrade path (os-inherit)** | proven capabilities were trapped in one project — depending on memory/discipline | automation | OS-foundational | **verified** (independent QA; sync/check/drift/missing all proven) — the `In OS → every project inherits` link now EXISTS | `capabilities/os-foundation.manifest.json` + `templates/tools/os-inherit.mjs` |
-| **capability-health** (governance; validate-the-validator) | a system can REPORT green while the behavior isn't happening (the maturity-matrix lesson) | gate | OS-foundational | **verified** (measures wired-vs-INERT reality; mutation-proven to FOLLOW real CI wiring; `--self-test` re-proves its own accuracy) — proven in Admin: 3 gates ALIVE, 4 INERT (honest) | `templates/tools/capability-health.mjs` |
+| **capability-health** (governance; validate-the-validator) | a system can REPORT green while the behavior isn't happening (the maturity-matrix lesson) | gate | OS-foundational | **verified** (measures wired-vs-INERT reality; mutation-proven to FOLLOW real CI wiring; `--self-test` re-proves its own accuracy) — proven in Admin: now 9/9 ALIVE incl. agent-orchestration | `templates/tools/capability-health.mjs` |
+| **agent-orchestration** (agent-route + agent-frontmatter) | agents were the MOST-used part of the OS (110+ spawns/session) yet UN-governed: selection was private judgment, never logged/testable; agent usage never measured | skill+automation | OS-foundational | **verified** (deterministic per-token-deduped routing + self-consistency gate; selection log = the "why"; agents:check Auto-executed in Admin CI; in manifest+capability-health → 9/9 ALIVE) | `templates/tools/agent-route.mjs` + `agent-frontmatter.mjs` |
+| **agent-health** (governance; the 7-question milestone report) | founder Q's: which agents available/selected/why/how-often/parallel/material-effect/never-chosen — nothing answered them | gate | OS-foundational | **verified** (reads roster+telemetry+transcripts+selection log; material-effect classifier mutation-proven; `--self-test` 15/15) — live: 81% decisive, 1 IDLE, parallel still 0% (honest) | `templates/tools/agent-health.mjs` |
 
 ## Open backlog (candidates — feed the chain forward)
 | Item | Founder reality | Kind | Priority | Why |
@@ -70,6 +72,8 @@ OS-foundational rows reach **Auto-executed in BOTH Admin and PLOS**. Current hon
 | founder-experience-reviewer | **Used 1× manual** | not standing; not auto-triggered |
 | experience-review (PLOS) | **Used 1×** | merged #127, but no cadence/pre-handoff (on-demand) |
 | capability ledger | **Used (manual)** | not auto-fed (census-detector inert) |
+| agent-route + agent-frontmatter | **Auto-executed (Admin CI)** ✅ — agents:check (frontmatter contract + routing self-consistency) runs every push; selection is now deterministic+testable. **Used (selection-logged)**: routing real work through agent-route is the behavioral step in progress | PLOS pending; selection log accrues as real tasks are routed |
+| agent-health (7-question report) | **Measured** ✅ — milestone report reads roster+telemetry+transcripts+selection log; in capability-health (9/9 ALIVE) | run after every milestone; PLOS pending. Gaps it honestly surfaces: parallel ~0%, 1 IDLE agent |
 
 **Honesty correction (2026-06-15, from the Capability-Health investigation):** the gate family is genuinely
 **Auto-executed (Admin CI)**, artifact-backed. But census-detector, learning-review, skill-router, and file-lesson

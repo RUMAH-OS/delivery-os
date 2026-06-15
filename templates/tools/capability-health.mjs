@@ -38,6 +38,8 @@ const WIRING = {
   "experience-gate": ["experience:review", "experience:check", "experience-gate"],
   "skill-route": ["skill:route", "skill-route", "skills:check"],
   "skill-frontmatter": ["validate-skills", "skill-frontmatter", "skills:check"],
+  "agent-route": ["agent:route", "agent-route", "agents:check"],
+  "agent-frontmatter": ["agent-frontmatter", "agents:check"],
   "census-detector": ["census-detector", "census:check"],
   "os-inherit": ["os:check", "os-inherit"],
   "capability-health": ["capability-health", "health:check"], // self-measurement (no exemption)

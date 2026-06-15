@@ -6,6 +6,8 @@
     "experience-gate": "ALIVE",
     "skill-frontmatter": "ALIVE",
     "skill-route": "ALIVE",
+    "agent-frontmatter": "ALIVE",
+    "agent-route": "ALIVE",
     "learning-review": "ALIVE"
   }
 }
