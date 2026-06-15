@@ -115,3 +115,20 @@ A fresh project runs the inheritance, and from that moment **cannot** complete a
 6. **Operating vs merely present** — the hard evidence the structure RAN (gate blocked/accepted real pushes; agents drove real findings/fixes; self-correction events), with an explicit verdict.
 
 **Generator:** `npm run milestone:report` (operator runs it at slice/milestone close; it produces 1+3+4+5). Points 2 + 6 are composed from the selection log + the cycle's commits. Honesty rules: report stand-in vs native agent usage distinctly; report the material-effect proxy's limits (a build/map scores CONFIRMING, not low value).
+
+## Autonomy Evidence (STANDING — mandatory in every slice-completion report, alongside V6 Usage Evidence)
+> Added 2026-06-15. The goal is not that v6 EXISTS — it's that v6 OPERATES; not that agents are PRESENT —
+> that they PERFORM work; not that auto-exec was DESIGNED — that it actually COMPLETED real work.
+> Report honestly: distinguish AUTONOMOUS (runtime-triggered, no human per-run) from ORCHESTRATOR-DRIVEN.
+
+**Per completed slice report:**
+1. Actions recommended · 2. Actions founder-approved · 3. Actions automatically executed · 4. Actions completed successfully · 5. Actions failed · 6. Outcomes captured · 7. Lessons generated.
+
+**Execution chain — mark each stage Proven / Partial / Not Proven:**
+`Event → Agent Selection → Reasoning → Action Selection → Execution → Outcome Capture → Learning`
+
+**### Auto-Exec Confidence**
+- Status: Not Proven / Partially Proven / Operationally Proven.
+- Evidence: # autonomous executions · # successful · # failed · human approval required (yes/no) · runtime traces supporting the claim.
+
+**Honesty rule:** in THIS harness the main loop (orchestrator) spawns agents — so the agent-orchestration layer is NOT autonomous; only the CI/pre-push gates execute without a human per-run. Do not claim "Operationally Proven" autonomy for agent work while a human/orchestrator is in the dispatch chain. The learning stage is Not Proven until G4 lands.
