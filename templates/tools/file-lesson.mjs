@@ -29,13 +29,29 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
-// PURE + EXPORTED: build the canonical signal entry from inputs.
+// PURE + EXPORTED: sanitize one free-text field before it is stored.
+// The corpus is JSONL (one JSON object per line) so `→` and `|` are SAFE inside a JSON string
+// (JSON.stringify escapes nothing dangerous for them) — the historical corruption came from a
+// field that carried RAW markdown (`**bold**`) and from values split on a `|`/`→` delimiter by a
+// caller that built the line by hand. We therefore (a) strip markdown bold markers `**`, (b)
+// collapse whitespace, and (c) leave `→`/`|` intact (JSON.stringify round-trips them). The whole
+// record is always serialized with JSON.stringify (NEVER manual delimiter concatenation), so a
+// value containing `→ | **` round-trips: JSON.parse(JSON.stringify(x)) === sanitize(x).
+export function sanitizeField(s) {
+  return String(s == null ? "" : s)
+    .replace(/\*\*/g, "")        // strip markdown bold fences (the corruption marker)
+    .replace(/\s+/g, " ")        // collapse internal/edge whitespace
+    .trim();
+}
+
+// PURE + EXPORTED: build the canonical signal entry from inputs (all fields sanitized).
 export function buildEntry({ project, pattern, where, capability }) {
+  const cap = sanitizeField(capability);
   return {
-    pattern: pattern.trim(),
-    project: project.trim().toLowerCase(),
-    source: `${project.trim().toLowerCase()}:${(where || "unspecified").trim()}`,
-    ...(capability ? { capability: capability.trim() } : {}),
+    pattern: sanitizeField(pattern),
+    project: sanitizeField(project).toLowerCase(),
+    source: `${sanitizeField(project).toLowerCase()}:${sanitizeField(where) || "unspecified"}`,
+    ...(cap ? { capability: cap } : {}),
     date: new Date().toISOString().slice(0, 10),
   };
 }
@@ -115,6 +131,28 @@ function selfTest() {
   // whitespace-normalized pattern is treated as the same → idempotent
   const r4 = fileLesson(corpus, { ...lesson, pattern: "a no-upstream   push exits clean" });
   ok("whitespace-variant of an existing pattern+source → idempotent skip", r4.appended === false);
+
+  // DEFECT REGRESSION: a value containing `→ | **` (arrow + pipe + markdown-bold) must round-trip
+  // cleanly through the JSONL serialization — JSON.stringify handles `→`/`|`; sanitize strips `**`.
+  // The corpus corruption (signals.jsonl lines ~21-48) was these characters mangling the record.
+  const dir2 = mkdtempSync(join(tmpdir(), "file-lesson-rt-"));
+  const corpus2 = join(dir2, "signals.jsonl");
+  const rawPattern = "**npm checks spawned with `shell:false` on Windows → false FAIL | (no output)**";
+  const rawCap = "false FAIL → `runTool` ran `npm.cmd` | fix: shell:true";
+  const rt = fileLesson(corpus2, { project: "rumah-admin", pattern: rawPattern, where: "retro:SLICE-x | step→4", capability: rawCap });
+  ok("round-trip lesson appended", rt.appended === true);
+  // read it straight back: EVERY line must be valid JSON (no manual-delimiter mangling)
+  const lines3 = readFileSync(corpus2, "utf8").split(/\r?\n/).filter((l) => l.trim());
+  let parsed = null, allJson = true;
+  for (const l of lines3) { try { parsed = JSON.parse(l); } catch { allJson = false; } }
+  ok("`→ | **` line parses back as valid JSON (round-trips, not mangled)", allJson === true && parsed != null);
+  // parse-back === sanitized input (markdown stripped, `→`/`|` preserved verbatim)
+  const expectedPattern = sanitizeField(rawPattern); // bold fences gone, arrow+pipe kept
+  const expectedCap = sanitizeField(rawCap);
+  ok("parsed pattern === sanitize(input) (no `**`, `→`/`|` preserved)", parsed && parsed.pattern === expectedPattern);
+  ok("parsed capability === sanitize(input) (no `**`, `→`/`|` preserved)", parsed && parsed.capability === expectedCap);
+  ok("sanitized pattern contains no `**` markdown", !/\*\*/.test(parsed.pattern));
+  ok("sanitized pattern STILL contains the `→` and `|` (only `**` stripped)", parsed.pattern.includes("→") && parsed.pattern.includes("|"));
 
   if (fail) { console.error(`FAIL: ${fail} file-lesson self-test assertion(s) failed.`); process.exit(1); }
   console.error("PASS: file-lesson self-test green (idempotent {pattern, source} de-dup).");
