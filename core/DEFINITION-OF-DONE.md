@@ -21,6 +21,7 @@
 
 **Telemetry row (projects with measurement/capture claims):**
 | 10 | **Verify the instruments** — new capture/measurement instrumentation is proven *recording* (a live row exists) before anything relies on it; the cadenced instruments-audit (loop standing beat) is scheduled | live-row evidence + audit schedule |
+| 11 | **Adoption Evidence (Completion Report Gate)** — a slice is DONE only when its slice-record carries a **COMPLETE Adoption Evidence report** (the 5 sections — Capability · Agent Usage · Skill Usage · Wiki Usage · Auto-Exec — **plus the Standing Question** "did each capability affect an outcome, or merely exist?"), auto-generated from runtime data by `adoption:report` and embedded by `slice:close`. **Fail-closed: the Completion Report Gate (`slice-gate` pre-push + `slice:check`) BLOCKS the push when any section / the Standing Question is missing or `REPORT STATUS = INCOMPLETE`.** This makes Adoption Evidence part of the Definition of Done, enforced by the OS — not by memory. | slice-record `## Adoption Evidence` region with `REPORT STATUS = COMPLETE` (Completion Report Gate) |
 
 > **DoD hygiene rule (v4):** **no row without an enforcement surface.** Every row names the mechanism or artifact that proves it; a row nobody can mechanically or artifact-wise check is deleted, not kept as aspiration. (Earned: two doc-status rows were *required, nonexistent, and unnoticed* for an entire project — unenforced rows train DoD-skimming. Those rows are deleted in v4; their job is done by derived state, git history, and the `DECISIONS.md` ledger.)
 
