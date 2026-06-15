@@ -47,6 +47,28 @@ Auto-generated (never memory) by `v6-review.mjs` from telemetry. Every such revi
 
 Honest caps (carried from the G9 board): "influenced" = verified citation@hash TRUST, **not causation** (DECISIVE needs ablation). "Auto-injected" is REPORT-ONLY, **firewalled from the adoption rung** (injection volume can never promote Used/Influential/Habitual). UNMEASURED fails closed. Proving usage can NEVER promote past PARTICIPATES.
 
+## The THREE original-vision outcome gates (RED — post-G8; "V6 complete in practice" requires ALL THREE met, not just mechanism+ecosystem proven)
+> G8 proves the ecosystem MECHANISM + generates initial adoption EVENTS. It does NOT demonstrate these three
+> outcomes — they are sustained-usage (PLOS, over time) + two genuinely-new knowledge pieces. Do NOT declare
+> V6 complete until each threshold is MET in practice (measured by the standing checks over real product work).
+
+**Outcome 1 — Specialist ownership → ~90% agent / 10% Claude** (Adoption proof; measured in PLOS product work)
+- 1a contribution-weighted Claude **build** share trends to **≤10%** over a sustained window of real product slices.
+- 1b all 3 IDLE specialists (frontend-engineer · database-data · api-integration) OFF idle, each owning its turf ≥ contribution threshold.
+- Cap: build-lane only; dispatch stays ~100% Claude by harness (never counted as a miss). No new mechanism — needs real volume.
+
+**Outcome 2 — Habitual skill retrieval + measurable influence** (Adoption proof; PLOS)
+- 2a ≥K skills reach **HABITUALLY-PARTICIPATES** (organic, ≥2 distinct real product slices, cited@hash).
+- 2b influence = cited + fingerprinted (L5), TRUST accrued.
+- 2c (OPTIONAL) ablation harness for DECISIVE causal influence — the only way past the TRUST/citation proxy (founder decides if required). **NEW mechanism.**
+
+**Outcome 3 — Habitual knowledge + influence + update propagation + cross-system reuse** (richest; two NEW pieces)
+- 3a habitual knowledge retrieval + influence (cited@hash) over real product slices. (Adoption proof; PLOS)
+- 3b **update propagation** — a KU version-bump propagates byte-current to all consumers + a multi-consumer cross-check asserts every app's INHERITED.json is current. **NEW mechanism** (END-STATE "two new pieces", not built).
+- 3c **cross-system reuse** — a shared KU authored once (OS/Admin) retrieved + cited in PLOS on real work ("learned once, reused everywhere"). **Ecosystem proof, post-G8.**
+
+**These three gates stay RED until met in practice. "V6 landed" (G8) is necessary but NOT sufficient for "V6 complete."**
+
 ## Backlog gate — "V6 STRUCTURE ADOPTED IN PRACTICE" (RED — keep visible until genuinely closed)
 Distinct from "G9/G11/G12 mechanism GREEN." Closes ONLY when, over real product slices:
 - specialist agents own ≥ a target share of real build (contribution-weighted; the 3 IDLE specialists off 0),
