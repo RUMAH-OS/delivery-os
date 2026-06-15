@@ -51,9 +51,16 @@ read is not a landed OS.
 - **Blocking:** YES. PASS = the founder's repeated sign-off, not a tool's green.
 
 ## EXCLUSIONS (conscious, not oversights)
-- **Autonomous self-spawning execution** is OUT of the landed definition: the harness only lets the main loop
-  spawn agents; the founder ruled self-spawning is not the success criterion. The bounded **A6 Founder-Away-
-  Mode envelope** is a **post-landed OPTIONAL enhancement**, not a landing criterion.
+- **Autonomous self-spawning execution (I)** is OUT of the landed definition: the harness only lets the main
+  loop spawn agents; the founder ruled self-spawning is not the success criterion.
+- **⚠ UNRESOLVED — CONTRADICTION FLAGGED 2026-06-15 (autonomy board):** this doc reclassified the **A6 away-mode
+  envelope (D/F/H/J — unattended bounded operation)** as "post-landed optional." The adversarial board seat
+  showed that is a **goalpost-move** vs the earlier pre-registered `AUTO-EXEC-CRITERIA.md` ("do not soften
+  Operationally"), and that D/F/H/J are **NOT harness-blocked** (only I is). Per `AUTONOMOUS-EXECUTION-DEFINITION.md`,
+  the honest position is that the **"AI Operating System" noun is not earned until D/F/H/J land.** This is an
+  **open founder trade** (5th pillar "Autonomous Operation" vs conscious-defer-and-don't-claim-the-noun) — do
+  NOT treat autonomy as settled until the founder signs it. Until then this is a **landed V6 delivery model /
+  orchestration layer**, not an "AI Operating System."
 - **Causal/DECISIVE influence (ablation)** is OPTIONAL rigor; TRUST-level (cited@hash + fingerprint) is the
   default bar for "influence." Founder may elect ablation later.
 
