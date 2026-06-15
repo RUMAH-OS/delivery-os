@@ -72,9 +72,44 @@ These prove the OS is *reusable across the ecosystem* — a stronger claim than 
 - **Causal/DECISIVE influence (ablation)** is OPTIONAL rigor; TRUST-level (cited@hash + fingerprint) is the
   default bar for "influence." Founder may elect ablation later.
 
-## Ratifiable thresholds (set once, then fixed)
-N (real Admin engineering slices = "sustained") · M (milestones = "durable") · K (skills/KUs = "habitual count")
-· Claude-build-share trending down. Proposed: N≥10, M≥3, K≥3. (Founder to confirm/adjust.)
+## EXPLICIT PASS/FAIL — the two remaining pillars (fixed 2026-06-16; execution criteria, no further redefinition)
+> Substrate = Admin's own remaining engineering work (residuals · KU-growth · housekeeping · policy-fixes),
+> each routed through the dispatch-runner. Window = **N=10 real Admin-engineering slices spanning M=3 milestones**
+> (durable, not a burst). Demos/verify/dogfood slices are PROVING — excluded. All measured by the STANDING
+> checks (operating-model-check · ownership-gate · dispatch-coverage · skill-health · knowledge-health), not memory.
+
+### PILLAR 2 — MECHANISM ADOPTION (Admin) — GREEN iff ALL hold over the N=10/M=3 window:
+1. **Dispatch is the standing path (habitual, not occasional):** ≥90% of build-bearing slices were routed
+   through `dispatch-route` (dispatch-coverage ratio ≥0.90) AND conformance PASS (actual owner = planned owner).
+   FAIL if >10% bare/un-routed spawns.
+2. **Specialists own their turf:** in ≥80% of slices, the work-type's required specialist OWNED the build by
+   CONTRIBUTION (ownership-gate PASS, not TOKEN, NO `--owner` override) · Claude direct build-share trends DOWN
+   across the window · 0 specialists IDLE-on-eligible-work. FAIL on TOKEN-contribution or a specialist idle while its turf was worked.
+3. **Skills habitual:** ≥3 distinct skills at HABITUALLY-PARTICIPATES (cited@hash, organic, each in ≥2 distinct
+   real slices). FAIL if skills are proving-only or single-slice.
+4. **Knowledge habitual:** ≥3 distinct KUs at HABITUALLY-PARTICIPATES (cited@hash, each in ≥2 distinct real
+   slices). FAIL if proving-only/single-slice.
+5. **Sustained, not bursty:** 1–4 hold across ≥3 milestones (the standing check shows the pattern persisting,
+   not a one-time batch). FAIL if it's a single burst.
+Injection volume is REPORT-ONLY and can never satisfy any criterion (cited@hash required for "used/influenced").
+
+### PILLAR 3 — FOUNDER EXPERIENCE — GREEN iff (founder-judged; cannot be self-certified):
+**Review process:** at each of ≥3 milestone closes, the founder runs a **Founder Operability Review** on a
+RANDOMLY-selected real Admin slice (random = not cherry-picked), reading ONLY that slice's standing record —
+NOT the code, NOT asking Claude.
+**Evidence that must be present in the record (auto-generated):** Adoption Evidence (capability/agent/skill/
+knowledge) · Ownership Gate (Required/Actual/Contribution/Status) · Dispatch evidence (what was auto-injected) ·
+routing `why` rationale · Operating-Model Check (role-areas + Mechanism-Adoption track) · gate results.
+**The 7 questions the founder must answer FROM THE RECORD ALONE:**
+1. Which specialist OWNED this slice's build (+ contribution %)? 2. Which skills were used + cited? 3. Which
+knowledge was retrieved + cited? 4. WHY was this owner/agent chosen? 5. What was auto-injected? 6. Did the
+gates pass — and would I know if they hadn't? 7. Do I trust this record without investigating further?
+**PASS:** Q1–6 answerable correctly from the record alone (verifiable — the answers are IN the record; no code-
+reading, grep, or asking Claude = "no detective work") AND Q7 = "yes" — on ≥3 randomly-selected slices across
+≥3 milestones, AND **founder control demonstrated** ≥1× (founder stops/redirects/overrides a real dispatch and
+the system honors it). **FAIL:** any of Q1–6 requires detective work, OR Q7 = "no", OR control not demonstrated.
+
+## (legacy) Ratifiable thresholds — now FIXED above. N=10 · M=3 · K=3 · dispatch≥90% · specialist-own≥80%.
 
 ## THE canonical statement (amended 2026-06-16 — Admin-internal)
 > **V6 is COMPLETE when, durably over ≥M milestones of real ADMIN ENGINEERING work: (1) the mechanism is
