@@ -186,6 +186,10 @@ all future agents + roadmap work.
 
 **Evidence sources (generated, not asserted):** capability-health (ALIVE=triggered-in-CI / INERT=dormant) · agent-health (USED/IDLE + decisive=influence) · skill-health [G10, pending] (skill trigger/use/trust) · slice-records (outcome) · selection log (routing decisions). Where no telemetry exists (skills today), the item is reported DORMANT/UNMEASURED — never inferred Operational.
 
-## G11 — Skill Usage Proof (board outcome 2026-06-15; see SKILL-PROOF-ARCHITECTURE.md)
+## G11 — Skill Usage Proof — SMALLEST SLICE PROVEN (2026-06-15)
 - **Status:** Designed (board review complete). Honest verdict: full 6-level proof NOT achievable by telemetry alone — L1–2 PROVEN, L3 attested (content-bound citation), L5 PROVEN for execution skills (artifact-fingerprint), L4/L6 proxy-only unless ablation. Every record stamped `evidence-strength`; trust = evidence ledger (NOT a gameable scalar); UNMEASURED fails closed; cadence field guards one-shot-skill dormancy mis-flagging.
 - **Smallest slice:** one execution skill end-to-end (skill-route --log + skill-health.mjs + citation/fingerprint verifier + marker convention). Build before scaling. Gated like G10; auto-injection shares the A3 dependency (G9).
+
+## G11 — Skill Usage Proof: SMALLEST SLICE PROVEN (2026-06-15)
+- **Status:** **Proven (smallest slice)** — the evidence ladder works end-to-end on ONE real skill. `skill-route --log` (proofId+marker) + `scripts/skill-health.mjs` (L1 log · L2 structural · L3 citation-verified · L5 fingerprint, each evidence-strength-stamped; TRUST=verified L5+L3 not raw triggers; UNMEASURED fail-closed; cadence exempts one-shot). Independent QA: 4 sabotage mutations each flip the verdict (`docs/verify/VERIFY-skill-usage-proof-local.md`). **Live proof:** verification-playbook Dormant→USED — Triggered 1[log]/Injected 1[structural]/Used 3[citation]/Influenced 14[fingerprint]/TRUST 17. Honesty held: verify-gate triggered-but-trust-0; fabricated citation→FP; 10 skills DORMANT; L4/L6 deferred to ablation (not claimed).
+- **Scale path (next):** wire `skill-health` into milestone:report (standing Skill Usage Evidence) + make `skill-route --log`+marker the standing skill-injection flow; instrument more skill-uses; fix the file-lesson `→|**` sanitization defect (also a G10 prerequisite).
