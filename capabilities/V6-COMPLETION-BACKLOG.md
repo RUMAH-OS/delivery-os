@@ -96,3 +96,22 @@
 
 ## The single success test for "V6 landed"
 A fresh project runs the inheritance, and from that moment **cannot** complete a slice without delivery evidence, **cannot** skip the health/experience/product-quality reports, **cannot** bypass the retrospective loop, **cannot** accumulate idle agents, and its agent selection is provably automatic — all enforced by process, none by memory. Until every G-item is `Proven` in Admin and re-confirmed by the Gap Report, we do not propagate.
+
+---
+
+## Completion Report Contract (STANDING — every completion/milestone report MUST include this)
+> Restored 2026-06-15 after it was dropped (operator-memory lapse — the exact failure v6 exists to
+> kill). A report section that depends on memory is no better than an ungated capability. So the
+> **V6 Usage Evidence** section is GENERATED, not remembered: its inputs come from `milestone:report`
+> (= `capability-health` + `agent-health` union) + the slice selection log + the cycle's shipped
+> founder-facing changes. No completion report is complete without it.
+
+**Required section — "V6 Usage Evidence" — 6 points, from evidence:**
+1. **Agents that participated** — agent-health roster USED this window (count + share).
+2. **Agents that exercised ownership** — the selection log: which agent was routed to its owned domain, with the `why` rationale (provenance — every decision traceable, per G6).
+3. **Used vs idle** — agent-health USED/IDLE (anti-IDLE: idle past grace is fail-closed).
+4. **Capability propagation** — capability-health (ALIVE/INERT) + os-inherit status (what is vendored byte-current; what has/has-not propagated to other projects).
+5. **Founder-experience impact** — the real founder-facing changes shipped this cycle + experience-gate/product-quality results.
+6. **Operating vs merely present** — the hard evidence the structure RAN (gate blocked/accepted real pushes; agents drove real findings/fixes; self-correction events), with an explicit verdict.
+
+**Generator:** `npm run milestone:report` (operator runs it at slice/milestone close; it produces 1+3+4+5). Points 2 + 6 are composed from the selection log + the cycle's commits. Honesty rules: report stand-in vs native agent usage distinctly; report the material-effect proxy's limits (a build/map scores CONFIRMING, not low value).
