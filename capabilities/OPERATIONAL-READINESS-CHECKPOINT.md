@@ -31,6 +31,24 @@
 | 8 | **Canon / Wiki Updated** | The non-obvious lesson is a retrievable KU (frontmatter contract, cited@hash, routable by `knowledge-route`, measured by `knowledge-health`) — not homeless prose. | [[ku-injection-is-not-adoption]] |
 | 9 | **Ready to Rely On** | ALL of the above hold. Only then may the capability be relied upon / declared complete / built upon. | — |
 
+## Classification step (capture-only — Founder OS Migration Principle)
+When a capability is reviewed, also CLASSIFY each of its artifacts into the 6 Founder-OS buckets and RECORD
+where it should live. This is capture-only: deciding the bucket happens now; the physical move stays gated and
+gradual (→ `FOUNDER-OS-MIGRATION-PRINCIPLE.md` — classify, don't delete; no big-bang). Do NOT create new
+per-project markdown collections — author shared intelligence toward its bucket.
+
+| Artifact is… | Target bucket |
+|---|---|
+| project-specific context | stays in `CLAUDE.md` (per project) |
+| reusable knowledge (architecture / decisions / lifecycles / principles / playbooks) | **Wiki** |
+| executable behavior (a repeatable procedure: invoicing, onboarding, verification, …) | **Skill** |
+| a lifecycle definition (lead / invoice / contract / tenant / payment lifecycle) | **Workflow** |
+| monitoring logic (seam / workflow / company health) | **Health** |
+| completion logic (completion rules / success criteria / founder-attention models) | **Objective** |
+
+Record the verdict as a short list (artifact → bucket → intended home), even when the target structure does
+not yet exist (Workflow / Health / Objective are create-when-first-needed). No artifact is deleted by this step.
+
 ## Cross-system seams — one extra mandatory assertion
 If the capability is a cross-system seam (API contract / event stream / handoff), column 2 is satisfied ONLY by
 **one real producer→drain→consumer round-trip on real data** — NOT by two isolated half-verifies that each
