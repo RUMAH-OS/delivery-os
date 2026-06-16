@@ -5,6 +5,15 @@
 > genuinely complete + reviewed inside Admin. PLOS inheritance/propagation/adoption are **NOT blockers** for
 > declaring the Admin V6 operating model complete. "V6 mechanism built" ≠ "V6 complete in practice": the
 > founder must be able to operate, understand, and trust it on Admin's own real runtime.
+>
+> **DIRECTIVE 2026-06-16 (founder, post board review — STRONGER than "frozen"):** G8 / ecosystem propagation is
+> **REMOVED from active consideration** — not paused, not reprioritized. Do NOT plan/prepare/discuss/produce
+> readiness reports for it; do NOT propose alternative propagation plans; do NOT reopen G8 unless the founder
+> explicitly requests it. **Admin is the proving ground.** The objective is no longer "can V6 be propagated?"
+> but **"can V6 prove itself in Admin beyond reasonable doubt?"** Propagation is reconsidered ONLY after the
+> operating model is demonstrably working in Admin. Ranked work → `ADMIN-RUNTIME-PROOF-BACKLOG.md`. NB: the
+> board's "propagation robustness" + "self-healing capability updates" items are ADMIN-INTERNAL (Admin's own
+> os-inherit), NOT PLOS — they stay in scope as runtime robustness.
 
 ## A) V6 COMPLETE (inside Admin) — the THREE Admin-internal pillars (all required + durable)
 > These are the entire definition of "V6 complete." None requires PLOS. Achievable inside Admin.
@@ -34,7 +43,28 @@ Over sustained real Admin ENGINEERING work (NOT demos, NOT product), the machine
   (rollout), NOT a V6-completion blocker.
 - **Blocking for V6-complete:** YES (Mechanism Adoption only).
 
-### Pillar 3 — FOUNDER EXPERIENCE / OPERATING REALITY  🔴 (the pillar that was missing)
+### Pillar 3 — FOUNDER EXPERIENCE / OPERATING REALITY  🔴 (the pillar that was missing) — NORTH STAR (founder, 2026-06-16)
+**THE GOVERNING DEFINITION (supersedes any metric-first framing): V6 success = founder-level autonomous
+execution surfaced on ONE founder-facing SCREEN.** A founder provides an objective; the system (1) determines
+the correct specialist, (2) routes to it, (3) executes, (4) verifies independently, (5) applies learned
+skills+knowledge, (6) updates system knowledge, (7) surfaces the result on a founder-facing screen. The founder
+must NOT need to inspect code, inspect logs, read markdown reports, run scripts, or manually ask for
+ownership/verification evidence. **Acceptance test:** the founder opens a single screen and answers, in ≤2
+minutes — What was requested? · Who performed it? · Why were they selected? · What skills+knowledge were used? ·
+Who verified it? · Did it pass? · What changed? · Is the outcome complete? **If this experience does not exist,
+V6 is NOT complete regardless of coverage, routing, ownership, reports, or architecture.** All roadmap decisions
+are evaluated against this North Star; when in doubt, PROVE autonomous execution over producing more reports.
+
+**COMPLETENESS PRINCIPLE (founder-locked 2026-06-16): a capability is NOT complete because it EXISTS.** It is
+complete only when: **Build → Proved → Reachable → Continuable → Founder-verifiable → Used successfully in a real
+workflow.** "Reachable" (you can navigate to it) and "Continuable" (the workflow has a next step, no dead-end)
+are first-class, equal to Built+Verified. This standard applies to ALL future V6 work. It encodes the audit's
+core finding: V6 previously validated components/availability/hygiene, NOT complete founder workflows — the
+failure classes "exists but unreachable / can't be continued / can't be edited / can't be completed /
+disconnected from the workflow." The V6-P0…P6 corrections (`FOUNDER-EXPERIENCE-AUDIT-2026-06-16.md`) re-base the
+gate suite from diff-anchored + availability-measured to **surface-anchored + workflow-complete**, so these
+classes cannot recur unnoticed.
+
 The founder can OPERATE, UNDERSTAND, and TRUST the OS — a technically-correct system that the founder can't
 read is not a landed OS.
 - **Evidence exists (mechanisms):** ownership-gate Required/Actual/Contribution; dispatch-log (what was

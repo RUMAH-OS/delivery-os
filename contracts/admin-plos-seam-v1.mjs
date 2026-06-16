@@ -37,6 +37,30 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 // Any HTML tag: <p>, </p>, <strong>, <a href=...>. This is the FV-4 detector.
 const HTML_TAG_RE = /<\/?[a-z][^>]*>/i;
+// A pdfRef.url must be the AUTHENTICATED Admin PDF endpoint — a relative resource
+// path (Admin renders from the FROZEN snapshot — immutability) OR a full https URL
+// ending in that same path (with an optional signed-URL query string, e.g.
+// ?token=...&expires=...). It is never a raw file, never a public link. PLOS fetches
+// it with the same PLOS->Admin token the read seam uses. The endpoint + safe-filename
+// form depend on the DOCUMENT KIND (pdfRef.kind below):
+//   - invoice    : GET /invoices/<id>/pdf      , filename Factuur-<number>.pdf
+//   - creditNote : GET /credit-notes/<id>/pdf  , filename Creditnota-<CN-number>.pdf
+// content-encoding is PART of the contract (FV-4 generalised): the right endpoint
+// renders the right artifact, the safe filename carries refs only (never PII).
+const PDF_KIND = {
+  invoice: {
+    url: /^(?:https:\/\/[^\s?#]+)?\/invoices\/[^\s/?#]+\/pdf(?:\?[^\s#]*)?$/,
+    urlDesc: "a /invoices/<id>/pdf path or an https URL ending in it",
+    filename: /^Factuur-[A-Za-z0-9-]+\.pdf$/,
+    filenameDesc: 'the safe form "Factuur-<number>.pdf"',
+  },
+  creditNote: {
+    url: /^(?:https:\/\/[^\s?#]+)?\/credit-notes\/[^\s/?#]+\/pdf(?:\?[^\s#]*)?$/,
+    urlDesc: "a /credit-notes/<id>/pdf path or an https URL ending in it",
+    filename: /^Creditnota-[A-Za-z0-9-]+\.pdf$/,
+    filenameDesc: 'the safe form "Creditnota-<CN-number>.pdf"',
+  },
+};
 
 const isUuid = (v) => typeof v === "string" && UUID_RE.test(v);
 const isIso = (v) => typeof v === "string" && ISO_RE.test(v);
@@ -66,6 +90,10 @@ const PII_ALLOW = new Set(["billername", "ownername"]);
 // human's name/email is a leak (refs must be flat *Id strings, not objects).
 const PII_OBJECT_KEYS = new Set(["tenant", "recipient"]);
 const NAME_OR_EMAIL = new Set(["name", "email", "legalname", "contactname", "contactemail"]);
+// PII smuggled into a URL value (scanPii only inspects KEYS, not value-strings):
+// an email anywhere, or an explicit name/email query param. The seam carries the
+// invoice id as the only ref in the url — never the human's address/name.
+const PII_URL_RE = /([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|([?&](?:email|name|contactname|legalname)=)/i;
 
 function scanPii(value, path, violations) {
   if (!isPlainObject(value)) return;
@@ -155,10 +183,18 @@ const REGISTRY = {
   // L1448 (POST /invoices/:id/send). THE FV-4/FV-5 type: operator-approved send.
   // notice is REQUIRED ({subject, body}); body is PLAIN TEXT; bodyHtml optional
   // rich form. billerName (sender identity) is allowed.
+  // pdfRef (OPTIONAL, additive — version-safe; pre-pdfRef consumers ignore it) is
+  // shape A (URL): { url, mimeType:"application/pdf", filename:"Factuur-<n>.pdf",
+  // expiresAt? }. It points PLOS at Admin's authenticated GET /invoices/:id/pdf
+  // (rendered from the FROZEN invoice snapshot — immutability) so PLOS can fetch +
+  // attach the real BTW/VAT invoice PDF to the customer email. NO PII (url/filename
+  // are scanned; PII-strict). Inline base64 (shape B) is rejected — keep the event
+  // lean. See pdfRef enforcement block in validateSeamEvent below.
   "invoice.send_requested": {
     required: ["invoiceId", "number", "tenantId", "contractId", "totalCents", "dueDate", "billerName", "notice"],
-    optional: [],
+    optional: ["pdfRef"],
     notice: { required: ["subject", "body"], optional: ["bodyHtml"], text: ["body"] },
+    pdfRef: { required: ["url", "mimeType", "filename"], optional: ["expiresAt"] },
   },
   // L1488 (reminders/run). The "reminder warranted" SIGNAL (PLOS owns cadence).
   "invoice.reminder_due": {
@@ -179,6 +215,24 @@ const REGISTRY = {
   "payment.received": {
     required: ["paymentId", "invoiceId", "amountCents", "fullyPaid"],
     optional: [],
+  },
+  // admin.ts POST /invoices/:id/credit-note (creditNoteId branch). A credit note (creditnota) was issued
+  // against an invoice — a money + legal artifact that (partly) reverses it; the ORIGINAL invoice is unchanged.
+  // REFS + amounts only (PII-FREE): number = the original invoice number, creditNoteNumber = CN-YYYY-NNNN,
+  // amountCents = the credited amount. pdfRef (OPTIONAL, additive — same rules as invoice.send_requested.pdfRef
+  // but the CN-PDF endpoint /credit-notes/<id>/pdf and the safe filename Creditnota-<CN-number>.pdf): points PLOS
+  // at Admin's authenticated GET /credit-notes/:id/pdf (rendered from the FROZEN snapshot — immutability) so PLOS
+  // can fetch + attach the real credit-note PDF. NO PII (url/filename scanned). Inline base64 (shape B) rejected.
+  //
+  // C2 (security review, 2026-06-16): `reason` is REMOVED from the seam. It is operator FREE-TEXT (max 500 chars)
+  // — a name/email/address typed into it (e.g. "refund to jan@example.com") would ship to PLOS, because scanPii
+  // inspects KEYS not VALUES (a free-text value can carry anything). The seam is refs+amounts only; `reason`
+  // remains on the credit_note ARTIFACT (DB row + the CN PDF) where it belongs. `reason` is now an UNKNOWN field
+  // here -> the strict per-type shape REJECTS it if an emitter ever re-adds it (fail-closed).
+  "invoice.credited": {
+    required: ["invoiceId", "number", "creditNoteId", "creditNoteNumber", "tenantId", "contractId", "amountCents"],
+    optional: ["pdfRef"],
+    pdfRef: { required: ["url", "mimeType", "filename"], optional: ["expiresAt"], kind: "creditNote" },
   },
   // L514 / L567 (mintSigning + refresh). variant=contract path. REFS only —
   // NEVER the token secret. expiresAt is an ISO instant.
@@ -290,7 +344,46 @@ export function validateSeamEvent(envelope) {
     }
   }
 
-  // 3. any top-level text-path fields (currently only notice.* uses text)
+  // 3. pdfRef (optional) — shape A (URL) only. The content-encoding of the
+  //    attachment is PART of the contract (FV-4 generalised): mimeType must be
+  //    application/pdf, url must be the AUTHENTICATED Admin PDF endpoint for THIS
+  //    document kind, and filename must be that kind's safe form. Inline base64
+  //    (shape B) is rejected. PII (email/name) must not appear in url/filename.
+  if (spec.pdfRef && "pdfRef" in payload && payload.pdfRef !== undefined) {
+    const ref = payload.pdfRef;
+    // The pdfRef kind (which endpoint/filename form): default "invoice"; a type
+    // whose spec.pdfRef.kind is set (e.g. invoice.credited -> "creditNote") points
+    // PLOS at the matching artifact endpoint. An unknown kind is a contract bug.
+    const kind = (spec.pdfRef.kind && PDF_KIND[spec.pdfRef.kind]) ? spec.pdfRef.kind : "invoice";
+    const rules = PDF_KIND[kind];
+    if (!isPlainObject(ref)) {
+      violations.push(`payload.pdfRef: must be an object { url, mimeType, filename, expiresAt? } (shape A, URL)`);
+    } else {
+      validateFields(ref, spec.pdfRef, "payload.pdfRef", violations);
+      // Shape B (inline base64) is explicitly refused — keep the PII-strict event lean.
+      if ("data" in ref || "base64" in ref || "bytes" in ref || "content" in ref) {
+        violations.push(`payload.pdfRef: inline document bytes (data/base64/bytes/content) are forbidden — send a URL ref (shape A), not the PDF inline`);
+      }
+      if (!isStr(ref.mimeType) || ref.mimeType !== "application/pdf") {
+        violations.push(`payload.pdfRef.mimeType: must be exactly "application/pdf"`);
+      }
+      if (!isStr(ref.url)) {
+        violations.push(`payload.pdfRef.url: must be a string (the authenticated ${kind} PDF endpoint)`);
+      } else if (!rules.url.test(ref.url)) {
+        violations.push(`payload.pdfRef.url: must be the authenticated ${kind}-PDF endpoint (${rules.urlDesc}), not a public/arbitrary link`);
+      } else if (PII_URL_RE.test(ref.url)) {
+        violations.push(`PII: payload.pdfRef.url contains tenant PII (an email/name) — the url must carry only refs (the document id), PLOS resolves the human`);
+      }
+      if (!isStr(ref.filename)) {
+        violations.push(`payload.pdfRef.filename: must be a string`);
+      } else if (!rules.filename.test(ref.filename)) {
+        violations.push(`payload.pdfRef.filename: must be ${rules.filenameDesc} (refs only — never a tenant name/email)`);
+      }
+      if ("expiresAt" in ref && ref.expiresAt !== undefined && !isIso(ref.expiresAt)) {
+        violations.push(`payload.pdfRef.expiresAt: must be an ISO-8601 instant when present`);
+      }
+    }
+  }
 
   // 4. PII-free (recursive, data-minimisation)
   scanPii(payload, "payload", violations);
