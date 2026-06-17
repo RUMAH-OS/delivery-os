@@ -43,20 +43,31 @@ const HTML_TAG_RE = /<\/?[a-z][^>]*>/i;
 // ?token=...&expires=...). It is never a raw file, never a public link. PLOS fetches
 // it with the same PLOS->Admin token the read seam uses. The endpoint + safe-filename
 // form depend on the DOCUMENT KIND (pdfRef.kind below):
-//   - invoice    : GET /invoices/<id>/pdf      , filename Factuur-<number>.pdf
-//   - creditNote : GET /credit-notes/<id>/pdf  , filename Creditnota-<CN-number>.pdf
+//   - invoice    : GET /admin/invoices/<id>/pdf      , filename Factuur-<number>.pdf
+//   - creditNote : GET /admin/credit-notes/<id>/pdf  , filename Creditnota-<CN-number>.pdf
 // content-encoding is PART of the contract (FV-4 generalised): the right endpoint
 // renders the right artifact, the safe filename carries refs only (never PII).
+//
+// CORRECTION (2026-06-17, v1 in-place — events not yet in prod, no consumer ever
+// fetched the broken form, so this is a buggy-pattern fix, NOT a v2 break): the
+// Admin app is MOUNTED at /admin (rumah-admin/src/index.ts: `app.route("/admin",
+// admin)`), so the REAL, fetchable PDF endpoints are /admin/invoices/<id>/pdf and
+// /admin/credit-notes/<id>/pdf. The earlier un-prefixed patterns (/invoices/...,
+// /credit-notes/...) matched a path that 404s — PLOS would fetch nothing and the
+// email would ship with NO PDF (the cleaning-PDF-defect class). The /admin/ prefix
+// is now REQUIRED (corrective tightening, not accept-both): there are no legacy
+// un-prefixed emissions to honor, and accept-both would silently re-admit the 404
+// path the founder's go-live depends on NOT shipping.
 const PDF_KIND = {
   invoice: {
-    url: /^(?:https:\/\/[^\s?#]+)?\/invoices\/[^\s/?#]+\/pdf(?:\?[^\s#]*)?$/,
-    urlDesc: "a /invoices/<id>/pdf path or an https URL ending in it",
+    url: /^(?:https:\/\/[^\s?#]+)?\/admin\/invoices\/[^\s/?#]+\/pdf(?:\?[^\s#]*)?$/,
+    urlDesc: "a /admin/invoices/<id>/pdf path or an https URL ending in it",
     filename: /^Factuur-[A-Za-z0-9-]+\.pdf$/,
     filenameDesc: 'the safe form "Factuur-<number>.pdf"',
   },
   creditNote: {
-    url: /^(?:https:\/\/[^\s?#]+)?\/credit-notes\/[^\s/?#]+\/pdf(?:\?[^\s#]*)?$/,
-    urlDesc: "a /credit-notes/<id>/pdf path or an https URL ending in it",
+    url: /^(?:https:\/\/[^\s?#]+)?\/admin\/credit-notes\/[^\s/?#]+\/pdf(?:\?[^\s#]*)?$/,
+    urlDesc: "a /admin/credit-notes/<id>/pdf path or an https URL ending in it",
     filename: /^Creditnota-[A-Za-z0-9-]+\.pdf$/,
     filenameDesc: 'the safe form "Creditnota-<CN-number>.pdf"',
   },
