@@ -80,6 +80,8 @@ are point-in-time -> Archive. A successful harvest produces tens of high-trust u
 The canonical structure is defined in KNOWLEDGE-ARCHITECTURE.md. The **7-bucket classifier** (the founder 6
 + **Contract** + **Archive**) and **where each physically lives + how apps consume it**:
 
+> Numbering note: CLAUDE.md is the locked project-local #1 (NOT a migration target); the 7 structured destinations are #2–#8.
+
 | # | Bucket | Holds | Physical home | App consumption |
 |---|---|---|---|---|
 | 1 | (stays local) project-context | per-app facts/config | each app CLAUDE.md | not migrated — STAYS |
@@ -103,7 +105,7 @@ re-states them.
 (knowledge-route, knowledge-health) via os-inherit (vendored + drift-checked) and retrieve canonical units at
 runtime. **Transitional exception (matches admin-first-proof):** during the proving phase a unit may be
 app-local in Admin with promotion-to-shared gated on >= 2-app reuse + contentHash lock (the board Placement
-rule). So: **seam = OS-owned now; corpus = app-local-until-proven, then promoted.**
+rule). So: **the seam WILL BE OS-owned once promoted (gated step P5/H7); today these tools live only in Admin and the `*.capability.json` manifest is the provenance source of truth; corpus = app-local-until-proven, then promoted.**
 
 ---
 

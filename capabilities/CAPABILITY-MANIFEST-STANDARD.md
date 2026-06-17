@@ -50,6 +50,10 @@ Honest `null` is a deliverable: it is how the platform answers *"which capabilit
 `facetCompleteness` (e.g. `2/5`) is **DERIVED, never stored** = the count of the five facets that are
 non-null. Storing it would let it drift from the refs; the registry computes it at scan time.
 
+> **'Complete' has two layers: the manifest declares FACET-completeness (5/5 facets present) + `status` (…|promoted); PROPAGATION/inherited state is NOT a manifest field — it's the registry/os-inherit check's job. The CAPABILITY-FRAMEWORK-SUFFICIENCY 'complete capability' = facet-complete AND promoted AND inherited. The manifest covers the first two.**
+
+> **`facets.ui`, when built, is a DATA-contract `{kind, dataContract, route}` where `dataContract` points at an authenticated read-seam endpoint returning a typed view-model the Delivery OS shell renders — NEVER a component reference (a DOS shell cannot import another system's component). The full inner shape is finalized WHEN the DOS UI shell is built (Waterline); this constraint only locks the data-driven intent now.**
+
 ## 3. Schema — `*.capability.json`
 
 A single JSON object. Required fields are marked. Unknown extra fields are allowed (forward-compatible) but
@@ -102,6 +106,7 @@ SHOULD be avoided.
   (contract / ui / skill / wiki path-style) that points to a file the registry can resolve but that does NOT
   EXIST is flagged (drift). `events` is an array of strings or `null`.
 - `invoke.kind` ∈ `{cli, http, event, none}`. `invoke.ref` required unless `kind === "none"`.
+- NOTE: **`invoke.kind:"none"` means not-platform-invocable; human-gated side-effecting capabilities (e.g. mail) are a future `invoke` extension (`input/output/sideEffect/idempotent`) added WHEN the command seam is built — so a current `none` may mean 'invocation deferred', not 'uninvocable'.**
 - `health` — a ref or `null`.
 
 ### 3.2 Where the file lives

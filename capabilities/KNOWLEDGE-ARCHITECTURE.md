@@ -187,8 +187,7 @@ the evidence trail).
 ### 3.2 Proposed v1 implementation shape
 Two artifacts, composed — mirroring the existing scanner-then-router pattern:
 
-**(a) `delivery-os/templates/tools/knowledge-harvester.mjs`** (OS-owned, vendored, drift-gated — same
-placement rule as `knowledge-route`). Zero-dep ESM, Windows-safe, fail-closed, with `--self-test`. It:
+**`knowledge-harvester.mjs`** (which **WILL BE** OS-owned once promoted — gated step P5/H7 — and given the canonical home `delivery-os/templates/tools/`, vendored + drift-gated; **today it lives only in Admin** and its `*.capability.json` manifest is the provenance source of truth, same placement rule as `knowledge-route`). Zero-dep ESM, Windows-safe, fail-closed, with `--self-test`. It:
 - walks a configured set of roots; skips `node_modules`, `.git`, already-archived dirs;
 - for each markdown file emits a candidate record:
   ```jsonc
@@ -248,6 +247,7 @@ hats the knowledge-engineer wears; naming them separates "find + classify" from 
    `superseded-by` (if replaced) or an Archive move (if simply obsolete). Retirement is provenance-preserving.
 6. **Maintain the reference graph** — keep `related: [[links]]` bidirectional and resolvable; no dangling
    links; `unknownCited[]` from `knowledge-health` is the Curator's worklist (citations to non-existent units).
+7. **Cross-repo os-inherit mirrors are NOT duplicates** — a vendored copy with a matching `contentHash` lock is intended propagation, not fragmentation; the Curator excludes contentHash-locked mirrors from merge candidates and escalates ONLY when the hash DIVERGES (a broken pin).
 
 **Mechanism (reuse, don't reinvent).**
 - The Curator's *detection* inputs are already produced: `knowledge-health --json` gives `installed[]` (the

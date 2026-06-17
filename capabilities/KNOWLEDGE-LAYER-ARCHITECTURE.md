@@ -141,6 +141,6 @@ Secondary kill: if the only way to green the slice is to count bare retrievals (
    applicable), each cell strength-stamped, **K4/K6 explicitly DEFERRED-TO-ABLATION (not claimed)**, adoption
    shown as a **ratio** (C2). Over-claim or laundered FP → the report FAILS.
 
-**Placement:** seam + health = OS-owned (`delivery-os/templates/tools/`), vendored + drift-gated; corpus =
+**Placement:** seam + health **WILL BE** OS-owned once promoted (gated step P5/H7); **today these tools live only in Admin** and the `*.capability.json` manifest is the provenance source of truth (not the file header). Once promoted their canonical home is `delivery-os/templates/tools/`, vendored + drift-gated. Corpus =
 app-local, promotion-to-shared gated on ≥2-app reuse + `contentHash` lock. Prove the chain on ONE KU in
 Admin; do NOT mass-promote the 21 memory files + 76 signals.
