@@ -86,9 +86,22 @@ SHOULD be avoided.
   },
 
   // --- how the platform / Jarvis calls it (required) ---
+  // The invoke descriptor is now an INTERFACE, not merely a LOCATOR. kind+ref say WHERE the
+  // capability lives; the EXTENDED fields (all OPTIONAL except sideEffect-when-invocable) say
+  // HOW to call it safely — the command-seam primitive (Waterline). A generic invoker
+  // (capability-invoke.mjs) plans/gates/executes purely from THIS descriptor — no bespoke
+  // per-capability integration.
   "invoke": {
     "kind": "cli",                              // REQUIRED. enum: cli | http | event | none
-    "ref":  "node scripts/knowledge-harvester.mjs"  // REQUIRED unless kind==="none"; then null/omitted.
+    "ref":  "node scripts/knowledge-harvester.mjs", // REQUIRED unless kind==="none"; then null/omitted.
+
+    // --- EXTENDED invocation interface (Waterline command-seam) ---
+    "input":  null,                             // optional. arg schema: an inline shape { name:{type,required?} } | a "$ref" path | null
+    "output": null,                             // optional. a schema ref (path) or inline shape describing the result | null
+    "sideEffect": "read",                       // REQUIRED WHEN INVOCABLE (kind ∈ {cli,http,event}). enum: read | write | outward
+    "idempotent": true,                         // optional bool. true = calling twice is safe (no extra effect).
+    "observability": null,                      // optional. { outcome: "<how the outcome is observed>" } — a health ref / delivery callback / event | null
+    "errors": null                              // optional. an error-taxonomy ref (path) OR an inline list of declared error codes/labels | null
   },
 
   // --- health probe (required key; null when none) ---
@@ -106,7 +119,25 @@ SHOULD be avoided.
   (contract / ui / skill / wiki path-style) that points to a file the registry can resolve but that does NOT
   EXIST is flagged (drift). `events` is an array of strings or `null`.
 - `invoke.kind` ∈ `{cli, http, event, none}`. `invoke.ref` required unless `kind === "none"`.
-- NOTE: **`invoke.kind:"none"` means not-platform-invocable; human-gated side-effecting capabilities (e.g. mail) are a future `invoke` extension (`input/output/sideEffect/idempotent`) added WHEN the command seam is built — so a current `none` may mean 'invocation deferred', not 'uninvocable'.**
+- **`invoke.sideEffect`** ∈ `{read, write, outward}` — **REQUIRED when the capability is invocable** (`kind ∈ {cli, http, event}`); omitted/ignored only when `kind === "none"`. Honest classification:
+  - `read` — observes state; mutates NO domain / persistent BUSINESS state (DB records, invoices, contracts, signatures) and affects nothing outside. A read capability MAY still write its OWN log / report / catalog / citation artifacts (e.g. a router's ranked-KU report or a harvester's catalog) — these are observability outputs, not domain writes, and are excepted. SAFE to call. The invoker MAY proceed. (This is why caps like knowledge-route / dispatch-route / knowledge-curator / knowledge-harvester are honestly `read` despite emitting their own log/report artifacts — they are not the `write` gate's concern, which is domain state.)
+  - `write` — mutates persistent state (DB / records). HUMAN-GATED.
+  - `outward` — sends to / affects the outside world (email, an external API, another system). HUMAN-GATED.
+  An unknown `sideEffect` value, or its absence on an invocable capability, is a validation FAIL.
+- **`invoke.input`** — optional. Either an inline shape `{ <argName>: { type, required? } }` (type ∈ string|number|boolean|object|array) the invoker validates args against, OR a `$ref`-style path to a schema, OR `null` (no declared input — any args pass through unvalidated).
+- **`invoke.output`** — optional schema ref/inline shape or `null`. Declares the expected result shape (surfaced in the plan; not enforced).
+- **`invoke.idempotent`** — optional bool. Surfaced so a caller knows whether a retry is safe.
+- **`invoke.observability`** — optional `{ outcome: "<string>" }` or `null` — how the outcome of a call WOULD be observed (a health ref, a delivery callback, an emitted event). Surfaced in the plan.
+- **`invoke.errors`** — optional. A path ref to an error taxonomy OR an inline array of declared error codes/labels OR `null`. Surfaced in the plan.
+- NOTE: **`invoke.kind:"none"` means not-platform-invocable** (no command-seam endpoint — reached implicitly / via a deep link). `sideEffect` is not required for `none`.
+
+### 3.1.1 The human-gate rule (by construction — SAFETY-CRITICAL)
+The invocation interface encodes the founder's gate (D2 / ADR-006/007): **all outbound/write actions are human-approved.** This is enforced BY THE INVOKER, not merely documented:
+- `sideEffect: "read"` → invocation MAY proceed (it is safe to observe).
+- `sideEffect: "write"` or `"outward"` → invocation REQUIRES an explicit human approval token. Without it the invoker returns a `GATED: requires human approval` plan and executes **nothing**.
+The default invoker mode is **describe / dry-run**: it returns the planned call + gate status and executes nothing. Live execution is a strictly-limited, explicit-flag opt-in (see the generic invoker tool). A capability declaring `write`/`outward` can therefore be DESCRIBED freely (the plan is safe) but never EXECUTED without approval — `sideEffect` honesty is what makes the gate trustworthy.
+
+**Approval-token scope (N2).** The current `--approve` flag is **presence-only**: any non-empty value lifts the GATE from `GATED`→`describe`. It is NOT a verified/authenticated approver identity and is NOT audit-logged. This is safe today only because the live lane NEVER executes `write`/`outward` (the live allow-list is `cli + read + admin` with a node-script ref under the repo root), so a present-but-unverified token can never cause an effectful execution — at most it flips a plan to describe-only. **Any future live `write`/`outward` (or outward HTTP) lane MUST bind `--approve` to a verified approver identity and an audit-log entry before it may execute.**
 - `health` — a ref or `null`.
 
 ### 3.2 Where the file lives
