@@ -20,6 +20,14 @@
 > Every doc resolves to one+ of: Wiki / Skill / Workflow / Health / Objective / Contract / Archive. Raw docs
 > are temporary; structured knowledge is permanent. Goal = ONE canonical answer per concept, not 20 competing
 > files.
+>
+> **Companion founder principle (verbatim, 2026-06-17 — learn-once permanence + system-wide reuse):**
+> *"A founder-discovered lesson should only need to be learned once. After validation, the system remembers it permanently and makes it available wherever it is relevant."* The lifecycle below therefore does not end at
+> "canonical" — it ends at **system-wide reuse across all systems** (PLOS, Admin, Founder OS, and future
+> systems), and it applies equally to all six pattern types (workflow · validation · handoff · health ·
+> governance · founder-review). A validated learning **detaches from the workflow that discovered it** and
+> becomes reusable everywhere it is relevant. Retrievable distilled form: wiki
+> `ku-learn-once-promote-system-wide`. This quote is the on-disk source that KU cites.
 
 ---
 
@@ -112,8 +120,16 @@ answer.**
 
 ```
 Discussion → Decision → Implementation → Learning → Knowledge Harvest → Classification
-   → Canonical Update → Archive Source
+   → Canonical Update → Archive Source → System-Wide Reuse (all systems, all 6 pattern types)
 ```
+
+> **Lifecycle terminus (founder principle, 2026-06-17).** The lifecycle does NOT terminate at "canonical." Its
+> end state is **system-wide reuse**: a validated learning, once promoted to its canonical bucket, detaches
+> from the workflow that discovered it and becomes available *wherever it is relevant* across PLOS, Admin,
+> Founder OS, and future systems — and this holds for every one of the six pattern types (workflow ·
+> validation · handoff · health · governance · founder-review), not just narrowly-scoped lessons. The
+> distilled rule is `ku-learn-once-promote-system-wide`; the full founder framing — *"learned once … remembers
+> it permanently and makes it available wherever it is relevant"* — is recorded verbatim in the header above.
 
 | Stage | What happens | Artifact at this stage | Owner |
 |---|---|---|---|
