@@ -13,7 +13,9 @@
     "templates/tools/dispatch-route.mjs"
   ],
   "contracts": [
-    "contracts/admin-plos-seam-v1.mjs"
+    "contracts/admin-plos-seam-v1.mjs",
+    "contracts/inventory-properties-v1.mjs",
+    "contracts/inventory-properties-v1.d.mts"
   ],
   "skills": [
     "learning-review"
