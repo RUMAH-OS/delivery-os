@@ -9,7 +9,8 @@
     "templates/tools/skill-frontmatter.mjs",
     "templates/tools/skill-route.mjs",
     "templates/tools/agent-frontmatter.mjs",
-    "templates/tools/agent-route.mjs"
+    "templates/tools/agent-route.mjs",
+    "templates/tools/dispatch-route.mjs"
   ],
   "contracts": [
     "contracts/admin-plos-seam-v1.mjs"
