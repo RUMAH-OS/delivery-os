@@ -431,6 +431,160 @@ maxAttempts/stop-predicate engine fields + the verifier-capability contract) BEF
 guard (sec 9) still binds: the loop pattern earns its place because BOTH domains exercise it (Mailbox
 classification/draft and Admin dunning-retry both loop act->verify->bounded-branch).
 
+### 10.5 The Verifier capability (STRATEGIC) - model it fully, because this is where the value moves
+
+> Founder directive, verbatim intent: future value will come less from workflow execution and more from the
+> quality of verification, evaluation, scoring, confidence assessment, and approval decisions ... the real
+> differentiator will be verifier quality. Sections 10.0-10.4 named the Verifier as a reusable capability and
+> stopped. This sub-section models it FULLY: its contract, a trust-ranked type taxonomy, the strategic
+> eval-the-evaluator property, its place in the capability catalog, and the cross-domain reuse table the founder
+> asked for. It also codifies the durable design principle. The shift this encodes: the loop mechanics (sec 10.2)
+> are solved and cheap; the verifier + its evals are the hard, high-value, EVALUATED capability - the
+> differentiator. DESIGN-ONLY.
+
+#### 10.5.0 Why a sub-section, not a new doc (anti-fragmentation)
+The Verifier was already named the loop reusable capability in sec 10.1(3)/10.2. Forking a new doc would split
+the execution model from its most strategic part. This EXTENDS sec 10; the engine surface (sec 10.2: maxAttempts
+field + stopCondition predicate) is UNCHANGED. Everything below is capability + eval weight, NOT new engine. The
+Verifier is a registered capability in the sense of CAPABILITY-PROMOTION-DISCOVERY.md (catalog/manifest/facets/
+governance ladder) - it reuses that machinery rather than inventing a parallel one.
+
+#### 10.5.1 The Verifier CONTRACT (the loop stop condition, made an interface)
+A Verifier is a capability with one uniform interface. It IS the loop objective stop condition (sec 10.2):
+the loop stops when the verdict is pass, OR attempt >= maxAttempts (the hard cap, sec 10.2 fields). A
+needs_improvement verdict (with suggestedImprovement) feeds the bounded retry back-edge; fail with no
+improvement path routes to a human-response await (C6).
+
+    Verifier.verify(input) -> Verdict
+      input  : { goal/criteria, candidate, context }   // the objective; what is judged; the run context
+      Verdict:
+        verdict             : pass | fail | needs_improvement   // the stop signal P4 reads
+        score?              : 0..1     // optional rubric score (threshold-gated verifiers)
+        confidence          : 0..1     // how sure the verifier is OF ITS OWN verdict (calibration target, 10.5.3)
+        reasons             : string[] // why - the audit trail; emitted to /v1/events (observable rung)
+        suggestedImprovement? : ...    // feeds the retry back-edge when needs_improvement
+
+Properties (deliberate):
+- **Objective over subjective.** verdict is the contract; score/confidence make the objectivity measurable.
+- **PII-aware by construction.** A verifier that must read Contact PII to judge (e.g. entity-resolution, comms
+  tone over a real person thread) RUNS IN PLOS, never in Admin or the engine (admin-truth-source-boundary;
+  ADR-0003). The engine receives only the Verdict across the seam - never the PII the verifier read. This is
+  the exact classifier-plus-its-evals-stay-in-the-domain boundary of sec 6/sec 9, applied to verifiers.
+- **It is a step executor, not engine surface.** A Verifier sits behind the P3 await (source agent-result) for
+  agent/LLM verifiers, or runs as a P2 in-process check for deterministic ones. It adds NO durable mechanism.
+
+#### 10.5.2 Verifier TYPES - a small taxonomy, RANKED BY TRUST (prefer objective; fall back to human)
+Five types, highest-trust first. The design rule: **use the highest-trust verifier the criterion admits; fall
+back down the ladder only when no higher type is trustworthy enough; the bottom rung (human) is always available.**
+
+| # | Type | Verdict comes from | Trust | Needs evals before it may GATE? | Canonical example |
+|---|---|---|---|---|---|
+| T1 | **Deterministic check** | a rule/assertion over facts | HIGHEST | NO - it is its own proof (a rule cannot be miscalibrated, only mis-specified) | invoice balance == 0; sum(allocations)==invoice.total; idempotency-key absent |
+| T2 | **Rubric scorer** | a scored rubric, threshold-gated (score >= t) | HIGH | YES - the threshold + rubric must be calibrated against labelled outcomes | draft-quality score >= 0.8; data-completeness score |
+| T3 | **Classifier-confidence** | the acting agent OWN confidence vs a threshold | MEDIUM | YES - self-reported confidence is worthless until calibrated (10.5.3) | classify only if confidence >= 0.9 else escalate |
+| T4 | **LLM-judge / maker-checker** | a SEPARATE agent scores the maker output | MEDIUM (powerful but opaque) | YES - strongly; an un-evalled judge is the most dangerous (confident + plausible + wrong) | a checker agent grades intent-correctness or tone |
+| T5 | **Human-approval** | a human IS the verifier | CONTEXT-HIGHEST for irreversible/subjective | N/A - the human is the ground truth (unifies with sec 5 human-in-the-loop / C6) | approve a send; issue a number; move money |
+
+The ranking is the design guidance: a T1 deterministic check beats a T4 LLM-judge whenever the criterion can be
+expressed as a rule - so *invest in making criteria objective* (push T4->T2->T1 where possible). T5 (human) is
+the **canonical fallback**: the unbypassable floor for anything irreversible, subjective, or where no objective
+verifier has earned enough trust to gate. T5 unifies sec 5 - a human gate is just a Verifier of type
+human-approval whose Verdict posts via the human-response callback (sec 3). One model now covers approval AND
+verification.
+
+#### 10.5.3 THE STRATEGIC PROPERTY - eval-the-evaluator (this is where the investment goes)
+**A Verifier must ITSELF be evaluated before it is allowed to GATE.** This is the load-bearing, non-obvious
+claim and the real differentiator. A weak/uncalibrated verifier is WORSE than no loop: it confidently iterates
+a bounded loop toward a WRONG objective, or stops pass when it should have failed - manufacturing false
+confidence at machine speed. The loop safety is exactly the verifier calibration.
+
+Therefore every non-T1 Verifier carries:
+- **An eval suite** - labelled cases with known-correct verdicts (true-pass / true-fail / known-hard), the
+  verifier measured precision/recall + calibration (does a stated confidence 0.9 actually mean ~90% right?).
+  This is the qa-test / agent-output evals already named in sec 9 step 3 and sec 10.3 - now made a *property of
+  the verifier capability*, not a one-off pre-flight.
+- **A measured trust level** - it earns the right to gate via the SAME CAPABILITY-GOVERNANCE-LADDER.md rungs
+  every capability climbs: **exists -> reachable -> validated (eval suite passes a stated bar, author!=verifier)
+  -> observable (its verdicts + reasons emitted to /v1/events) -> trusted (calibration holds on real data) ->
+  enabled (allowed to GATE autonomously)**. A verifier is just a capability; the may-it-gate question is exactly
+  the governance-ladder question (ku-capability-governance-ladder), and built-is-not-allowed-to-gate is exactly
+  ku-implemented-is-not-operationally-proven applied to verifiers.
+- **The advise-vs-gate rule (the fail-safe):** *an un-evaluated / not-yet-enabled Verifier may only ADVISE,
+  never GATE.* While below the enabled rung it runs in shadow - its verdict is recorded/emitted (building the
+  eval evidence) but does NOT stop or branch the loop; the loop real stop condition stays a human-approval
+  (T5) until the verifier calibration earns the enabled rung. T1 deterministic checks are exempt (a rule is
+  its own proof). This is the construction-level guard against a confident-but-wrong gate, and it is precisely
+  where the v1 effort + founder gating belong - NOT the loop mechanics.
+
+**Say it plainly: the differentiator and the real investment are the EVAL INFRASTRUCTURE** - objective stop
+criteria, labelled eval suites, calibration measurement, and the advise->gate promotion gate - NOT the loop
+engine (which is two fields and a back-edge, near-proven). The engine is minimal on purpose; the strategic
+weight is the Verifier capability + its evals.
+
+#### 10.5.4 Reusability - Verifiers are catalog capabilities, invoked by id, composed into loops
+A Verifier is registered exactly like any capability in CAPABILITY-PROMOTION-DISCOVERY.md: a *.capability.json
+manifest, the 5 facets, an invoke descriptor, a governance-ladder status, discoverable via capability-route,
+invoked by id via capability-invoke. Consequences:
+- **One verifier, many loops.** A confidence-threshold verifier or an llm-judge rubric is declared ONCE and
+  reused across Mailbox/Contact/Outreach/Jarvis - not re-authored per domain.
+- **Composable.** A goal-success verifier (10.5.5, Jarvis) COMPOSES domain verifiers by id rather than
+  re-implementing them.
+- **PII-routing is a manifest fact.** A verifier touching Contact PII carries pii:true and is PLOS-owned -
+  the same fail-closed scope machinery (A2/SEC-1 in CAPABILITY-PROMOTION-DISCOVERY) governs whether its verdict
+  may cross the cross-system seam. No new mechanism.
+- **The dedup gate prevents 5 bespoke verifiers.** The rebuild-detector (C4/C5 there) is exactly what stops a
+  team re-inventing a quality-scorer that already exists.
+
+#### 10.5.5 The reuse table (the founder explicit ask) - the SAME types reused across all 5
+The strategic claim made concrete: these are NOT 5 bespoke verifiers; they are the SAME catalog verifier TYPES
+(T1-T5) reused across domains. Read the rightmost columns vertically - each type recurs.
+
+| Domain | Verifier(s) used | Type(s) | Stop / fallback |
+|---|---|---|---|
+| **Mailbox Intelligence** | classification-confidence verifier; intent-correctness checker; comms tone/correctness scorer | T3 (confidence) + T4 (LLM-judge) + T2 (rubric) | stop-when-confident/passes; else bounded retry; else escalate-to-human (T5) |
+| **Contact Intelligence** | entity-resolution-confidence verifier (is this the right Contact? score+confidence); dedup-correctness checker | T3 (confidence) + T1/T4 (rule + judge) | stop-when-resolved-confident; ambiguous -> human (T5). PII -> runs in PLOS (10.5.1) |
+| **Outreach Intelligence** | message-quality scorer; compliance/approval verifier; reply-classification confidence | T2 (rubric) + T1 (compliance rule) + T3 (confidence) | quality-passes + compliance-passes -> human-approval (T5) before any send (C6) |
+| **Human Approval Flows** | the human-approval verifier (the canonical fallback - the human IS the verifier) | **T5** | the human decision IS the verdict; unifies with sec 5; the floor for irreversible/money/subjective |
+| **Future Jarvis workflows** | a goal-success verifier (did the goal objective criteria get met?) that COMPOSES the domain verifiers above | composite (composes T1-T4) + T5 floor | stop when goal-criteria met; bounded; every irreversible action still a T5 human gate |
+
+The reuse is the point: **T3 confidence-threshold** appears in Mailbox, Contact AND Outreach; **T2 rubric-scorer**
+in Mailbox AND Outreach; **T4 LLM-judge** in Mailbox AND Contact; **T1 deterministic** in Contact AND Outreach
+(compliance); **T5 human-approval** is the shared floor across ALL of them and IS the Human-Approval-Flows row.
+Jarvis adds no new type - it composes the existing ones behind a goal-success verifier. That cross-domain
+recurrence is the strategic reusability the founder asked to see demonstrated.
+
+#### 10.5.6 The CORE DESIGN PRINCIPLE (durable - candidate KUs)
+Codified for promotion to the wiki (the org KU corpus), drafted by knowledge-engineer, author!=verifier, not
+self-certified:
+
+> **Verified-loop execution (Goal -> Act -> Verify -> Improve -> Stop) is a core Delivery OS principle.** Every
+> goal-oriented agent task is BOUNDED (maxAttempts) + gated by an OBJECTIVE stop condition + verified by a
+> CALIBRATED Verifier capability. Verification is a strategic, reusable, EVALUATED capability - the
+> differentiator is verifier QUALITY, not loop mechanics. **A Verifier must itself be evaluated before it is
+> allowed to gate** (an un-evaluated verifier may only ADVISE). Prefer objective verifiers (deterministic ->
+> rubric -> confidence -> judge) and fall back to a human-approval verifier when no objective verifier has
+> earned enough trust; the human gate is the unbypassable floor for anything irreversible.
+
+Two candidate KU ids (proposed, gated on the founder ratifying this amendment - DESIGN-ONLY, not created here):
+- **ku-verified-loop-execution** - the loop is a bounded, objective-stop, verifier-gated pattern; loops are
+  opt-in where verification matters; the value is the verification + objective done-criteria, not the steps.
+  Earned-from: this sec 10 (founder Loop-Engineering ask) + the org own maker-checker dogfood (sec 10.0).
+  Related: ku-verify-seam-by-one-real-round-trip, ku-author-not-equal-verifier.
+- **ku-verifier-must-be-evaluated** - a verifier must itself be calibrated/evaluated before it may GATE; an
+  un-evaluated verifier may only advise; a weak verifier is worse than no loop. Earned-from: this sec 10.5.3.
+  Related: ku-capability-governance-ladder (it climbs the same rungs to earn enabled/gate),
+  ku-implemented-is-not-operationally-proven (built != allowed-to-gate), ku-enable-capabilities-on-trust-not-existence.
+
+#### 10.5.7 The honest hard part (where v1 investment + risk actually are)
+The loop MECHANICS are solved and cheap (sec 10.3): a back-edge + an attempt counter + a stop predicate, all
+near-proven, two engine fields. **The hard, high-value, high-risk work is verifier QUALITY + the EVAL
+INFRASTRUCTURE:** defining objective stop criteria, building labelled eval suites, measuring calibration, and
+the eval-the-evaluator gate (advise-until-calibrated). This is the single largest v1 investment area and the
+single largest risk - a confident wrong verifier gating a bounded loop is the failure mode, and it is silent.
+Keep the ENGINE minimal (a verifier is a CAPABILITY, not engine surface); spend the effort on the capability +
+its evals. This restates and sharpens sec 10.3 and the sec 9 Agent-quality/evals (HIGH) risk: the founder
+gating belongs on which verifiers are trusted enough to GATE, not on the loop wiring.
+
 ---
 
 ## Critical-rule check
