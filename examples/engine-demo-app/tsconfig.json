@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "rootDir": ".",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true
+  },
+  "include": ["*.ts", "src/**/*.ts", ".claude/os/engine/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    ".claude/os/engine/golden-master.ts",
+    ".claude/os/engine/scripts/**"
+  ]
+}

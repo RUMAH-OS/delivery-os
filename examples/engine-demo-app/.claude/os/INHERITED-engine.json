@@ -1,0 +1,81 @@
+{
+  "osVersion": "v5.0-114-g2bc2cd3",
+  "manifestVersion": "v1",
+  "key": "workflow-engine",
+  "source": "templates/workflow-engine",
+  "note": "VENDORED (sha-pinned) from delivery-os/templates/workflow-engine — the CANONICAL workflow-engine. Do NOT hand-edit these files; re-run `os-inherit sync`. `os-inherit engine-check` fails if the installed copy drifts from these hashes OR these hashes drift from canonical.",
+  "files": [
+    {
+      "rel": ".claude/os/engine/approvals-route.ts",
+      "sha256": "d499bbb2cf65ed39575a88e309d24dbd5b78a7a58f60081afe74de404facba4c"
+    },
+    {
+      "rel": ".claude/os/engine/callback-completer.ts",
+      "sha256": "b936209db357971568e4ecbd984441c4ecde9da8ab4abed04d6ced10fae3d4cb"
+    },
+    {
+      "rel": ".claude/os/engine/capability-pack.ts",
+      "sha256": "8769a202a24f0790750b4a13d2257d8eb122d0c7f8a2e2da72407c1bf7e29014"
+    },
+    {
+      "rel": ".claude/os/engine/contracts/approvals-v1.ts",
+      "sha256": "d4a463ffb0b3eb16de377fbeda06f44c92bd3d9971fb234bba4c11d53be06ecd"
+    },
+    {
+      "rel": ".claude/os/engine/definitions.ts",
+      "sha256": "5f11f2b7675640fb3de19d317114be3217966aa88fb2fb5b60143655a388fbfc"
+    },
+    {
+      "rel": ".claude/os/engine/engine.ts",
+      "sha256": "40d4191c5b460d2bc5e5dcac7bd649fc4543cffd4c6263d4cbae49f4dac64737"
+    },
+    {
+      "rel": ".claude/os/engine/golden-master.ts",
+      "sha256": "5b379b296547ea060a42b9a4876fa99c978eafcdcacf28186ca19b8e12845d70"
+    },
+    {
+      "rel": ".claude/os/engine/handlers.ts",
+      "sha256": "b895b5163a6cac637e8d9dc4e6c1872ff471b29744fa52003ba5898236df1641"
+    },
+    {
+      "rel": ".claude/os/engine/human-principal.ts",
+      "sha256": "ac501cc8c65d36faeeb720c0f40b9e506400b255129ade850c099e49c452ff03"
+    },
+    {
+      "rel": ".claude/os/engine/index.ts",
+      "sha256": "dcef08068f05b30c103db63dedeab4d8bdc163ba9e3ff738985829545609b133"
+    },
+    {
+      "rel": ".claude/os/engine/migrations/0001_engine_core.down.sql",
+      "sha256": "ba0ce73215dfb74c5e26210882c59b53e59e0d6da31f4a2e1b847000e6ac6d46"
+    },
+    {
+      "rel": ".claude/os/engine/migrations/0001_engine_core.sql",
+      "sha256": "6527735951dcdff8727d22d4e4c3aef9539f1cdf88cdd67282ec6f1f42e63b6e"
+    },
+    {
+      "rel": ".claude/os/engine/migrations/0002_engine_await_loop.down.sql",
+      "sha256": "05c04c2fa1816065f552718897f22ef18e2ab70811d49ec8075a88ae272bcf0b"
+    },
+    {
+      "rel": ".claude/os/engine/migrations/0002_engine_await_loop.sql",
+      "sha256": "ed1a658640f828073dbcc3bb495f0cb3a1a4b3c8a7eabd2f91170c8ce0f4204b"
+    },
+    {
+      "rel": ".claude/os/engine/scripts/proof-harness.ts",
+      "sha256": "a3d8fe2d4fe5be7bc1306c65dbc2b7cf09f135902fe2517f6c8e172d0b78ba47"
+    },
+    {
+      "rel": ".claude/os/engine/state-machine.ts",
+      "sha256": "75e427eb543179692652d7a76044e2ec81aea0e8ea40f0c34defb21abdcbb79b"
+    },
+    {
+      "rel": ".claude/os/engine/verifiers.ts",
+      "sha256": "9fa602fac7cc2ca9bca0229f72895cbb2a9cf761b12c12fe4faea486081fdec4"
+    },
+    {
+      "rel": ".claude/os/engine/workflow-route.ts",
+      "sha256": "bb749ba5b4b0e5187a246d37eee2f6b2cb1803f469e56ad019486337ea23a2d1"
+    }
+  ]
+}

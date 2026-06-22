@@ -1,0 +1,19 @@
+# Throwaway Postgres for the engine-demo-app — a DISTINCT port (55433) + db-name (engine_demo) so it never
+# collides with Admin's test DB. NEVER prod. `npm run db:up` to start, `npm run db:down` to destroy (-v wipes
+# the volume). Ephemeral by design (no named volume): a restart starts clean.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: engine_demo
+    ports:
+      - "55433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d engine_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

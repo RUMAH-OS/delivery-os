@@ -1,0 +1,63 @@
+{
+  "osVersion": "v5.0-114-g2bc2cd3",
+  "manifestVersion": "v1",
+  "note": "VENDORED from delivery-os via os-inherit. Do NOT hand-edit these files; re-run `os-inherit sync`. `os-inherit check` fails if they drift from canonical.",
+  "files": [
+    {
+      "rel": ".claude/os/tools/admin-plos-seam-v1.mjs",
+      "sha256": "e078ef1b0ea99ed50406a915e50e38709dc085c9af9c1d9099669e2d2a22c056"
+    },
+    {
+      "rel": ".claude/os/tools/agent-frontmatter.mjs",
+      "sha256": "2d2bb8c0fda616d2312f6ece4ec59aba365de95e4a668909b54f56e0c362b5d1"
+    },
+    {
+      "rel": ".claude/os/tools/agent-route.mjs",
+      "sha256": "9c934ce0eca55ae598cd3b35ff1526e9aed7d8ac56da94b00985bca4c7db4554"
+    },
+    {
+      "rel": ".claude/os/tools/dispatch-route.mjs",
+      "sha256": "b3c8f5d5a2a238d1e10279810a99f83de1ac17c8ddee14b07d7b340d909b282c"
+    },
+    {
+      "rel": ".claude/os/tools/experience-gate.mjs",
+      "sha256": "99da97730dd54bfb49235ecb17ef79fffac52b848ebd799c319291b9cf23c6b0"
+    },
+    {
+      "rel": ".claude/os/tools/inventory-properties-v1.d.mts",
+      "sha256": "2fdbf1f5fe500a9cf9af7aa9fd02e784623109d6124a37adbaa2369282ba8fc9"
+    },
+    {
+      "rel": ".claude/os/tools/inventory-properties-v1.mjs",
+      "sha256": "0fb12ce45e741b9e1e03fb8a678e511ae4a0c3d6772e896a9a7487935ccbca2c"
+    },
+    {
+      "rel": ".claude/os/tools/lifecycle-gate.mjs",
+      "sha256": "799ed822fd232845d8fbced4ee1d54c871c156c3b0cc9a8e66c702e361923b1c"
+    },
+    {
+      "rel": ".claude/os/tools/os-inherit.mjs",
+      "sha256": "ea134107d969ad4fd2b552c622b60532cd7ebe9e07c604b9e5195c057375256a"
+    },
+    {
+      "rel": ".claude/os/tools/seam-gate.mjs",
+      "sha256": "cbcf6c14a94c15de0f2635c902ed38a38c1a5a675d6ad69281b61ef1a9577fe6"
+    },
+    {
+      "rel": ".claude/os/tools/skill-frontmatter.mjs",
+      "sha256": "7e3579900c3d3bca39ab7d71e029415480afff883464c071f5ad1c3abca0b1e1"
+    },
+    {
+      "rel": ".claude/os/tools/skill-route.mjs",
+      "sha256": "5b4acd3877d22d935ac3659fa31a35aefcd4ae0e954303dac80b96b131cbe4e3"
+    },
+    {
+      "rel": ".claude/os/tools/workflow-gate.mjs",
+      "sha256": "8306436ec765a93965f2068b128f3f70265513924a7ac2e020923d33a616c802"
+    },
+    {
+      "rel": ".claude/skills/learning-review/SKILL.md",
+      "sha256": "15ceb6c20a3d567ca78e261dd3aaa48c22d852915b277cd17d58ec6446b49559"
+    }
+  ]
+}

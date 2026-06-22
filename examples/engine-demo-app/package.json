@@ -1,0 +1,27 @@
+{
+  "name": "engine-demo-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "N=2 platform proof: a genuinely SEPARATE app that INSTALLS the Delivery OS workflow engine via os-inherit and runs a workflow GREEN. Imports ONLY its own code + the vendored engine (.claude/os/engine). ZERO dependency on rumah-admin.",
+  "scripts": {
+    "engine:install": "node .claude/os/tools/os-inherit.mjs sync --from ../.. --into .",
+    "engine:drift:check": "node .claude/os/tools/os-inherit.mjs engine-check --from ../.. --into .",
+    "ddl:parity": "tsx scripts/ddl-parity.ts",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down -v",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx run-demo.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5",
+    "zod": "^3.23.8",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
