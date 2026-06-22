@@ -639,8 +639,21 @@ function backoff(attempt: number): number {
   return Math.round(base * (0.5 + Math.random() * 0.5));
 }
 
-function isUniqueViolation(e: unknown): boolean {
-  return typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "23505";
+// Unique-violation (pg 23505) detection that is robust to query-layer wrapping. The current Drizzle
+// version wraps the underlying pg error in a DrizzleQueryError whose own `.code` is undefined and carries
+// the real driver code under `.cause` (`e.cause.code === '23505'`). A top-level-only check therefore MISSES
+// the violation and the catch site (e.g. enqueue's idempotent SELECT-and-return) is never reached — the
+// error re-throws and a legit idempotent retry surfaces as a bare 500. Walk the `.cause` chain defensively
+// (finite depth, cycle-guarded) so the guarantee survives the wrapping. Mirrors goals-route's pgCode().
+export function isUniqueViolation(e: unknown): boolean {
+  let cur: unknown = e;
+  for (let depth = 0; depth < 8 && cur !== null && typeof cur === "object"; depth++) {
+    if ((cur as { code?: unknown }).code === "23505") return true;
+    const next = (cur as { cause?: unknown }).cause;
+    if (next === cur) break; // defensive cycle guard
+    cur = next;
+  }
+  return false;
 }
 
 export type { WorkflowDefinition };

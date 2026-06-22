@@ -4,7 +4,7 @@
 // (EngineContext, HumanPrincipalPort) and the scopes (WORKFLOW_SCOPES); the app supplies the impls.
 
 // ── runner ──
-export { createEngine, evaluateStopCondition } from "./engine.js";
+export { createEngine, evaluateStopCondition, isUniqueViolation } from "./engine.js";
 export type { Engine, EngineContext, EngineTables, DbLike, TickReport, TxLike } from "./engine.js";
 
 // ── state machine ──
