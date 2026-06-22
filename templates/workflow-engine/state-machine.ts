@@ -115,8 +115,24 @@ export class IllegalStepTransitionError extends Error {
 // the engine leaves the run `blocked` for a human. This mirrors dispatch-route's no-spawn ceiling and
 // ratifies OPEN-Q7 as an invariant. Emit-only steps are idempotent because the outbox emit is
 // idempotent on its row id and the transition is idempotent on (run_id, seq, attempt).
-export type StepEffect = "emit-only" | "idempotent" | "irreversible";
+//
+// `await-callback` is the cross-system capability-step (the v1 net-new primitive): it emits a REQUEST to
+// the outbox in-txn and BLOCKS the run on the correlated inbound callback (system-callback source). It is
+// UNATTENDED-SAFE by the SAME argument as emit-only: it mutates no money, assigns no number, sends nothing
+// directly — it only emits an idempotent request and parks. It reaches `blocked` via a DISTINCT source
+// (system-callback) from the irreversible/cap-trip human-gate path (human-response): both land in `blocked`
+// but the completer that resolves each is least-privilege per await_source (S2).
+export type StepEffect = "emit-only" | "idempotent" | "irreversible" | "await-callback";
 
+// Unattended-safe = the engine may run it without a human. await-callback is unattended-safe: it emits an
+// idempotent request and blocks; the irreversible decision (if any) is owned by the OTHER system, which
+// reports an outcome the engine merely records. Only `irreversible` (in-engine money/number/send) blocks
+// for a human.
 export function isUnattendedSafe(effect: StepEffect): boolean {
-  return effect === "emit-only" || effect === "idempotent";
+  return effect === "emit-only" || effect === "idempotent" || effect === "await-callback";
+}
+
+// Is this step the cross-system await-callback primitive? (drives the engine's emit-request→block branch).
+export function isAwaitCallback(effect: StepEffect): boolean {
+  return effect === "await-callback";
 }

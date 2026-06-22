@@ -23,8 +23,12 @@ export interface StepContext {
   emit: (type: string, payload: Record<string, unknown>) => Promise<void>;
 }
 
+// An await-callback handler (a step whose effect is "await-callback") additionally returns `awaitEventId`:
+// the correlation key (the id of the REQUEST event it emitted in-txn) that the inbound system callback will
+// carry back. The engine sets it on the blocking step (awaiting_event_id) so the completer can match. A
+// non-await handler omits it (undefined). PII-free: it is an opaque event id, never domain data.
 export type HandlerResult =
-  | { ok: true; result: Record<string, unknown>; checkpoint: Record<string, unknown> }
+  | { ok: true; result: Record<string, unknown>; checkpoint: Record<string, unknown>; awaitEventId?: string }
   | { ok: false; transient: boolean; error: string };
 
 export type Handler = (ctx: StepContext) => Promise<HandlerResult>;

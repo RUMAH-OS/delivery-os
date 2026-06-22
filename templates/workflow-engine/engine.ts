@@ -21,6 +21,7 @@ import { getDefinition, type WorkflowDefinition, type StopCondition } from "./de
 import {
   assertLegalRunTransition,
   assertLegalStepTransition,
+  isAwaitCallback,
   isUnattendedSafe,
   type RunState,
   type StepEffect,
@@ -53,6 +54,13 @@ export interface DbLike {
 export interface EngineContext {
   db: DbLike;
   tables: EngineTables;
+  // OPTIONAL domain-injected hook for the callback-before-block race (R1/N1). The engine is DOMAIN-FREE: it
+  // does not know the app's callback-outcome table (e.g. a delivery log). For an await-callback step, the
+  // engine asks the app — via this hook, IN the same txn, AFTER the request is emitted — whether the
+  // correlated outcome ALREADY arrived. If it returns true, the engine advances the step directly instead of
+  // blocking (record-then-advance-if-waiting). If the hook is absent, the engine always blocks (and relies on
+  // the completer to advance later) — the safe default. The hook receives ONLY an opaque event id.
+  outcomeArrived?: (tx: TxLike, eventId: string) => Promise<boolean>;
 }
 
 // The Drizzle transaction handle type (kept loose — the engine threads whatever the app's db hands it).
@@ -75,6 +83,7 @@ export interface Engine {
 export function createEngine(ctx: EngineContext): Engine {
   const { db } = ctx;
   const { workflowRun, workflowStep, outbox } = ctx.tables;
+  const outcomeArrived = ctx.outcomeArrived; // OPTIONAL race hook (callback-before-block); undefined = always block.
 
   // ── enqueue() — the thin boundary (C2). Creates a run (queued) + materializes its steps. ──────────
   // Idempotent on (definition_key, idempotency_key): a re-enqueue with the same key returns the existing
@@ -247,6 +256,19 @@ export function createEngine(ctx: EngineContext): Engine {
       // -> block the human-response gate (S3/C6). attempt/max_attempts on the ACT step is the hard cap (D3).
       if (step.handler === "engine.verify") {
         return await runVerifyStep(tx, step, leaseToken, now);
+      }
+
+      // ── AWAIT-CALLBACK branch (v1 cross-system primitive) — emit the request in-txn, then BLOCK on the
+      // correlated inbound system callback (distinct from the irreversible human-gate block path). ──────
+      // The step is leased (CAS held). Its handler emits the REQUEST event to the outbox in-txn and returns
+      // the correlation key (awaitEventId = the request event id the callback will carry back). The engine
+      // then EITHER: (a) callback-before-block race (R1/N1) — if the app's optional outcomeArrived hook says
+      // the correlated outcome ALREADY landed, advance leased->done directly (no block, no lost work); OR
+      // (b) the common case — set await_source='system-callback' + awaiting_event_id, transition
+      // leased->blocked + run executing->blocked, and EXIT the tick holding NO lease (crash-while-blocked is
+      // trivially resumable). Resume happens via completeAwaitingStep() called from the app's callback txn.
+      if (isAwaitCallback(step.effect)) {
+        return await runAwaitCallbackStep(tx, step, leaseToken, thisAttempt, now);
       }
 
       // ── Execute the step handler. Emit-only/idempotent so a crash mid-handler is safe to re-run. ──
@@ -434,6 +456,91 @@ export function createEngine(ctx: EngineContext): Engine {
     await transitionRun(tx, step.run_id, "failed", now, { blockedReason: null });
     await emitTx(tx, "workflow.run.failed", step.run_id, { runId: step.run_id, seq: step.seq, reason: "verify_error" });
     return { advanced: true, runId: step.run_id, from: step.run_state, to: "failed", detail: `verify error -> run failed: ${error}` };
+  }
+
+  // ── The await-callback control (v1 cross-system primitive). Runs the request handler, then blocks (or, on
+  // the callback-before-block race, advances directly). Called with the step ALREADY leased (CAS held). ──
+  // The ONLY net-new engine surface: emit-request-in-txn -> block-on-correlation-key, reusing the existing
+  // leased->blocked + executing->blocked + blocked->done edges. DOMAIN-FREE: the engine never reads the
+  // request payload or the outcome — the handler emits, the optional outcomeArrived hook decides the race.
+  async function runAwaitCallbackStep(tx: TxLike, step: LeasedStep, leaseToken: string, thisAttempt: number, now: Date): Promise<TickReport> {
+    // ── run the handler — it emits the REQUEST event in-txn (transactional outbox) + returns awaitEventId. ──
+    const sctx: StepContext = {
+      tx, runId: step.run_id, seq: step.seq, attempt: thisAttempt, checkpoint: step.checkpoint ?? null,
+      emit: (type, payload) => emitTx(tx, type, step.run_id, payload),
+    };
+    let outcome: { ok: true; result: Record<string, unknown>; checkpoint: Record<string, unknown>; awaitEventId?: string }
+      | { ok: false; transient: boolean; error: string };
+    try {
+      outcome = await runHandler(step.handler, sctx);
+    } catch (e) {
+      outcome = { ok: false, transient: true, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // a failing await-request handler is handled exactly like any other step failure (retry/terminal).
+    if (!outcome.ok) {
+      if (outcome.transient && thisAttempt < step.max_attempts) {
+        const retryAt = new Date(now.getTime() + backoff(thisAttempt));
+        const wrote = await tx.update(workflowStep).set({
+          state: "failed", nextRetryAt: retryAt, error: { message: outcome.error, attempt: thisAttempt }, leaseToken: null, leaseUntil: null, updatedAt: now,
+        }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
+        if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await-request retry write-back" };
+        await tx.update(workflowRun).set({ wasInterrupted: true, updatedAt: now }).where(eq(workflowRun.id, step.run_id));
+        await emitTx(tx, "workflow.step.failed", step.run_id, { runId: step.run_id, seq: step.seq, attempt: thisAttempt, willRetryAt: retryAt.toISOString() });
+        return { advanced: true, runId: step.run_id, detail: `await-request seq ${step.seq} failed (attempt ${thisAttempt}/${step.max_attempts}) — retry` };
+      }
+      await tx.update(workflowStep).set({
+        state: "failed", error: { message: outcome.error, attempt: thisAttempt, terminal: true }, leaseToken: null, leaseUntil: null, updatedAt: now,
+      }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
+      await transitionRun(tx, step.run_id, "failed", now, { blockedReason: null });
+      await emitTx(tx, "workflow.run.failed", step.run_id, { runId: step.run_id, seq: step.seq, reason: "await_request_failed" });
+      return { advanced: true, runId: step.run_id, from: step.run_state, to: "failed", detail: `await-request seq ${step.seq} exhausted -> run failed` };
+    }
+
+    // the handler MUST have emitted a request and returned its correlation key (awaitEventId). A misconfigured
+    // await-callback handler (no key) is a terminal misconfiguration — fail closed (never block on nothing).
+    const eventId = outcome.awaitEventId;
+    if (!eventId) {
+      await tx.update(workflowStep).set({
+        state: "failed", error: { message: "await-callback handler returned no awaitEventId", terminal: true }, leaseToken: null, leaseUntil: null, updatedAt: now,
+      }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
+      await transitionRun(tx, step.run_id, "failed", now, { blockedReason: null });
+      await emitTx(tx, "workflow.run.failed", step.run_id, { runId: step.run_id, seq: step.seq, reason: "await_misconfigured" });
+      return { advanced: true, runId: step.run_id, from: step.run_state, to: "failed", detail: `await-callback seq ${step.seq} misconfigured (no awaitEventId) -> run failed` };
+    }
+
+    // ── (a) CALLBACK-BEFORE-BLOCK race (R1/N1): record-then-advance-if-waiting. If the app's hook reports the
+    // correlated outcome ALREADY arrived (a callback raced ahead of the block), advance leased->done DIRECTLY
+    // — do NOT block. No lost/double work: the completer that recorded the outcome found no blocked step (no-op),
+    // and the engine picks it up here. Same-txn, CAS-guarded on the lease. ──
+    let raced = false;
+    if (outcomeArrived) {
+      try { raced = await outcomeArrived(tx, eventId); } catch { raced = false; }
+    }
+    if (raced) {
+      assertLegalStepTransition("leased", "done");
+      const wrote = await tx.update(workflowStep).set({
+        state: "done", result: { ...outcome.result, resolvedBy: "system-callback", race: "callback-before-block" }, checkpoint: outcome.checkpoint,
+        awaitSource: "system-callback", awaitingEventId: null, leaseToken: null, leaseUntil: null, updatedAt: now,
+      }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
+      if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await race-advance write-back (lost lease)" };
+      // run stays executing (the next tick advances the following step). Emit the completion + a coded marker.
+      await emitTx(tx, "workflow.step.completed", step.run_id, { runId: step.run_id, seq: step.seq, source: "system-callback", race: true });
+      return { advanced: true, runId: step.run_id, from: step.run_state, to: "executing", detail: `await seq ${step.seq} outcome already arrived -> advanced (callback-before-block race handled)` };
+    }
+
+    // ── (b) COMMON CASE: emit done already; set the correlation key + block (leased->blocked, run
+    // executing->blocked) in THIS txn. The step holds NO lease while blocked (crash-while-blocked is trivial).
+    // The request event was emitted by the handler; awaiting_event_id = its id (R1: emit + set key + block atomic). ──
+    assertLegalStepTransition("leased", "blocked");
+    const wrote = await tx.update(workflowStep).set({
+      state: "blocked", awaitSource: "system-callback", awaitingEventId: eventId, checkpoint: outcome.checkpoint,
+      result: outcome.result, leaseToken: null, leaseUntil: null, updatedAt: now,
+    }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
+    if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await block write-back (lost lease)" };
+    await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) awaiting system-callback (eventId ${eventId})` });
+    await emitTx(tx, "workflow.step.blocked", step.run_id, { runId: step.run_id, seq: step.seq, source: "system-callback", awaitingEventId: eventId });
+    return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `await-callback seq ${step.seq} -> blocked on system-callback (eventId ${eventId})` };
   }
 
   // All steps done -> completed, or recovered if the run was ever interrupted/failed (#5 proof state).

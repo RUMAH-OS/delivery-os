@@ -55,7 +55,7 @@ CREATE TABLE workflow_step (
   ku            text,                                              -- knowledge-route top match (advisory)
   handler       text NOT NULL,                                     -- registered executor key
   effect        text NOT NULL DEFAULT 'emit-only'
-                  CHECK (effect IN ('emit-only','idempotent','irreversible')),  -- C6 unattended gate
+                  CHECK (effect IN ('emit-only','idempotent','irreversible','await-callback')),  -- C6 unattended gate (await-callback = the cross-system block-on-callback primitive; unattended-safe)
   lease_until   timestamptz,                                       -- visibility-timeout lease expiry (C1)
   lease_token   uuid,                                              -- CAS token for the lease (C1)
   attempt       integer NOT NULL DEFAULT 0,                        -- this step's attempt (idempotency dim)

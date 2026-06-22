@@ -14,7 +14,7 @@ export {
   TERMINAL_RUN_STATES, isTerminal,
   isLegalRunTransition, assertLegalRunTransition, IllegalTransitionError,
   isLegalStepTransition, assertLegalStepTransition, IllegalStepTransitionError,
-  isUnattendedSafe,
+  isUnattendedSafe, isAwaitCallback,
 } from "./state-machine.js";
 export type { RunState, StepState, StepEffect } from "./state-machine.js";
 
@@ -39,6 +39,10 @@ export { createWorkflowRoute } from "./workflow-route.js";
 export type { WorkflowRouteContext, ScopeGuard } from "./workflow-route.js";
 export { createApprovalsRoute } from "./approvals-route.js";
 export type { ApprovalsRouteContext } from "./approvals-route.js";
+
+// ── system-callback completer (the v1 cross-system primitive's resume side) ──
+export { completeAwaitingStep } from "./callback-completer.js";
+export type { CompleteAwaitingArgs, CompleteAwaitingResult } from "./callback-completer.js";
 
 // ── callback contract (pure zod) ──
 export { ApprovalCallbackV1, ApprovalCallbackResponseV1 } from "./contracts/approvals-v1.js";
