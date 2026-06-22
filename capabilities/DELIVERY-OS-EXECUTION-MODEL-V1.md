@@ -309,6 +309,130 @@ N=1).
 
 ---
 
+## 10. Verified-loop / goal-oriented execution (the founder's "Loop Engineering" ask)
+
+> Founder ask, distilled: make the org's OWN discipline a first-class RUNTIME pattern. Shift the agent model
+> from Human -> Prompt Agent -> Result to Goal -> Agent -> Verify -> Retry/Improve -> Stop Condition. A
+> loop = trigger + action + an OBJECTIVE stop condition. The VALUE is the verification + the objective (not
+> subjective) done-criteria, NOT the step-execution. Every loop is hard-capped (runaway/cost guard). Maker-checker
+> (a separate scorer/eval agent). "Most tasks don't need loops" - loops are OPT-IN where verification matters.
+> EXCLUDED from v1 (transcript hype, not load-bearing): 24/7 agent fleets; a meta-agent that infers loops.
+> DESIGN-ONLY. This section amends v1; it builds nothing.
+
+### 10.0 This is the org's own DNA, generalized - not a new concept
+
+Say it plainly: Delivery OS ALREADY runs maker-checker verified loops at the DEVELOPMENT level. Every slice is
+build-agent -> independent verifier -> retry -> stop-when-verified, enforced by author!=verifier (CODEOWNERS),
+the verify-gate skill + .claude/hooks/verify-gate.mjs, and the sec-11 multi-lens review for consequential
+decisions. Slice 0 itself only counted as done when an INDEPENDENT verifier reproduced its criteria - that is a
+verified loop with an objective stop (the criteria) and a hard cap (the gate blocks, it does not retry forever).
+The founder's ask is to make that SAME loop - act, then an independent objective check, then retry-or-stop - a
+first-class RUNTIME execution pattern for agents (Mailbox/Contact/Outreach/Jarvis), not just a development-time
+discipline. We are generalizing our own dogfood, not importing an AI-workflow idea.
+
+### 10.1 The six questions, answered honestly
+
+1. Does P1-P4 naturally support Reason->Act->Verify->Repeat->Stop as first-class?
+   PARTLY, mechanically - NOT first-class. P4 (branch/next-selector) plus a back-edge (a next-selector that
+   picks an EARLIER seq) can mechanically express a loop: act -> verify -> branch(stop | retry-act). The state
+   machine already permits arbitrary edges, so a cycle is allowed. BUT the model as written has: no first-class
+   GOAL / objective stop-condition concept, no attempt counter or hard-cap (a back-edge with no bound is exactly
+   a runaway), and no NAMED verify step (verification is just another step, indistinguishable from action).
+   So as-is, P1-P4 is a step-executor that CAN cycle - it is not a first-class verified-loop. Shipping it as-is is
+   precisely the rework the founder fears: you build the step-executor, then discover the value was the
+   verification + stop + bound and have to retrofit them.
+
+2. Smallest change now to avoid that rework?
+   Keep the engine P1-P4 verbatim. Add only THREE things, two of them tiny engine fields:
+   (a) an attempt counter + maxAttempts hard-cap carried on a looping step (runaway/cost guard - by
+       construction, not by reviewer memory);
+   (b) an OBJECTIVE stop-condition predicate that P4 evaluates over a verify RESULT (stop vs retry-back-edge);
+   (c) confirm P4 supports a back-edge (cycle) - the state machine already allows the edge, so this is a
+       selector capability, not new state.
+   No new primitive, no P5. The loop is a COMPOSITION of existing pieces plus a bound and a predicate.
+
+3. Verification loops as primitive vs capability vs pattern?
+   - The LOOP is a workflow PATTERN layered on P1-P4: act step (P2/P3) + verify step (P3 agent-result, or P2
+     in-process check) + bounded branch (P4 + maxAttempts + stop-predicate). It is not a primitive because it
+     adds no new durable mechanism - it is wiring of P1-P4.
+   - The VERIFIER is a reusable CAPABILITY (maker-checker / scorer / eval agent) registered in the capability
+     catalog and reused across Mailbox / Contact / Outreach. One verifier capability, many loops.
+   - The ONLY engine-level additions are the attempt-bound (one field + tick check) and the objective
+     stop-predicate (evaluated by P4). Justification for NOT a new primitive: the over-build guard (sec 9) - a
+     primitive earns its place only if BOTH domains exercise a NEW durable mechanism; the loop introduces none.
+     Calling the loop a primitive would re-absorb verification + decision content into the engine, the exact
+     anti-pattern sec 9 forbids. Loop = composition; verifier = capability; bound + predicate = the only engine
+     surface.
+
+4. How would Mailbox Intelligence use it?
+   Each agent step becomes a verified loop ONLY where verification matters (most steps stay single-shot):
+   - Classification: act: classify -> verify: confidence >= threshold OR a checker agent agrees -> branch:
+     stop-when-confident | retry-with-more-context (back-edge) | maxAttempts reached -> escalate-to-human (a
+     human-response await, C6). The objective stop is the confidence/checker predicate; the bound caps retries;
+     the human-gate is the floor when the loop cannot satisfy the criteria.
+   - Communication / draft: act: draft reply -> verify: tone/correctness checker agent passes -> branch:
+     stop-when-passes | improve-and-redraft (back-edge, bounded) -> then human-approval await before send.
+     The verifier raises draft quality; the human gate still owns the irreversible send (C6). The loop bounds the
+     redraft attempts; the stop-predicate is the checker pass.
+   This drops cleanly onto sec 7b: classify and draft are already P3/P2 steps; we add a verify step + a bounded
+   branch around the ones that need it.
+
+5. How would Jarvis-style multi-agent use it?
+   Jarvis does NOT prompt step-by-step. Jarvis sets a GOAL + objective success criteria; the engine runs
+   reason->act->verify->repeat loops ACROSS agents (the maker-checker and manager-with-helpers patterns are just
+   multi-agent loops the engine orchestrates) until the stop-predicate is satisfied or maxAttempts trips. Every
+   irreversible action remains a human-gate await (C6). Quality is gated by verifiers, not by Jarvis re-prompting.
+   The 8-question North-Star screen (sec 6) reads this directly: goal, attempts so far, last verify result, stop
+   reason - all already in workflow_run/workflow_step + emitted facts; no new screen mechanism.
+
+6. Which transcript concepts to incorporate into v1 BEFORE implementation?
+   INCORPORATE: objective goal + stop-condition as first-class; verification-as-the-core-value (a named verify
+   step + a reusable checker capability); a hard-cap / maxAttempts on EVERY loop; Reason->Act->Verify->Repeat->Stop
+   as a NAMED pattern (this section); maker-checker (a separate scorer with evals, the qa-test / agent-output
+   evals already in sec 9 step 3); most tasks do not need loops (loops are opt-in; the engine stays minimal -
+   single-shot steps remain the default); per-attempt logging/observability (each attempt + each verify result
+   emitted via outbox -> /v1/events, ECR-0006 - no new transport).
+   EXCLUDE (explicitly): 24/7 agent fleets; the meta-agent-that-infers-loops. Both violate the over-build guard
+   and the G9 no-spawn ceiling; neither is exercised by the two proven domains.
+
+### 10.2 The amended model (net-new is SMALL)
+
+P1-P4 UNCHANGED. On top:
+- The verified-loop PATTERN: act step + named verify step + bounded branch. Pure composition; no new primitive.
+- Two tiny ENGINE fields on a looping step: attempt / maxAttempts (hard-cap) and a stopCondition predicate
+  that P4 evaluates over the verify result. (One column-pair + one tick clause + one selector clause; same order
+  of magnitude as the timer-wake wake_at net-new in sec 4.)
+- The VERIFIER capability: maker-checker / scorer / eval agent, registered in the catalog, reused across domains.
+  It is a step executor behind the P3 await (source agent-result) or a P2 in-process check - it adds NO engine
+  surface.
+- Stop-when-bound-trips routes to a human-response await (C6), never to silent failure or unbounded retry.
+
+Why this avoids the founder's feared rework: the feared failure is build a step-executor, later discover the
+value is verification. We make goal + verify + stop + bound first-class NOW, at near-zero extra engine surface
+(two fields + a pattern + a catalog capability). We do not wait for a v2 retrofit; we also do not over-build a
+loop primitive. This is the minimum that makes the verification the first-class thing.
+
+### 10.3 The honest hard part
+
+The loop MECHANICS are trivial (a back-edge + a counter + a predicate - all near-proven). The real work and the
+real risk is the VERIFIER QUALITY: defining OBJECTIVE stop criteria and building trustworthy agent EVALS. A loop
+with a weak verifier is worse than no loop - it confidently retries toward a wrong objective, or stops when it
+should not. This is the same lesson as sec 9 risk Agent quality / evals (HIGH): the engine is easy; the
+objective done-criteria + maker-checker evals are where the effort and the founder gating belong. Loops are
+opt-in precisely because a loop is only as good as its verifier - do not loop a step whose success you cannot
+objectively check.
+
+### 10.4 Sequencing (unchanged posture)
+
+Still DESIGN-ONLY - this section builds nothing. The verified-loop pattern + the two engine fields fold into the
+sec 9 sequence: off-prod build on the Slice-0 harness; comms go-live remains the precondition for live proof;
+agent evals (sec 9 step 3) BEFORE any loop drives a live run; and a sec-11 mini-review of THIS amended v1 (the
+maxAttempts/stop-predicate engine fields + the verifier-capability contract) BEFORE any code. The over-build
+guard (sec 9) still binds: the loop pattern earns its place because BOTH domains exercise it (Mailbox
+classification/draft and Admin dunning-retry both loop act->verify->bounded-branch).
+
+---
+
 ## Critical-rule check
 This doc CONSOLIDATES the two prior board docs into one execution-model index (anti-fragmentation), DERIVES the
 model from TWO validated domains (the cross-domain reduction is the proof of sharedness), reduces to exactly
