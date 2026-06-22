@@ -1,0 +1,23 @@
+# Delivery OS — deterministic line endings.
+#
+# The Workflow Engine (and the vendored tool templates) are VENDORED byte-for-byte
+# into consuming apps and locked by a byte-exact drift gate (os-inherit engine-check),
+# which hashes the WORKING-TREE bytes against canonical's working-tree bytes. If
+# canonical's working tree is platform-dependent (autocrlf smudging LF->CRLF on
+# Windows), the vendored bytes — and therefore the gate's expected sha-set — become
+# non-deterministic across machines/CI. Pin these paths to LF so canonical's working
+# tree is the SAME bytes on every platform, regardless of core.autocrlf.
+
+# The OS-foundational Workflow Engine (vendored + drift-checked).
+templates/workflow-engine/**     text eol=lf
+
+# The vendored OS tool templates + contracts (also vendored into apps).
+templates/tools/**               text eol=lf
+contracts/**                     text eol=lf
+
+# Belt-and-braces by extension for the engine/tool source kinds.
+*.ts    text eol=lf
+*.mts   text eol=lf
+*.mjs   text eol=lf
+*.sql   text eol=lf
+*.json  text eol=lf

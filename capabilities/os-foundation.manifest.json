@@ -2,6 +2,7 @@
   "_comment": "OS-FOUNDATIONAL capabilities — the set every project inherits automatically via the upgrade path (os-inherit.mjs). This is the 'In OS -> OS Upgrade Path -> Every Project Inherits' link of the capability chain (capabilities/CAPABILITY-LEDGER.md). A capability is NOT complete until it is listed here and a project's `os-inherit sync` brings it in + `os-inherit check` keeps it byte-current. Agents propagate via os-sync (base+overlay); tools/contracts/skills propagate via os-inherit (vendored, drift-checked) so a project is self-contained (works in CI without the OS mounted).",
   "manifestVersion": "v1",
   "tools": [
+    "templates/tools/os-inherit.mjs",
     "templates/tools/seam-gate.mjs",
     "templates/tools/lifecycle-gate.mjs",
     "templates/tools/workflow-gate.mjs",
@@ -19,6 +20,25 @@
   ],
   "skills": [
     "learning-review"
+  ],
+  "enginesNote": "ENGINES are OS-OWNED runtime capability packs vendored as a WHOLE DIRECTORY (byte-identical) into the consuming app, with a per-engine INHERITED-<key>.json sha-record. They are the LOCK that makes Delivery OS the platform/runtime and the app a mere INSTALLER: `os-inherit sync` installs the engine; `os-inherit engine-check` is the fail-closed drift gate (installed-vs-recorded AND recorded-vs-canonical) plus a DDL PARITY check. ddlParity declares the canonical engine migration set (source of truth for the SHAPE) and the app's APPLIED instance migrations (renumbered/split per the app's sequence) — the check asserts they are STRUCTURALLY equivalent (same tables/columns/CHECK bodies/indexes/triggers/functions/policies/RLS), so the engine OWNS the DDL and divergence is caught. The app applies an equivalent instance; it does NOT re-run the canonical files.",
+  "engines": [
+    {
+      "key": "workflow-engine",
+      "source": "templates/workflow-engine",
+      "into": ".claude/os/engine",
+      "record": "INHERITED-engine.json",
+      "ddlParity": {
+        "canonicalDir": "templates/workflow-engine/migrations",
+        "appMigrations": [
+          "migrations/0034_workflow_engine.sql",
+          "migrations/0037_workflow_await_loop.sql",
+          "migrations/0038_workflow_await_callback_effect.sql"
+        ],
+        "ignoreColumns": [],
+        "note": "Canonical 0001_engine_core.sql == app 0034 + 0038 (0034 creates workflow_step with a 3-value effect CHECK; 0038 widens it via DROP+ADD CONSTRAINT to the canonical 4-value set incl. await-callback — final state equivalent). Canonical 0002_engine_await_loop.sql == app 0037 (DDL byte-identical after comment/whitespace normalisation). The app's outbox COMMENT ON COLUMN (0034) is installer-owned infra, NOT engine DDL — canonical 0001 deliberately omits the outbox; the structural check ignores non-engine objects."
+      }
+    }
   ],
   "agents": [
     "integration-architect",
