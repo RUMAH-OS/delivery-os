@@ -225,12 +225,14 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
       }
 
       // CAP TRIPPED: terminal. Fail the RUN (blocked->failed, a legal run edge) — the run is NEVER falsely
-      // completed. The STEP is left `blocked` (NOT moved to 'failed') with its correlation key CLEARED. WHY not
-      // step->failed: the engine tick LEASES steps in state 'failed' of runs in state 'failed' (the auto-retry /
-      // recovery path) — moving the step to 'failed' would let a later tick RE-LEASE + re-run the await handler,
-      // resurrecting the dead run. A `blocked` step is NOT in the tick's leasable set AND (with awaiting_event_id
-      // cleared) is NOT in the runner's claim set, so it stays inert under the failed run — terminal by both gates.
-      // We record the terminal error + runner identity as a same-state (blocked->blocked) bookkeeping write.
+      // completed. The STEP is left `blocked` (NOT moved to 'failed') with its correlation key CLEARED.
+      // DEFENSE IN DEPTH: the engine tick no longer auto-leases steps of a terminal 'failed' run (the lease
+      // predicate matches r.state IN ('planned','executing') only — see engine.ts advanceNextReadyStep), so the
+      // dead run cannot be resurrected even if a step reads 'failed'. We STILL leave the step `blocked` (not
+      // 'failed') as a redundant, belt-and-braces guard and so the step's state-name does not falsely advertise
+      // an in-process retry that will never come. A `blocked` step with awaiting_event_id cleared is OUT of both
+      // the tick's leasable set AND the runner's claim set — terminal by both gates, with the engine guard behind
+      // it. We record the terminal error + runner identity as a same-state (blocked->blocked) bookkeeping write.
       await tx.update(workflowStep).set({
         checkpoint: { ...cp, runnerAttempt, agentFailed: true }, awaitingEventId: null,
         error: { message: outcome.error ?? "executor_failed", runnerAttempt, terminal: true },

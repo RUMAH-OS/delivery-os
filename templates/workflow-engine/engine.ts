@@ -180,6 +180,15 @@ export function createEngine(ctx: EngineContext): Engine {
 
   // The leasable-step query: a step is leasable when ready, OR leased with an EXPIRED lease (dead process),
   // OR failed and due for retry. SKIP LOCKED so concurrent ticks never contend on the same step.
+  //
+  // TERMINAL-RUN GUARD (non-resurrection): the predicate matches runs in 'planned' or 'executing' ONLY — it
+  // does NOT auto-lease steps of a 'failed' run. A 'failed' run is TERMINAL; the legitimate auto-recovery paths
+  // (#4 kill-and-resume, #5 transient-failure-then-retry) all keep the run in 'executing' while a step is
+  // 'failed'+nextRetryAt or 'leased'+expired-lease — the run only becomes 'failed' when retries are EXHAUSTED
+  // (terminal). Including 'failed' runs here was a silent dead-run-resurrection vector: for an await-callback
+  // step it re-ran the dispatch handler (re-emitting the request + a new awaiting_event_id) and transitioned
+  // the run failed->blocked. The 'failed'->'executing' run edge remains legal for DELIBERATE operator/manual
+  // resume (a distinct, explicit re-lease path), but the unattended tick never auto-resurrects a terminal run.
   async function advanceNextReadyStep(now: Date): Promise<TickReport> {
     const leaseToken = randomUUID();
     const leaseUntil = new Date(now.getTime() + LEASE_SECONDS * 1000);
@@ -194,7 +203,7 @@ export function createEngine(ctx: EngineContext): Engine {
         SELECT s.id, s.run_id, s.seq, s.attempt, s.max_attempts, s.effect, s.handler, s.checkpoint, s.stop_condition, s.await_source, s.state AS step_state, r.state AS run_state, r.was_interrupted
         FROM workflow_step s
         JOIN workflow_run r ON r.id = s.run_id
-        WHERE r.state IN ('planned','executing','failed')
+        WHERE r.state IN ('planned','executing')
           AND s.state IN ('ready','leased','failed')
           AND (s.lease_until IS NULL OR s.lease_until < ${now.toISOString()})
           AND (s.next_retry_at IS NULL OR s.next_retry_at <= ${now.toISOString()})
@@ -223,8 +232,9 @@ export function createEngine(ctx: EngineContext): Engine {
       const interrupted = step.step_state === "leased";
 
       // C6: an irreversible step is NEVER run unattended — block the run for a human. The only legal edge
-      // into blocked is executing->blocked, so move the run through executing first (planned->executing or
-      // the self-loop / failed-recovery edge), then executing->blocked. The step itself is left untouched.
+      // into blocked is executing->blocked, so move the run through executing first (planned->executing or the
+      // executing self-loop — never from 'failed', which the lease predicate excludes), then executing->blocked.
+      // The step itself is left untouched.
       if (!isUnattendedSafe(step.effect)) {
         await transitionRun(tx, step.run_id, "executing", now, interrupted ? { wasInterrupted: true } : {});
         await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) is irreversible — human required` });
@@ -233,7 +243,8 @@ export function createEngine(ctx: EngineContext): Engine {
         return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: "irreversible step -> blocked (C6)" };
       }
 
-      // Move the run into executing (legal from planned, executing self-loop, or failed-recovery edge).
+      // Move the run into executing (legal from planned or the executing self-loop; the lease predicate
+      // excludes terminal 'failed' runs, so this never auto-resurrects a dead run).
       await transitionRun(tx, step.run_id, "executing", now, interrupted ? { wasInterrupted: true } : {});
 
       // CAS-lease the step: claim it ONLY if its lease is still free (token write). Idempotent on
@@ -313,7 +324,9 @@ export function createEngine(ctx: EngineContext): Engine {
           state: "failed", nextRetryAt: retryAt, error: { message: outcome.error, attempt: thisAttempt }, leaseToken: null, leaseUntil: null, updatedAt: now,
         }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
         if (wrote.length === 0) return { advanced: false, detail: "CAS miss on retry write-back" };
-        // run stays executing (the recovery edge failed->executing fires on the NEXT tick for this step);
+        // run STAYS executing (the STEP is 'failed'+nextRetryAt; the run is NOT moved to terminal 'failed'),
+        // so the next tick re-leases this 'failed' step UNDER the still-'executing' run — that is the in-process
+        // recovery path (it does NOT depend on leasing under a 'failed' RUN, which is now excluded as terminal).
         // mark interrupted so a later success lands in `recovered`.
         await tx.update(workflowRun).set({ wasInterrupted: true, updatedAt: now }).where(eq(workflowRun.id, step.run_id));
         await emitTx(tx, "workflow.step.failed", step.run_id, { runId: step.run_id, seq: step.seq, attempt: thisAttempt, willRetryAt: retryAt.toISOString() });
