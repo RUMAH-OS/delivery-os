@@ -59,3 +59,63 @@ The domain-free refactor is **real** (`src/engine/*` grep-clean of invoice/contr
 - Domain-free: **DONE** (verified).
 - Installable: **NOT DONE** — 3 live blockers (engine.ts db-coupling; Admin-numbered migrations; Admin-mounted routes/auth) + the os-inherit flat-file gap.
 - **Do not promote until Phase A lands.** Phase A (portability) is the next engine work, and it is the prerequisite the founder's target requires.
+
+---
+
+# EXHAUSTIVE ENGINE-CONCERN INVENTORY (completeness pass, 2026-06-22)
+
+> Founder end state: **Delivery OS = reusable platform** (owns the entire Workflow Engine — runtime · workflow
+> engine · state machine · await/resume · verified loops · verifier framework · human gates · callback handling ·
+> timers · recovery · agent orchestration · multi-agent). **Admin = installed capability pack** (invoices/contracts/
+> payments/tenants/properties/financial workflows ONLY). **PLOS = installed capability pack.** This pass enumerates
+> EVERY engine touchpoint still in rumah-admin (grep of `workflow|verifier|await|completer|tick|enqueue|blocked|lease|timer|wake_at`).
+
+## The exhaustive table
+Legend: RT=runtime · WE=workflow engine · SM=state machine · AR=await/resume · VL=verified loops · VF=verifier framework · HG=human gates · CB=callbacks · TM=timers · RC=recovery · AO=orchestration · MA=multi-agent.
+
+| # | Concern | File:symbol | Cat | Verdict | Coupling to cut |
+|---|---|---|---|---|---|
+| 1 | Engine runner enqueue/tick/plan/lease/CAS | `engine.ts` | RT/WE | **PROMOTE** | `../db/client` (L17) + `../db/schema` tables (L18) — the ONLY db-bound engine module |
+| 2 | Verified-loop control (runVerify/reopen/block/stop) | `engine.ts` | VL | **PROMOTE** | same db/schema |
+| 3 | Recovery (interrupted/backoff/recovered) | `engine.ts` | RC | **PROMOTE** | same |
+| 4 | Transactional-outbox emit primitive | `engine.ts` emitTx/transitionRun | RT | **PROMOTE (pattern)** | PATTERN=engine; `outbox` TABLE per-app (ECR-0005) |
+| 5-7 | Run/step state machines + unattended classifier | `state-machine.ts` | SM | **PROMOTE** | none — pure, portable today |
+| 8 | Definition mechanism + registry | `definitions.ts` | WE | **PROMOTE** | none — pure |
+| 9 | Verifier FRAMEWORK (Verdict/input/registry) | `verifiers.ts` | VF | **PROMOTE** | none — pure |
+| 10 | Handler mechanism + registry | `handlers.ts` | RT/WE | **PROMOTE** | none — pure |
+| 11 | **Engine built-in `engine.verify`/`engine.human-gate` reserved-handler convention** | `engine.ts:115,209` | RT/HG/VL | **PROMOTE** | reserved `engine.*` namespace leaks as STRING config into Admin's definition — semantics+convention travel with engine |
+| 12 | Human-gate completer route | `approvals-api.ts` | HG/CB | **PROMOTE (factory)** | db + schema tables + auth port |
+| 13 | Human-gate completer contract | `contracts/approvals-v1.ts` | HG/CB | **PROMOTE** | none — pure zod |
+| 14 | Human-principal auth | `auth.ts` requireHumanPrincipal/NON_HUMAN_ROLES | HG | **PROMOTE as PORT** (impl stays) | engine declares interface+policy; Admin injects HS256 impl |
+| 15 | System-callback completer | `deliveries-api.ts` | CB | **SPLIT** — pattern→engine factory; this delivery-OUTCOME instance (writes `delivery`, no step advance) STAYS-Admin |
+| 16 | Delivery contract | `contracts/deliveries-v1.ts` | CB | **STAYS-Admin** (domain) |
+| 17 | Event drain (outbox PULL seam) | `events-api.ts` | RT/CB | **SPLIT/FLAG** — seam pattern is eventing; ECR-0006 mount + table stay per-app for now |
+| 18-22 | Engine SCHEMA: run/step tables, triggers, await/loop cols, audit table, down-files | `migrations/0034*`,`0037*`; `schema.ts` workflow* | WE/SM/AR/HG | **PROMOTE (DDL owned-by-engine, applied-per-app)** | Admin-numbered; restated as Drizzle objects; `workflow_approval_audit` = engine infra not domain |
+| 23 | The cage (golden-master) | `scripts/engine-golden-master.ts` | SM/WE | **PROMOTE** | relative paths re-point to vendored dir |
+| 24-25 | Proof harnesses (Slice-0/Slice-1) | `engine-proof.ts`,`engine-loop-proof.ts` | RT/RC/VL | **PROMOTE mechanism; STAY fixtures** | import domain fixtures — split mechanism/fixture |
+| 26 | npm engine scripts | `package.json` engine:* | WE | **PROMOTE** | travel with template |
+| 27 | HTTP runtime: enqueue/tick/runs routes | `admin.ts:2321-2364` | RT/WE | **PROMOTE (factory)** | mounted in admin.ts under `invoice:write` (WRONG scope — needs engine scope) |
+| 28 | Heartbeat tick driver (`?max=` cron loop) | `admin.ts:2336` | RT/TM | **PROMOTE** | serverless liveness pattern |
+| 29 | Route mounts | `index.ts:41-77` | RT/CB | **PROMOTE** (`/v1/approvals`); events/deliveries per #15/#17 |
+| 30 | `approvals:write` scope vocabulary | `auth.ts:74` | HG | **PROMOTE (definition)** | meaning=engine; minting=Admin |
+| 31 | Timers `timer`/`wake_at` slot | `0037` CHECK; `schema.ts:498` (DEFERRED) | TM | **PROMOTE when built** — mostly NOT built (only next_retry_at backoff exists) |
+| 32 | cross-repo workflow gate | `scripts/workflow-check.ts` + vendored `workflow-gate.mjs` | CB | tool already-DOS; the Admin domain round-trip check STAYS-Admin |
+
+## Orchestration / Multi-agent — ALREADY DOS-CANONICAL (confirmed, no work)
+`dispatch-route`/`agent-route`/`skill-route`/`knowledge-route` are vendored in `.claude/os/tools/*` (sha-pinned `INHERITED.json`, drift-gated). AO/MA are already platform-owned + installed; `definitions.ts` deliberately reuses the dispatch-route plan SHAPE rather than re-implementing orchestration. **No Admin-resident orchestration engine code exists.**
+
+## STAYS-Admin (the pure domain capability pack)
+`src/engine-admin/invoice-workflows.ts` (definitions `INVOICE_PREP_*`; verifier INSTANCE `verifyInvoicePrepared`+`VERIFIER_REASON_CODES`; act handlers `resolveBilling`/`prepareDraft`/`emitSummary`; `registerInvoiceWorkflows()`) · the invoice domain EVENTS · the per-app TABLE materializations in `schema.ts` · `deliveries-api`+contract (domain callback) · the proof FIXTURES · the auth verifier IMPL behind the port · `.claude/capabilities/invoice-prepared-postcondition.capability.json`.
+
+## Ambiguous / shared — explicit splits
+1. **Outbox/drain (#4,#17):** emit-primitive + drain-pattern = engine/eventing; the `outbox` TABLE + invoice event VOCABULARY + the ECR-0006 `/v1/events` mount stay per-app.
+2. **Delivery completer (#15):** promote the idempotent-callback-completer PATTERN; the delivery-outcome INSTANCE stays Admin (it resolves a domain outcome, not a workflow step).
+3. **Migration runner (`db/migrate.ts`):** STAYS-Admin app infra — the engine ships its DDL SET into Admin's stream; it does not own the runner.
+4. **Capability JSON (#5-split):** `invoice-prepared-postcondition.capability.json` `home.path`/`seamValidator` point at the GENERIC `src/engine/verifiers.ts` but the instance lives in `src/engine-admin/` — metadata cut: `seamValidator`→vendored framework, `home`→Admin instance.
+5. **requireHumanPrincipal (#14):** policy (verified-human/no-machine-role) = engine doctrine; token-format verifier = Admin. Engine declares `HumanPrincipalPort`; Admin injects impl.
+
+## Would Admin be a clean capability pack after the full promote-list? — ALMOST
+Two named residuals: **(a)** the outbox + event-drain SEAM stays Admin-resident by current ratification (ECR-0005 schema per-app; ECR-0006 `/v1/events` is the Admin↔PLOS seam) — acceptable residual, flagged (the TABLE-as-per-app-data is correct; only the drain-seam is platform-shaped-living-in-an-app, pending a deliberate DOS eventing capability). **(b)** the auth verifier IMPL stays Admin by the port pattern — correct, not a leak. Everything else promotes cleanly, leaving `invoice-workflows.ts` + per-app tables + the domain callback + the manifest as the pure pack.
+
+## Net-new this pass adds to the migration backlog (beyond the 4 anchor blockers)
+the `engine.*` reserved-handler convention (#11) · `workflow_approval_audit` confirmed engine-infra (#21) · proof mechanism/fixture split (#24-25) · npm engine scripts (#26) · heartbeat driver (#28) · timer/wake_at reserved slot (#31, mostly-unbuilt) · capability-JSON metadata cut · the delivery-completer pattern-vs-instance split (#15). **The 4 gating blockers are unchanged:** engine.ts db-coupling · Admin-numbered migrations · Admin-mounted routes/auth · os-inherit flat-file→directory vendoring.
