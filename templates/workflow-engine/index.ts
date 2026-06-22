@@ -34,6 +34,10 @@ export type { Verifier, VerifierInput, Verdict, VerifierVerdict } from "./verifi
 export { WORKFLOW_SCOPES, NON_HUMAN_ROLES, isVerifiedHuman } from "./human-principal.js";
 export type { HumanPrincipalPort, Principal, WorkflowScope } from "./human-principal.js";
 
+// ── capability-pack contract (the app-agnostic install seam) ──
+export { registerPacks, createCapabilityRuntime, CapabilityConflictError } from "./capability-pack.js";
+export type { CapabilityPack, PackHandler, CapabilityRuntime, CapabilityRuntimeContext } from "./capability-pack.js";
+
 // ── route factories ──
 export { createWorkflowRoute } from "./workflow-route.js";
 export type { WorkflowRouteContext, ScopeGuard } from "./workflow-route.js";
