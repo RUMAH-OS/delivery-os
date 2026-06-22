@@ -1,0 +1,321 @@
+# Delivery OS Execution Model v1 - the minimum that powers BOTH state and communication (DESIGN-ONLY)
+
+> CONSOLIDATES, and SUPERSEDES as the single index, two prior board docs:
+> WORKFLOW-ENGINE-V1-BOARD-REVIEW.md (the await-callback primitive, proven on invoice-send) and
+> MAILBOX-INTELLIGENCE-MULTIAGENT-V1.md (the multi-agent pipeline + its emergent R1-R6). Anti-fragmentation:
+> this is now the ONE execution-model doc; the two priors are kept as the cited derivations, not maintained in
+> parallel. If they disagree with this doc, fix the prior to point here.
+>
+> Founder directive, verbatim intent: I do not want an invoice engine. I do not want a mailbox engine. I want
+> the minimum Delivery OS execution model that can power both. This doc is built FROM two already-validated
+> domains, not from either alone - the cross-domain reduction IS the proof the model is shared, not an
+> abstraction. DESIGN-ONLY: no build, no scripts, no wiring. Board call.
+
+---
+
+## 0. The thesis (and the verdict)
+
+Thesis: both domains reduce to ONE core primitive - a durable step that BLOCKS on a correlation key and
+RESUMES when a matching callback arrives, where the callback SOURCE is pluggable (system-callback /
+agent-result / timer-wake / domain-event / human-response). Everything else (the durable run, the in-process
+step, the branch selector) is small scaffolding around that one primitive.
+
+Verdict: the thesis HOLDS for the two domains, with ONE honest exception pushed OUT of the engine. Four
+named flows - delivery-confirmation (Admin), intent-classification (PLOS), payment-follow-up timer (Admin),
+human-reply (PLOS) - are the SAME block/resume primitive with different sources (sec 7). The exception that
+does NOT fit the engine is branch-on-LLM-classification quality (the decision content + its evals): that is
+real, hard, domain-owned work that must live in the PLOS agent, NOT in the engine. The engine only needs the
+result of a classification to pick a next step (a deterministic branch selector); it must never absorb the
+classifier or its evals (sec 6, sec 9 over-build guard).
+
+This is the intersection of two PROVEN flows (the invoice-delivery round-trip; the Slice-0 durable machine),
+not a speculative platform. The state machine ALREADY declares the target edge
+[blocked,executing] // dependency satisfied (approval, callback, timer) (src/engine/state-machine.ts L36)
+- the engine ANTICIPATED the pluggable source; v1 only wires the sources into that one proven edge.
+
+---
+
+## 1. Model 1 - Shared workflow primitives (reduce ruthlessly)
+
+Only primitives BOTH domains exercise. Each tagged PROVEN (reuse as-is) / NET-NEW.
+
+| # | Primitive | What it is | Both domains exercise it? | PROVEN vs NET-NEW |
+|---|---|---|---|---|
+| P1 | Durable run + steps (7-state machine, SKIP-LOCKED tick, CAS lease, recovery) | the run record + its ordered steps + the unattended tick that advances/blocks/recovers them | YES - invoice flow IS a run; mailbox flow IS a run | PROVEN - Slice 0 (VERIFY-execution-engine-slice0.md): #1 unattended-terminal, #4 kill-and-resume, #5 forced-failure->recovered, CAS, trigger+RLS, golden-master cage. Reuse verbatim. |
+| P2 | In-process step | a step that completes within one tick (no external dependency); emit-only / idempotent runs unattended | YES - invoice record-outcome; mailbox Contract-Agent seam READ | PROVEN - Slice-0 in-process handlers + the emit-only / irreversible-blocks discipline (C6). Reuse. |
+| P3 | The ONE await step - block-on-correlation with a pluggable source | emits a request/task, drives executing->blocked, holds NO lease, resumes only when a callback whose correlation key matches arrives. Source is a field: system-callback / agent-result / timer / domain-event / human-response | YES - every wait in both domains is one of these | MIXED. The block/resume EDGE + the system-callback source are PROVEN (VERIFY-invoice-delivery-status.md round-trip + Slice-0 edges). The other four sources are NET-NEW but are the SAME edge with a different writer of the callback. Deepest net-new = agent-result and human-response (sec 9). |
+| P4 | Branch / next-selector | the definition picks the next step seq from the prior step result (class=noise->terminate; category=dunning->dunning sub-path). NOT a DSL. | YES - invoice: delivered->settle vs failed->retry-or-escalate; mailbox: the classification branch | NET-NEW (small). Slice 0 runs sequential steps only. A pure data-driven next-selector over a step result. No new state, no language. |
+
+That is the entire model: P1 + P2 + P3 + P4. P1/P2 are proven; P3 is one proven edge made source-pluggable;
+P4 is a small selector. There is no P5. We resist (Waterline, N=1): no callback ROUTER, no generic effect
+registry, no SLA/dead-letter engine, no parallel fan-out, no DSL - none of those is exercised by BOTH domains
+in v1 (sec 8 deferred).
+
+---
+
+## 2. Model 2 - Agent ownership (who EXECUTES each step)
+
+The engine is repo-agnostic and never spawns. It owns the durable run; it does not own the work inside a step.
+Step executors sit BEHIND the await primitive.
+
+| Layer | Owns | In this model |
+|---|---|---|
+| DOS / engine | the durable run, the steps, the block/resume edge, the tick, recovery, the completer | runs the run; for an await step it emits a task + BLOCKS; never executes domain logic and never spawns an agent |
+| Admin | System-of-Record STATE steps (contract/invoice state read via /v1/ops; emit state facts like payment.observed) | executes P2 in-process state steps + emits-and-awaits where a fact needs an Admin ack. Never PII; never money unattended (C6) |
+| PLOS | communication + the LLM capability/agent steps (classification, intent, contact-resolution, comms draft/send) | executes the agent-result and system-callback (send) sources; posts callbacks back to the engine |
+| human | every irreversible decision (approve a send, issue a number, move money) | executes the human-response / human-decision source via a human-callback (sec 5) |
+
+Step executor contract (uniform): emit-task -> bounded runner executes -> posts a callback. The engine emits a
+task to the outbox; a bounded runner (Admin handler, PLOS agent runner, a timer, or a human via the UI) does
+the work and POSTs the result to the ONE completer (sec 3). The engine resumes. This is identical for all
+sources - the only difference is who writes the callback.
+
+The G9 ceiling is binding and is WHY this works. Per G9-DISPATCH-RUNNER-ARCHITECTURE.md: only the main loop
+(Claude) spawns subagents; dispatch-route PLANS, it does not spawn (dispatch-route.capability.json: Plans, does
+not spawn - honest V6 ceiling). So agent-result v1 is NOT the engine autonomously spawning a Claude subagent.
+It is: the engine emits an agent-task that a bounded PLOS agent runner (or, interim, a founder-/Claude-driven
+dispatch) executes and posts back. The engine emits a task + awaits - it never self-spawns. This is the
+load-bearing scoping decision and the deepest net-new risk (sec 9).
+
+How dispatch-route plans ownership per step. A workflow DEFINITION is dispatch-route plan-shaped (Slice-0 C7):
+for each step, dispatch-route resolves the owner (ownership-policy wins; route explains), the agent, and the
+skills+knowledge to inject, and emits the DispatchPlan + spawnPrompt. The engine RUNS that plan - it does not
+re-decide ownership. dispatch-route is the PLANNER; the engine is the durable RUNNER of the plan; the executors
+are the orchestra. No second planner, no new mechanism.
+
+---
+
+## 3. Model 3 - The ONE callback contract (all sources post here)
+
+There is exactly ONE completer. The proven /v1/deliveries completer is GENERALIZED - same shape, same
+in-txn/idempotent/CAS discipline - so every source posts to the same place.
+
+Correlation key. A waiting step is identified by (runId, seq) materialized as a single
+workflow_step.awaiting_event_id (the request event id). The inbound callback carries that id. (Net-new = one
+column + index on the step table, exactly the prior N2 design - no new table.)
+
+The callback contract (uniform across all sources):
+
+    awaitingEventId : evt_...        (the correlation key = the request event id; equals runId+seq)
+    source          : system-callback | agent-result | timer | domain-event | human-response
+    result          : source-specific payload (deliveryOutcome | agentResult | empty-for-timer | event | humanDecision)
+    status          : ok | failed    (did the awaited work succeed? drives the P4 branch)
+    idempotencyKey  : ...            (dedup key; a duplicate post is a no-op)
+
+Completer properties (all PROVEN on the delivery case; generalized, not redesigned):
+- In-transaction + idempotent. The completer runs in the SAME txn that records the result (the proven
+  deliveries-api pattern: append-only insert + advance). A duplicate callback is a no-op on idempotencyKey.
+- CAS-guarded. It advances the step only WHERE awaiting_event_id = mine AND state = blocked - losing the CAS
+  means someone already completed it (race-safe, the proven Slice-0 write-back discipline).
+- Callback-before-block race handled (proven design): the tick checks for an already-arrived result before
+  blocking (record-then-advance-if-waiting). A callback that beats the block is recorded and consumed when the
+  step would block.
+- Crash-while-blocked is trivial because a blocked step holds no lease (sec 4) - recovery re-reads state;
+  nothing to un-stick.
+
+The single most important generalization: today /v1/deliveries writes only the delivery outcome and (after
+GAP-B) a read-only projection - it deliberately touches no workflow run (VERIFY-invoice-delivery-status.md
+criterion 1: callback stance preserved, no mutation). v1 job is to add ONE thing: when an inbound callback
+awaitingEventId matches a blocked step, the completer (in that same txn) advances it blocked->executing. Every
+source posts the same body to the same completer; the source field only changes who wrote it.
+
+---
+
+## 4. Model 4 - The waiting state (one blocked state, different wake conditions)
+
+A blocked step holds no lease (PROVEN, Slice-0 #4 - that is exactly why crash-while-blocked is trivial). A
+blocked step is fully described by: source, awaiting_event_id (correlation), wake_at (optional), sla/timeout
+(optional). There is ONE blocked state with TWO wake conditions, never two states:
+
+| Wake condition | Mechanism | PROVEN vs NET-NEW |
+|---|---|---|
+| external-wait (system-callback, agent-result, domain-event, human-response) | an inbound POST to the completer (sec 3) drives blocked->executing | edge PROVEN; the four non-system sources are net-new WRITERS of the same edge |
+| timer-wait (wake_at) | the already-running tick wakes runs whose wake_at is past and drives blocked->executing - the CLOCK is just another callback source | NET-NEW (small): one workflow_step.wake_at column + one tick clause. No scheduler service, no new state. |
+
+Both are the SAME blocked state; the only difference is the wake condition. wake_at and awaiting_event_id can
+coexist on one step (an external wait WITH an SLA timeout = resume on callback OR wake at T and escalate). v1
+ships the bare timer-wake; full SLA/dead-letter is deferred (sec 8).
+
+---
+
+## 5. Model 5 - Human-in-the-loop (a human gate IS an await step)
+
+A human gate is not a special mechanism - it is the P3 await step whose source is human-decision (approval:
+yes/no) or human-input (a response/value). The human is just another bounded runner that posts a callback.
+
+The invariant (Slice-0 C6, sec 11 C6): every irreversible action - send a message, move money, ISSUE a number
+- ALWAYS routes through a human-gate await. The engine runs emit-only / idempotent steps unattended; it leaves
+the run blocked for a human on anything irreversible (state-machine.ts L73: mirrors dispatch-route no-spawn
+ceiling). Enforced by construction, not by reviewer memory.
+
+The two domains human gates are the SAME primitive:
+- Admin send-approval (the Communication step draft+approve, class B / D2): block on human-decision; the
+  founder approves in the UI; the UI POSTs a human-callback (status ok); the proven send fires.
+- PLOS human-reply (the mailbox reply the agent drafted): block on human-decision; same UI approval; same
+  human-callback; the proven send port sends.
+
+Both resolve via the SAME completer (sec 3) with source human-response. The engine never knows or cares that a
+human (vs a system) wrote the callback - that is the whole elegance. The UI approval action is a thin POST to
+the one completer.
+
+---
+
+## 6. Model 6 - The multi-agent execution path (end-to-end)
+
+    trigger (inbound email / invoice-due / founder intent)
+      -> dispatch-route PLANS the run (owner + agent + skills + knowledge per step; emits the definition)
+      -> engine materializes the durable run (P1) and ticks
+           for each step:
+             in-process (P2)   -> completes in tick (emit-only / read seam)
+             OR await (P3)     -> emit task to (Admin handler | PLOS agent runner | timer | human),
+                                  drive executing->blocked, exit (NO lease held)
+      -> executor does the work, POSTs the ONE callback (sec 3) with its source + result
+      -> completer (in-txn, idempotent, CAS) matches awaiting_event_id, advances blocked->executing
+      -> branch/next-selector (P4) picks the next step from the result
+      -> ... loop until terminal (completed | failed | recovered)
+
+- Recovery is via durable state (P1): a crash mid-pipeline resumes because blocked holds no lease and every
+  transition is CAS-guarded (Slice-0 #4/#5). Honest new cases to prove: agent-callback-before-block; duplicate
+  agent result; timer-fires-during-recovery (the prior rec R6 list).
+- Observability is via the existing outbox -> /v1/events (PULL, ECR-0006): every transition is emitted; The
+  Room consumes for ranking (Admin emits FACTS, never ranks - admin-truth-source-boundary).
+- Jarvis / the V6 North-Star screen sit ON TOP: a straight read of workflow_run/workflow_step + emitted facts
+  answers the 8 questions (what/who/why/skills+knowledge/verifier/pass/what-changed/complete). No new mechanism
+  for the screen - it reads the run.
+- The classifier exception (stays OUT of the engine). The LLM that decides class/intent and its evals are
+  PLOS-owned step executors. The engine receives only result.category and runs P4. If the classifier is wrong,
+  that is a PLOS eval problem, not an engine problem. Keeping the decision content out of the engine is what
+  keeps the model the intersection of two flows and not an AI workflow platform.
+
+---
+
+## 7. BOTH domains mapped onto the model (the proof it is shared)
+
+### 7a. Admin - invoice flow (state)
+
+| Step | Primitive | Callback source | sync/async/wait/human |
+|---|---|---|---|
+| due/eligible trigger | (trigger) | - | starts the run |
+| prepare invoice (draft, number NULL) | P2 in-process | - | sync (emit-only, Slice-0 proven) |
+| request send | P3 await | system-callback (PLOS delivery) | async-wait - the PROVEN round-trip |
+| founder approves send (irreversible) | P3 await | human-response | human gate (C6) |
+| record delivery outcome | P2 in-process | - (consumes the callback) | sync |
+| branch on outcome | P4 | - | delivered->settle ; failed->retry/escalate |
+| payment follow-up (no payment by T+N) | P3 await | timer (wake_at) | async-wait - the timer source |
+| (on wake) draft next reminder | back to request-send | system-callback again | loops via the same edge |
+
+### 7b. PLOS - mailbox flow (communication)
+
+| Step | Primitive | Callback source | sync/async/wait/human |
+|---|---|---|---|
+| inbound email | (trigger) | - | starts the run |
+| classify (noise vs value, category) | P3 await | agent-result | async-wait (LLM agent runner) |
+| branch on class | P4 | - | noise->terminate ; dunning/deal->continue |
+| infer intent | P3 await | agent-result | async-wait |
+| resolve contact/tenant | P3 await | agent-result (graph) | async-wait |
+| read Admin contract/invoice state | P2 in-process | - (/v1/ops seam read) | sync (PII-free) |
+| draft reply (LLM) | P2 in-process | - | sync (content only, no send) |
+| founder approves reply (irreversible) | P3 await | human-response | human gate (C6) |
+| send reply | P3 await | system-callback (delivery) | async-wait - the SAME proven send round-trip |
+| follow-up (no reply by T+N) | P3 await | timer (wake_at) | async-wait |
+
+Verdict on does the one model power both?: YES. Both flows are entirely P1/P2/P3/P4. Every wait in both is the
+SAME executing->blocked / blocked->executing edge; the ONLY variable is the callback source. The four named
+flows prove it: delivery-confirmation = system-callback; intent-classification = agent-result; payment-follow-up
+= timer; human-reply = human-response - same primitive, four sources. Notably the send round-trip is literally
+shared: invoice-send and mailbox-reply both block on the same delivery system-callback. The model is the
+intersection of the two, demonstrated.
+
+What must stay OUT of the shared model (push to the domain):
+- The LLM classifier/intent/contact intelligence + their EVALS -> PLOS. The engine takes the result, runs P4.
+- Invoice numbering / money / balance -> Admin SoR, behind a human-gate await. The engine never issues.
+- Mailbox read lane / DWD consent / send-scope / comms templates/cadence -> PLOS comms-execution.
+- Ranking / attention / inbox / dashboards -> The Room (consumes events; never in the engine or Admin).
+- PII -> never in the run state; tenantId-only across the seam (ADR-0003); bodies un-persisted.
+
+---
+
+## 8. The minimum v1 surface (proven vs net-new) + what is deferred
+
+Reuse, do NOT rebuild (PROVEN):
+- P1 durable run/steps/tick/CAS/recovery + golden-master cage (Slice 0).
+- P2 in-process emit-only steps + the C6 irreversible-blocks discipline.
+- The system-callback half of P3 - the emit->drain->send->/v1/deliveries->record round-trip, idempotent +
+  PII-free (invoice-delivery verify).
+- dispatch-route PLANNING; capability discovery; outbox -> /v1/events PULL transport (ECR-0006).
+
+NET-NEW v1 (small, on top of Slice 0):
+1. Pluggable-source await + the ONE completer - generalize /v1/deliveries to match awaiting_event_id and
+   advance blocked->executing for ANY source; add workflow_step.awaiting_event_id (+ index). The system-callback
+   source is proven; this opens the same edge to the other four.
+2. Timer-wake source - workflow_step.wake_at + one tick clause (the clock as a callback source). NET-NEW.
+3. agent-result source - the emit-agent-task + bounded-runner-posts-result wiring (the heart of multi-agent;
+   the deepest net-new - sec 9).
+4. human-response source - the UI approval action POSTs a human-callback to the same completer. NET-NEW (small)
+   but gates every irreversible action.
+5. P4 branch/next-selector - pick next seq from a step result. NET-NEW (small), no DSL.
+
+Explicitly DEFERRED (Waterline - not exercised by both domains at N=1): a callback ROUTER for more than 2
+callback types / a generic effect registry / full SLA / escalation / dead-letter (v1 = timer-wake + escalation
+EMIT only) / parallel fan-out / a DSL / pgmq/BullMQ adapter (single SKIP-LOCKED backend, sec 11 C2) / any prod
+wiring or gate enforcement (v1 stays off-prod behind the comms go-live, like Slice 0) / domain-event as a source
+(designed as pluggable, but no v1 flow forces a non-delivery domain-event yet - add on first real need).
+
+---
+
+## 9. Sequencing / over-build guard / risks / founder-gated
+
+Sequencing.
+1. PRECONDITION - comms go-live is the proof real backing (prod deploy of events/deliveries APIs, tokens, PLOS
+   mailbox OAuth consent, the resolved Phase-0 double-send). Without it the system-callback and the send half of
+   both flows have no real backing. v1 BUILDS off-prod in parallel on the Slice-0 harness; its PROD proof waits
+   on go-live.
+2. Build off-prod: the 5 net-new pieces (sec 8) on the proven block/resume edge. No prod touched.
+3. Agent evals (qa-test / agent-output evals) on Classification + Intent BEFORE they drive a live run - a
+   misclassification silently mis-routes founder mail. The classifier stays OUT of the engine; its quality is a
+   PLOS gate.
+4. sec 11 mini-review of THIS scope before code (consequential: the pluggable-source contract, the agent-result
+   shape, the cross-repo run boundary).
+5. VALIDATE end-to-end + the recovery/race proofs (author not-equal verifier, as Slice 0 was): a real flow
+   blocks on each source and resumes to terminal; crash at each block; duplicate-callback; callback-before-block;
+   timer-fires-during-recovery.
+6. GENERALIZE + promote: extract the engine from exactly what the two flows needed; DOS promotion + os-inherit
+   vendoring gated post-V6 + past the N=1 master gate.
+
+The over-build guard (load-bearing). This model is the INTERSECTION of two PROVEN flows, not an abstraction.
+The guard: a primitive earns its place ONLY if BOTH the invoice flow AND the mailbox flow exercise it (sec 7
+tables are the test). That is why there is no callback router, no effect registry, no SLA engine, no DSL in v1 -
+neither pair of tables needs them. If a future proposal adds a primitive, it must show two domains exercising it
+first (Waterline, N>=2). The engine is the residue of two real flows; it is never built ahead of them.
+
+Risks (honest ledger).
+- PROVEN (low risk): P1 state machine + tick + CAS + recovery; the system-callback round-trip; dispatch
+  planning; the outbox transport.
+- NET-NEW + HARD: agent-result (R-agent-runtime, HIGH) - PLOS agents are gesture-scoped pure functions and NO
+  self-spawning runner exists (G9); v1 must be emit-task -> bounded-runner -> callback, never engine-spawns.
+  Under-scoping this is the single most likely failure. human-response (MED) - small mechanism but it is the
+  brake on every irreversible action; it must be unbypassable-by-construction (C6). Agent quality / evals (HIGH)
+  - LLM decisions branch a real workflow + draft customer text; evals before live; every send stays human-gated.
+  The timer (MED) - serverless tick latency (ECR-0005): on-demand tick after enqueue/callback; blocked runs cost
+  nothing. Branch selector (LOW-MED) - keep it a pure selector, resist growing a DSL. Cross-repo run (MED) -
+  first engine driving steps in another repo; reuse the proven PULL transport, no new transport.
+- R-over-build (HIGH if unguarded) - mitigated by the intersection guard above + the deferred list (sec 8).
+
+Founder-gated. The comms go-live (gates validation, not the off-prod build) / the agent-runtime posture for
+agent-result (bounded runner + human gate vs anything more autonomous) / every irreversible action
+(human-response gate: send, issue a number, move money - never autonomous) / the sec 11 acceptance of the
+pluggable-source / agent-result / cross-repo boundary / promotion to DOS + vendoring to PLOS (post-V6, past
+N=1).
+
+---
+
+## Critical-rule check
+This doc CONSOLIDATES the two prior board docs into one execution-model index (anti-fragmentation), DERIVES the
+model from TWO validated domains (the cross-domain reduction is the proof of sharedness), reduces to exactly
+four primitives (P1/P2 proven; P3 one proven edge made source-pluggable; P4 a small selector), maps BOTH domains
+onto them with a YES verdict, honors the ownership boundary (Admin=State, PLOS=Communication, DOS=Orchestration)
+and the G9 no-spawn ceiling, and is honest about the net-new core (agent-result + human-response sources, the
+agent runtime, the timer, the branch). It refutes one thing for honesty: the LLM classifier + its evals do NOT
+belong in the engine - they stay in the domain. DESIGN-ONLY: no build, no scripts, no wiring. Built is not
+Adopted: this model is real only when ONE flow blocks on each callback source and resumes to terminal with the
+recovery/race cases proven - not because this doc exists.
