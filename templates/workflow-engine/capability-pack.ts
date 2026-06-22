@@ -28,6 +28,8 @@ import { registerHandler, type Handler } from "./handlers.js";
 import { createEngine, type EngineContext, type Engine } from "./engine.js";
 import { createWorkflowRoute, type ScopeGuard } from "./workflow-route.js";
 import { createApprovalsRoute } from "./approvals-route.js";
+import { createGoalsRoute } from "./goals-route.js";
+import type { SelectableCapability } from "./capability-selector.js";
 import type { HumanPrincipalPort, Principal } from "./human-principal.js";
 import type { Hono } from "hono";
 
@@ -46,14 +48,29 @@ export interface CapabilityPack {
   definitions?: WorkflowDefinition[];
   verifiers?: { id: string; verify: Verifier }[];
   handlers?: PackHandler[];
+  // ── GOAL SELECTION (the front of the chain) — OPTIONAL declarative selectors. Each entry maps one of THIS
+  // pack's definition keys to the goals it serves (intent and/or a match predicate — see CapabilitySelector).
+  // A definition with no selector entry is NOT goal-selectable (it must be enqueued explicitly). The MECHANISM
+  // (selectCapability/submitGoal) is generic engine code; WHAT each capability matches is THIS app-declared
+  // content. registerPacks collects these into the selector registry the goals route routes against.
+  selectors?: SelectableCapability[];
 }
 
 // FAIL-CLOSED conflict signal: two DISTINCT packs registered the same definition key / verifier id / handler
 // key. The engine refuses to silently overwrite (that would mask a real collision between installed packs).
 export class CapabilityConflictError extends Error {
-  constructor(kind: "definition" | "verifier" | "handler", key: string, packId: string) {
+  constructor(kind: "definition" | "verifier" | "handler" | "selector", key: string, packId: string) {
     super(`capability conflict: ${kind} "${key}" registered by pack "${packId}" is already registered by another pack`);
     this.name = "CapabilityConflictError";
+  }
+}
+
+// FAIL-CLOSED: a selector references a definition key NO registered pack declares. Routing to a non-existent
+// definition would enqueue an un-runnable run — refuse it at install time (a selector is dead-content otherwise).
+export class SelectorUnknownDefinitionError extends Error {
+  constructor(definitionKey: string, packId: string) {
+    super(`capability selector error: pack "${packId}" declares a selector for definition "${definitionKey}" which no pack registered`);
+    this.name = "SelectorUnknownDefinitionError";
   }
 }
 
@@ -66,8 +83,13 @@ const REGISTERED_PACK_IDS = new Set<string>();
 const DEFINITION_OWNER = new Map<string, string>();
 const VERIFIER_OWNER = new Map<string, string>();
 const HANDLER_OWNER = new Map<string, string>();
+// the SELECTOR registry — one selector entry per goal-selectable definition key, plus its owning pack (so a
+// re-register by the SAME pack is idempotent and a second pack selecting the SAME key is a conflict). This is
+// the registry the goals route routes against. Generic — definitionKey is an opaque engine key, never domain data.
+const SELECTOR_OWNER = new Map<string, string>();
+const SELECTOR_REGISTRY = new Map<string, SelectableCapability>();
 
-export function registerPacks(packs: CapabilityPack[]): { enqueueKeys: string[] } {
+export function registerPacks(packs: CapabilityPack[]): { enqueueKeys: string[]; selectors: SelectableCapability[] } {
   for (const pack of packs) {
     if (REGISTERED_PACK_IDS.has(pack.id)) continue; // idempotent: this pack is already installed.
 
@@ -89,9 +111,25 @@ export function registerPacks(packs: CapabilityPack[]): { enqueueKeys: string[] 
       HANDLER_OWNER.set(h.key, pack.id);
       registerHandler(h.key, h.run);
     }
+    for (const sel of pack.selectors ?? []) {
+      const owner = SELECTOR_OWNER.get(sel.definitionKey);
+      // two DISTINCT packs claiming a selector for the SAME definition key is a programming error (which pack's
+      // selector wins?) — fail-closed exactly like the other registries.
+      if (owner && owner !== pack.id) throw new CapabilityConflictError("selector", sel.definitionKey, pack.id);
+      SELECTOR_OWNER.set(sel.definitionKey, pack.id);
+      SELECTOR_REGISTRY.set(sel.definitionKey, sel);
+    }
     REGISTERED_PACK_IDS.add(pack.id);
   }
-  return { enqueueKeys: [...DEFINITION_OWNER.keys()] };
+  // FAIL-CLOSED: every selector must reference a registered definition (else it routes to an un-runnable run).
+  // Checked AFTER all packs are registered so selector-before-definition pack ordering is allowed.
+  for (const [definitionKey, sel] of SELECTOR_REGISTRY) {
+    if (!DEFINITION_OWNER.has(definitionKey)) {
+      throw new SelectorUnknownDefinitionError(definitionKey, SELECTOR_OWNER.get(definitionKey) ?? "?");
+    }
+    void sel;
+  }
+  return { enqueueKeys: [...DEFINITION_OWNER.keys()], selectors: [...SELECTOR_REGISTRY.values()] };
 }
 
 // ── The bootstrap surface a consuming app receives. The ONE handle an app holds after installation. ──
@@ -101,7 +139,11 @@ export interface CapabilityRuntime {
   tick: Engine["tick"];
   workflowRoute: Hono<{ Variables: { principal: Principal } }>;
   approvalsRoute: Hono<{ Variables: { principal: Principal } }>;
+  // the GOAL ENTRYPOINT (POST /goals) — select-then-enqueue, fail-closed. Mount it the same way as the others.
+  goalsRoute: Hono<{ Variables: { principal: Principal } }>;
   enqueueKeys: string[];
+  // the selectable-capability registry derived from the registered packs (the goals route routes against this).
+  selectors: SelectableCapability[];
 }
 
 export interface CapabilityRuntimeContext {
@@ -116,13 +158,16 @@ export interface CapabilityRuntimeContext {
   packs: CapabilityPack[];
   // OPTIONAL: the scope the human gate requires (default workflow:admin — see approvals-route).
   approvalsScope?: string;
+  // OPTIONAL: the scope the goal entrypoint (POST /goals) requires (default workflow:runtime — submitting a
+  // goal drives execution). An app may pass a dedicated scope (e.g. goals:submit) it mints onto goal callers.
+  goalsScope?: string;
 }
 
 // ── createCapabilityRuntime — the SINGLE bootstrap an app makes. Composes ports + packs into a ready engine. ──
 // It (1) registers the packs uniformly (fail-closed on conflict), (2) builds the engine, (3) pre-wires both
 // route factories, and (4) DERIVES enqueueKeys from the registered definitions — the app hand-maintains nothing.
 export function createCapabilityRuntime(rc: CapabilityRuntimeContext): CapabilityRuntime {
-  const { enqueueKeys } = registerPacks(rc.packs);
+  const { enqueueKeys, selectors } = registerPacks(rc.packs);
   const engine = createEngine(rc.context);
 
   const workflowRoute = createWorkflowRoute({
@@ -140,7 +185,15 @@ export function createCapabilityRuntime(rc: CapabilityRuntimeContext): Capabilit
     requiredScope: rc.approvalsScope,
   });
 
-  return { engine, enqueue: engine.enqueue, tick: engine.tick, workflowRoute, approvalsRoute, enqueueKeys };
+  // the GOAL ENTRYPOINT — routes against the selectors DERIVED from the registered packs (not a hand list).
+  const goalsRoute = createGoalsRoute({
+    registry: selectors,
+    enqueue: engine.enqueue,
+    auth: rc.auth,
+    requiredScope: rc.goalsScope,
+  });
+
+  return { engine, enqueue: engine.enqueue, tick: engine.tick, workflowRoute, approvalsRoute, goalsRoute, enqueueKeys, selectors };
 }
 
 // re-export the registry readers a pack author may want for a self-check (purely generic).

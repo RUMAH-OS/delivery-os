@@ -35,8 +35,14 @@ export { WORKFLOW_SCOPES, NON_HUMAN_ROLES, isVerifiedHuman } from "./human-princ
 export type { HumanPrincipalPort, Principal, WorkflowScope } from "./human-principal.js";
 
 // ── capability-pack contract (the app-agnostic install seam) ──
-export { registerPacks, createCapabilityRuntime, CapabilityConflictError } from "./capability-pack.js";
+export { registerPacks, createCapabilityRuntime, CapabilityConflictError, SelectorUnknownDefinitionError } from "./capability-pack.js";
 export type { CapabilityPack, PackHandler, CapabilityRuntime, CapabilityRuntimeContext } from "./capability-pack.js";
+
+// ── capability SELECTION (the front of the chain: Goal → Capability → run; deterministic, fail-closed) ──
+export { selectCapability, submitGoal } from "./capability-selector.js";
+export type { Goal, CapabilitySelector, SelectableCapability, SelectionResult, SubmitGoalDeps, SubmitGoalResult } from "./capability-selector.js";
+export { createGoalsRoute } from "./goals-route.js";
+export type { GoalsRouteContext } from "./goals-route.js";
 
 // ── route factories ──
 export { createWorkflowRoute } from "./workflow-route.js";
