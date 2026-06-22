@@ -163,6 +163,64 @@ function blocked(impl) {
     `(template: delivery-os/templates/VERIFY.md.template), capture real execution evidence, then proceed.`;
 }
 
+// ── ENGINE-OWNERSHIP ENFORCEMENT (Delivery-OS-as-platform) ───────────────────────────────────────
+// The workflow engine is OWNED by Delivery OS and only INSTALLED (vendored, byte-identical) into an
+// app via `os-inherit sync` (npm run engine:install). The FILE-HASH 3-way lock in os-inherit
+// engine-check is the ownership guarantee: it FAILS on LOCAL DRIFT (the vendored copy was hand-edited)
+// or STALE INSTALL (the install is out of sync with canonical). This gate turns that proven check into
+// an ENFORCED one on the commit-gating path: an app may NOT commit a hand-edited engine.
+//
+// Design (deliberate, see ENGINE-OWNERSHIP-GOVERNANCE.md):
+//   - We SHELL os-inherit engine-check (not import) so the engine + its exact check logic stay the
+//     single source of truth — no re-implementation, no drift between the gate and the lock.
+//   - BLOCKING signal = the FILE-HASH lock (LOCAL DRIFT / STALE INSTALL / record/file-set violations).
+//     A legit re-vendor (canonical changed → app ran engine:install → vendored == recorded == canonical)
+//     PASSES: engine files in the commit are fine WHEN they match canonical.
+//   - ddlParity is treated as ADVISORY (warn, never block) to avoid BUG-1 false-positives on apps whose
+//     migration paths aren't in the shared manifest; the hash lock is the robust ownership guarantee.
+//   - UNREACHABLE canonical (delivery-os not a sibling) → do NOT silently pass and do NOT hard-block
+//     unrelated commits (dev ergonomics): emit a LOUD warning that engine drift could not be verified
+//     locally. CI enforces it hard (by-construction, multi-machine).
+//   - FAST: hashes ~18 files; runs ONLY on the commit-gate path, never on every Bash call.
+const ENGINE_DIR = join(ROOT, ".claude", "os", "engine");
+const CANONICAL_ENGINE = join(ROOT, "..", "delivery-os", "templates", "workflow-engine");
+// File-hash-lock violation tokens (ownership guarantee → BLOCK). ddlParity is handled separately (warn).
+const HASH_LOCK_TOKENS = /\b(LOCAL DRIFT|STALE INSTALL|INSTALL MISSING|ORPHAN RECORD|UNRECORDED CANONICAL|UNTRACKED INSTALL|MISSING RECORD)\b/;
+function engineDriftBlock() {
+  // Only relevant when an engine is actually installed in this app.
+  if (!existsSync(ENGINE_DIR)) return null;
+  // Unreachable canonical → loud warning, no block (CI is the hard backstop).
+  if (!existsSync(CANONICAL_ENGINE)) {
+    process.stderr.write(
+      `[verify-gate] ⚠ ENGINE DRIFT NOT VERIFIED LOCALLY: an installed engine exists (.claude/os/engine/) but ` +
+      `canonical delivery-os is not reachable at ../delivery-os/templates/workflow-engine. Local ownership ` +
+      `enforcement is SKIPPED — CI enforces engine drift hard (by-construction). Mount delivery-os as a sibling ` +
+      `to get the local block.\n`);
+    return null;
+  }
+  let out = "";
+  try {
+    // exits 0 on PASS; non-zero on ANY violation — we re-classify below.
+    out = execSync(`node .claude/os/tools/os-inherit.mjs engine-check --from ../delivery-os --into .`,
+      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60000 });
+  } catch (e) {
+    out = `${e.stdout || ""}\n${e.stderr || ""}`;
+  }
+  const lines = out.split(/\r?\n/);
+  const hashViolations = lines.filter((l) => HASH_LOCK_TOKENS.test(l)).map((l) => l.trim());
+  const ddlViolations = lines.filter((l) => /\bDDL PARITY\b/.test(l)).map((l) => l.trim());
+  // ddlParity is ADVISORY — warn, never block.
+  if (ddlViolations.length) {
+    process.stderr.write(`[verify-gate] ⚠ engine DDL-parity advisory (NOT blocking — hash lock governs ownership):\n  - ` +
+      ddlViolations.slice(0, 4).join("\n  - ") + (ddlViolations.length > 4 ? `\n  …(+${ddlViolations.length - 4})` : "") + "\n");
+  }
+  if (!hashViolations.length) return null; // hash lock holds → engine is OS-owned + in sync → PASS
+  const drifted = (hashViolations[0].match(/:\s*([^\s—]+)/) || [])[1] || "(see below)";
+  return `⛔ Engine is owned by Delivery OS. Do not edit \`.claude/os/engine/\` directly.\n` +
+    `Change \`delivery-os/templates/workflow-engine/\` then run \`npm run engine:install\`. (drifted: ${drifted})\n` +
+    `File-hash lock violations (the ownership guarantee):\n  - ` + hashViolations.join("\n  - ");
+}
+
 // ---- main ----
 const input = readStdin();
 
@@ -183,6 +241,11 @@ try {
   if (MODE === "pre-commit") {
     const cmd = input?.tool_input?.command || "";
     if (!/\bgit\s+(commit|push)\b/.test(cmd)) process.exit(0); // only guard commit/push
+    // ENGINE-OWNERSHIP enforcement (commit-gating path only): a hand-edited / stale vendored engine
+    // cannot be committed. Runs BEFORE the VERIFY check so the ownership block is unambiguous.
+    const engineBlock = engineDriftBlock();
+    if (engineBlock)
+      emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: engineBlock } });
     const impl = changedImpl();
     if (impl.length && !freshPassArtifact(impl, changedTests()))
       emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: blocked(impl) } });
@@ -190,6 +253,8 @@ try {
   }
 
   if (MODE === "stop") {
+    const engineBlock = engineDriftBlock();
+    if (engineBlock) emit({ decision: "block", reason: engineBlock });
     const impl = changedImpl();
     if (impl.length && !freshPassArtifact(impl, changedTests())) emit({ decision: "block", reason: blocked(impl) });
     process.exit(0);
