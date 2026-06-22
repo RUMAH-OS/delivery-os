@@ -160,7 +160,15 @@ export function createEngine(ctx: EngineContext): Engine {
           // Slice 1: persist the declarative loop predicate (D4). A human-response gate step records its source
           // so the completer's per-source match (S2) is a DB fact, not an app inference.
           stopCondition: (s.stopCondition ?? null) as Record<string, unknown> | null,
-          awaitSource: s.effect === "irreversible" && s.handler === "engine.human-gate" ? "human-response" : null,
+          // await_source materialization (S2): a human-response gate records 'human-response'; an await-callback
+          // step records its DECLARED source (default 'system-callback') so the engine's block + the completer's
+          // per-source match agree by construction. Any other step records NULL (in-process).
+          awaitSource:
+            s.effect === "irreversible" && s.handler === "engine.human-gate"
+              ? "human-response"
+              : isAwaitCallback(s.effect)
+                ? (s.awaitSource ?? "system-callback")
+                : null,
         });
       }
       assertLegalRunTransition("queued", "planned");
@@ -183,7 +191,7 @@ export function createEngine(ctx: EngineContext): Engine {
       // of order and consuming a half-built checkpoint. The NOT EXISTS clause enforces strict in-order
       // advancement; combined with FOR UPDATE SKIP LOCKED it stays concurrency-safe.
       const picked = await tx.execute(dsql`
-        SELECT s.id, s.run_id, s.seq, s.attempt, s.max_attempts, s.effect, s.handler, s.checkpoint, s.stop_condition, s.state AS step_state, r.state AS run_state, r.was_interrupted
+        SELECT s.id, s.run_id, s.seq, s.attempt, s.max_attempts, s.effect, s.handler, s.checkpoint, s.stop_condition, s.await_source, s.state AS step_state, r.state AS run_state, r.was_interrupted
         FROM workflow_step s
         JOIN workflow_run r ON r.id = s.run_id
         WHERE r.state IN ('planned','executing','failed')
@@ -201,7 +209,7 @@ export function createEngine(ctx: EngineContext): Engine {
       const rows = picked as unknown as Array<{
         id: string; run_id: string; seq: number; attempt: number; max_attempts: number;
         effect: StepEffect; handler: string; checkpoint: Record<string, unknown> | null;
-        stop_condition: StopCondition | null;
+        stop_condition: StopCondition | null; await_source: string | null;
         step_state: string; run_state: RunState; was_interrupted: boolean;
       }>;
       if (rows.length === 0) {
@@ -464,6 +472,10 @@ export function createEngine(ctx: EngineContext): Engine {
   // leased->blocked + executing->blocked + blocked->done edges. DOMAIN-FREE: the engine never reads the
   // request payload or the outcome — the handler emits, the optional outcomeArrived hook decides the race.
   async function runAwaitCallbackStep(tx: TxLike, step: LeasedStep, leaseToken: string, thisAttempt: number, now: Date): Promise<TickReport> {
+    // S2: the block source the step DECLARED (materialized at plan time). The completer that resolves this step
+    // MUST match this source (a 'system-callback' post can never resolve an 'agent-result' step, and vice-versa).
+    // Default 'system-callback' (the v1 primitive) preserves the prior behaviour for definitions that omit it.
+    const awaitSource = step.await_source ?? "system-callback";
     // ── run the handler — it emits the REQUEST event in-txn (transactional outbox) + returns awaitEventId. ──
     const sctx: StepContext = {
       tx, runId: step.run_id, seq: step.seq, attempt: thisAttempt, checkpoint: step.checkpoint ?? null,
@@ -520,12 +532,12 @@ export function createEngine(ctx: EngineContext): Engine {
     if (raced) {
       assertLegalStepTransition("leased", "done");
       const wrote = await tx.update(workflowStep).set({
-        state: "done", result: { ...outcome.result, resolvedBy: "system-callback", race: "callback-before-block" }, checkpoint: outcome.checkpoint,
-        awaitSource: "system-callback", awaitingEventId: null, leaseToken: null, leaseUntil: null, updatedAt: now,
+        state: "done", result: { ...outcome.result, resolvedBy: awaitSource, race: "callback-before-block" }, checkpoint: outcome.checkpoint,
+        awaitSource, awaitingEventId: null, leaseToken: null, leaseUntil: null, updatedAt: now,
       }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
       if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await race-advance write-back (lost lease)" };
       // run stays executing (the next tick advances the following step). Emit the completion + a coded marker.
-      await emitTx(tx, "workflow.step.completed", step.run_id, { runId: step.run_id, seq: step.seq, source: "system-callback", race: true });
+      await emitTx(tx, "workflow.step.completed", step.run_id, { runId: step.run_id, seq: step.seq, source: awaitSource, race: true });
       return { advanced: true, runId: step.run_id, from: step.run_state, to: "executing", detail: `await seq ${step.seq} outcome already arrived -> advanced (callback-before-block race handled)` };
     }
 
@@ -534,13 +546,13 @@ export function createEngine(ctx: EngineContext): Engine {
     // The request event was emitted by the handler; awaiting_event_id = its id (R1: emit + set key + block atomic). ──
     assertLegalStepTransition("leased", "blocked");
     const wrote = await tx.update(workflowStep).set({
-      state: "blocked", awaitSource: "system-callback", awaitingEventId: eventId, checkpoint: outcome.checkpoint,
+      state: "blocked", awaitSource, awaitingEventId: eventId, checkpoint: outcome.checkpoint,
       result: outcome.result, leaseToken: null, leaseUntil: null, updatedAt: now,
     }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
     if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await block write-back (lost lease)" };
-    await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) awaiting system-callback (eventId ${eventId})` });
-    await emitTx(tx, "workflow.step.blocked", step.run_id, { runId: step.run_id, seq: step.seq, source: "system-callback", awaitingEventId: eventId });
-    return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `await-callback seq ${step.seq} -> blocked on system-callback (eventId ${eventId})` };
+    await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) awaiting ${awaitSource} (eventId ${eventId})` });
+    await emitTx(tx, "workflow.step.blocked", step.run_id, { runId: step.run_id, seq: step.seq, source: awaitSource, awaitingEventId: eventId });
+    return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `await-callback seq ${step.seq} -> blocked on ${awaitSource} (eventId ${eventId})` };
   }
 
   // All steps done -> completed, or recovered if the run was ever interrupted/failed (#5 proof state).
@@ -593,7 +605,8 @@ export function createEngine(ctx: EngineContext): Engine {
 type LeasedStep = {
   id: string; run_id: string; seq: number; attempt: number; max_attempts: number;
   effect: StepEffect; handler: string; checkpoint: Record<string, unknown> | null;
-  stop_condition: StopCondition | null; step_state: string; run_state: RunState; was_interrupted: boolean;
+  stop_condition: StopCondition | null; await_source: string | null;
+  step_state: string; run_state: RunState; was_interrupted: boolean;
 };
 
 // the PURE stopCondition predicate (D4) — the ONLY loop decision the engine itself makes. No DSL.

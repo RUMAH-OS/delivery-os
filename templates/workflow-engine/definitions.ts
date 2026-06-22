@@ -29,6 +29,12 @@ export interface DefinitionStep {
   effect: StepEffect; // emit-only | idempotent | irreversible (drives the C6 unattended-vs-blocked gate)
   maxAttempts: number; // per-step retry ceiling (auto-retry with backoff; criterion #5)
   handler: string; // the registered executor key (engine resolves this to a function)
+  // ── await-callback source declaration (S2 per-source least-privilege) ──
+  // ONLY meaningful on an `await-callback` step: which callback SOURCE resolves this step's block. The engine
+  // writes this onto the blocked step's await_source, and the completer matches on it (a 'system-callback' post
+  // can NEVER resolve an 'agent-result' step and vice-versa — the bidirectional guard). Defaults to
+  // 'system-callback' (the v1 cross-system primitive) when omitted, so existing definitions are unchanged.
+  awaitSource?: "system-callback" | "agent-result"; // (other enum values exist in DDL but are not engine-driven yet)
   // ── Slice 1 (verified-loop, §10.2) — present ONLY on a `verify` step ──
   verifierId?: string; // the Verifier capability id to run in-process (P2; T1 in Slice 1) — NOT engine logic
   stopCondition?: StopCondition; // the declarative predicate the engine evaluates over the stored verdict (D4)
