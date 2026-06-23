@@ -29,6 +29,13 @@ export interface DefinitionStep {
   effect: StepEffect; // emit-only | idempotent | irreversible (drives the C6 unattended-vs-blocked gate)
   maxAttempts: number; // per-step retry ceiling (auto-retry with backoff; criterion #5)
   handler: string; // the registered executor key (engine resolves this to a function)
+  // ── MULTI-AGENT requirement (Slice 1; meaningful on an `agent-result` await-callback step) ──
+  // WHICH agent must execute this step's work. `id` pins an exact agent; `skill` requests ANY agent that has
+  // that skill. The engine MATERIALIZES this onto the step at plan time (step.agent_requirement); the runner
+  // resolves it to exactly one registered agent (selectAgentFor) and routes the step to that agent's executor,
+  // recording the resolved agent_id. FAIL-CLOSED: an unresolvable requirement fails THAT step (no arbitrary
+  // agent). Omitted on non-agent-result steps (they run the in-process engine handler, not an agent executor).
+  agent?: { id?: string; skill?: string };
   // ── await-callback source declaration (S2 per-source least-privilege) ──
   // ONLY meaningful on an `await-callback` step: which callback SOURCE resolves this step's block. The engine
   // writes this onto the blocked step's await_source, and the completer matches on it (a 'system-callback' post

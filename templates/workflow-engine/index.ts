@@ -55,11 +55,15 @@ export { completeAwaitingStep } from "./callback-completer.js";
 export type { CompleteAwaitingArgs, CompleteAwaitingResult } from "./callback-completer.js";
 
 // ── agent runner (Slice A: continuous, durable, concurrent drain of blocked agent-result steps) ──
-export { claimAgentTask, createAgentRunner, AGENT_RESULT_SOURCE } from "./agent-runner.js";
+export { claimAgentTask, createAgentRunner, AGENT_RESULT_SOURCE, DEFAULT_AGENT_ID } from "./agent-runner.js";
 export type {
   AgentTask, AgentExecutor, AgentExecutorOutcome,
   ClaimedAgentTask, ClaimArgs, AgentRunnerArgs, AgentRunnerHandle, RunOnceReport,
 } from "./agent-runner.js";
+
+// ── MULTI-AGENT registry + discovery/routing (Slice 1: goal→capability→AGENT routing; deterministic, fail-closed) ──
+export { AgentRegistry, registerAgents, selectAgentFor, DuplicateAgentError } from "./agent-registry.js";
+export type { Agent, AgentRequirement, AgentSelectionResult } from "./agent-registry.js";
 
 // ── callback contract (pure zod) ──
 export { ApprovalCallbackV1, ApprovalCallbackResponseV1 } from "./contracts/approvals-v1.js";

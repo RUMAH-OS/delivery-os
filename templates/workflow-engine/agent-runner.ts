@@ -26,6 +26,7 @@ import { and, eq } from "drizzle-orm";
 import { sql as dsql } from "drizzle-orm";
 import { assertLegalRunTransition } from "./state-machine.js";
 import { completeAwaitingStep } from "./callback-completer.js";
+import { AgentRegistry, registerAgents, selectAgentFor, type Agent, type AgentRequirement } from "./agent-registry.js";
 import type { DbLike, EngineContext, EngineTables, TxLike } from "./engine.js";
 
 // The DECLARED source a runner drains. The runner is the agent-result executor; it claims ONLY agent-result
@@ -50,6 +51,7 @@ export type AgentExecutor = (task: AgentTask) => Promise<AgentExecutorOutcome>;
 export interface ClaimedAgentTask extends AgentTask {
   attempt: number; // the step's current attempt count (for retry accounting)
   maxAttempts: number; // the step's per-step ceiling (the hard cap)
+  agentRequirement: AgentRequirement | null; // the step's materialized agent requirement ({id?, skill?}) or null
 }
 
 export interface ClaimArgs {
@@ -71,7 +73,7 @@ export async function claimAgentTask(ctx: EngineContext, args: ClaimArgs, now: D
     // so two runners never contend on the same row. The await_source match enforces S2 (runner drains ONLY
     // agent-result). ORDER BY for FIFO-ish fairness; LIMIT 1 (one task per claim).
     const picked = await tx.execute(dsql`
-      SELECT id, run_id, seq, attempt, max_attempts, awaiting_event_id, result, checkpoint
+      SELECT id, run_id, seq, attempt, max_attempts, awaiting_event_id, result, checkpoint, agent_requirement
       FROM workflow_step
       WHERE state = 'blocked'
         AND await_source = ${AGENT_RESULT_SOURCE}
@@ -83,6 +85,7 @@ export async function claimAgentTask(ctx: EngineContext, args: ClaimArgs, now: D
     const rows = picked as unknown as Array<{
       id: string; run_id: string; seq: number; attempt: number; max_attempts: number;
       awaiting_event_id: string; result: Record<string, unknown> | null; checkpoint: Record<string, unknown> | null;
+      agent_requirement: AgentRequirement | null;
     }>;
     if (rows.length === 0) return null;
     const s = rows[0]!;
@@ -98,14 +101,33 @@ export async function claimAgentTask(ctx: EngineContext, args: ClaimArgs, now: D
     return {
       runId: s.run_id, seq: s.seq, eventId: s.awaiting_event_id, task,
       attempt: s.attempt, maxAttempts: s.max_attempts,
+      agentRequirement: (s.agent_requirement ?? null) as AgentRequirement | null,
     };
   });
 }
 
-// ── createAgentRunner — the LOOP. claim -> run executor (timeout) -> complete | retry/fail -> release. ──
+// ── createAgentRunner — the LOOP. claim -> RESOLVE THE AGENT (selectAgentFor, fail-closed) -> run that agent's
+//    executor (timeout) -> complete | retry/fail -> release. ──
+//
+// MULTI-AGENT (Slice 1): the runner is constructed with an AGENT REGISTRY (≥1 agent, each holding an executor
+// PORT) instead of ONE global executor. For each claimed agent-result step it resolves the step's materialized
+// agent REQUIREMENT to EXACTLY ONE registered agent (selectAgentFor) and routes to THAT agent's executor,
+// recording the resolved agent_id on the step + every workflow.agent.* outbox event. FAIL-CLOSED: a requirement
+// that resolves to no-match/ambiguous fails THAT step cleanly (terminal, no arbitrary agent) without blocking
+// the rest of the drain. Executors run ONE AT A TIME (single-slot — a concurrency pool is Slice 2).
+//
+// BACK-COMPAT: existing callers pass a SINGLE `executor`. That is preserved — a lone `executor` is wrapped as a
+// default single-agent registry (agent id = `default`, skill = a wildcard) and the runner routes every step to
+// it (a step with NO agent requirement, or one requiring the default, resolves to it). A caller wanting real
+// routing passes `agents` (the declared roster) instead. EXACTLY ONE of `executor` | `agents` must be supplied.
 export interface AgentRunnerArgs {
   context: EngineContext;
-  executor: AgentExecutor; // the injected PORT (simulated in Slice A; a real launcher in Slice B)
+  // BACK-COMPAT single-agent mode: ONE injected PORT. Wrapped internally as a default single-agent registry that
+  // satisfies any requirement (incl. a null requirement). Mutually exclusive with `agents`.
+  executor?: AgentExecutor;
+  // MULTI-AGENT mode: the declared roster (each agent = id + skills + executor). The runner routes each step to
+  // the agent its requirement resolves to (fail-closed). Mutually exclusive with `executor`.
+  agents?: Agent[];
   runnerId: string; // this runner's identity (recorded on each claimed step + the outbox audit)
   pollMs?: number; // start()/stop() poll interval when the queue is empty (default 250ms)
   leaseMs?: number; // the claim lease window (default 30_000ms) — auto-reclaim after this if the runner dies
@@ -113,6 +135,11 @@ export interface AgentRunnerArgs {
   backoffMs?: number; // base backoff between executor retries (default 100ms; exponential by attempt)
   executorTimeoutMs?: number; // hard timeout per executor invocation (default 60_000ms)
 }
+
+// The id of the synthetic agent that wraps a single `executor` (back-compat mode). The wildcard skill makes it
+// satisfy a skill requirement too, so an existing definition that declares no agent still routes to it.
+export const DEFAULT_AGENT_ID = "default" as const;
+const DEFAULT_AGENT_SKILL = "*" as const;
 
 export interface AgentRunnerHandle {
   runnerId: string;
@@ -124,9 +151,10 @@ export interface AgentRunnerHandle {
 
 export type RunOnceReport =
   | { kind: "idle" } // nothing claimable
-  | { kind: "completed"; runId: string; seq: number } // executor ok -> step completed via the completer
-  | { kind: "retry"; runId: string; seq: number; attempt: number } // executor failed, attempts remain -> released for retry
-  | { kind: "failed"; runId: string; seq: number; attempt: number } // executor failed past the cap -> step+run failed
+  | { kind: "completed"; runId: string; seq: number; agentId: string } // executor ok -> step completed via the completer
+  | { kind: "retry"; runId: string; seq: number; attempt: number; agentId: string } // executor failed, attempts remain -> released for retry
+  | { kind: "failed"; runId: string; seq: number; attempt: number; agentId: string } // executor failed past the cap -> step+run failed
+  | { kind: "unrouted"; runId: string; seq: number; reason: "no-match" | "ambiguous" } // requirement resolved to no/ambiguous agent -> step+run FAILED (fail-closed, NO arbitrary agent)
   | { kind: "lost"; runId: string; seq: number }; // lost the claim/CAS race (another runner won) — safe no-op
 
 const DEFAULTS = { pollMs: 250, leaseMs: 30_000, backoffMs: 100, executorTimeoutMs: 60_000 };
@@ -136,6 +164,17 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
   const db = ctx.db as DbLike;
   const { workflowRun, workflowStep, outbox } = ctx.tables as EngineTables;
   const runnerId = args.runnerId;
+
+  // ── build the AGENT REGISTRY the runner routes against (multi-agent), or wrap a single executor (back-compat). ──
+  // EXACTLY ONE of `executor` | `agents` must be supplied (fail-closed on a mis-configured runner).
+  if ((args.executor && args.agents) || (!args.executor && !args.agents)) {
+    throw new Error("createAgentRunner: supply EXACTLY ONE of { executor } (single-agent back-compat) or { agents } (multi-agent registry)");
+  }
+  const registry: AgentRegistry = args.agents
+    ? registerAgents(args.agents)
+    : registerAgents([{ id: DEFAULT_AGENT_ID, skills: [DEFAULT_AGENT_SKILL], executor: args.executor! }]);
+  // in single-agent mode a NULL requirement (legacy steps) must still route to the default agent.
+  const singleAgentMode = !args.agents;
   const pollMs = args.pollMs ?? DEFAULTS.pollMs;
   const leaseMs = args.leaseMs ?? DEFAULTS.leaseMs;
   const backoffBase = args.backoffMs ?? DEFAULTS.backoffMs;
@@ -146,14 +185,14 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
 
   // run the executor port under a hard timeout. A timeout is reported as a (transient) failure — the work is
   // retried/reclaimed, never silently assumed done. NEVER throws (a throwing executor is a transient failure).
-  async function runExecutor(task: AgentTask): Promise<AgentExecutorOutcome> {
+  async function runExecutor(executor: AgentExecutor, task: AgentTask): Promise<AgentExecutorOutcome> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const timeout = new Promise<AgentExecutorOutcome>((resolve) => {
         timer = setTimeout(() => resolve({ ok: false, error: "executor_timeout" }), executorTimeoutMs);
       });
       const work = Promise.resolve()
-        .then(() => args.executor(task))
+        .then(() => executor(task))
         .catch((e) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }));
       return await Promise.race([work, timeout]);
     } finally {
@@ -165,9 +204,25 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
     const claimed = await claimAgentTask(ctx, { runnerId, leaseMs }, now);
     if (!claimed) return { kind: "idle" };
 
-    // run the injected executor port (timeout-enforced). The runner does NOT inspect/trust the work beyond the
-    // ok/fail signal — the workflow's verify step (the next step) independently checks the real artifact/result.
-    const outcome = await runExecutor({ runId: claimed.runId, seq: claimed.seq, eventId: claimed.eventId, task: claimed.task });
+    // ── RESOLVE THE AGENT (multi-agent discovery, FAIL-CLOSED) ──────────────────────────────────────
+    // Resolve the step's materialized requirement to EXACTLY ONE registered agent. In single-agent (back-compat)
+    // mode a NULL requirement is satisfied by the default agent. In multi-agent mode a NULL requirement is a
+    // mis-declared step (an agent-result step that named no agent) → no-match → fail THAT step (no arbitrary
+    // agent). A skill matching >1 agents → ambiguous → fail-closed. The step+run go terminal (NOT silently
+    // retried, NOT routed to some default), and the claim is released so subsequent claims keep draining.
+    const requirement: AgentRequirement | null =
+      claimed.agentRequirement ?? (singleAgentMode ? { agentId: DEFAULT_AGENT_ID } : null);
+    const selection = selectAgentFor(requirement, registry);
+    if (selection.kind !== "selected") {
+      return await failUnrouted(claimed, selection.kind, now);
+    }
+    const agent = registry.get(selection.agentId)!;
+    const agentId = agent.id;
+
+    // run the RESOLVED AGENT's executor port (timeout-enforced). The runner does NOT inspect/trust the work
+    // beyond the ok/fail signal — the workflow's verify step (the next step) independently checks the real
+    // artifact/result. ONE AT A TIME (single-slot; a concurrency pool is Slice 2).
+    const outcome = await runExecutor(agent.executor, { runId: claimed.runId, seq: claimed.seq, eventId: claimed.eventId, task: claimed.task });
     const cap = args.maxAttempts ?? claimed.maxAttempts;
 
     if (outcome.ok) {
@@ -178,17 +233,18 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
         const out = await completeAwaitingStep(
           tx,
           { workflowRun, workflowStep },
-          { eventId: claimed.eventId, outcome: { ...(outcome.result ?? {}), runnerId }, awaitSource: AGENT_RESULT_SOURCE },
+          { eventId: claimed.eventId, outcome: { ...(outcome.result ?? {}), runnerId, agentId }, awaitSource: AGENT_RESULT_SOURCE },
         );
         if (out.kind === "advanced") {
-          // clear the claim (the step is now done) + audit which runner executed it. Same-row write post-advance.
-          await tx.update(workflowStep).set({ runnerId, runnerClaimedAt: null, runnerLeaseExpiresAt: null, updatedAt: now })
+          // clear the claim (the step is now done) + RECORD THE RESOLVED AGENT (agent_id) + audit which runner
+          // executed it. Same-row write post-advance. The agent_id is the per-agent report's grouping key.
+          await tx.update(workflowStep).set({ runnerId, agentId, runnerClaimedAt: null, runnerLeaseExpiresAt: null, updatedAt: now })
             .where(and(eq(workflowStep.runId, out.runId), eq(workflowStep.seq, out.seq)));
-          await emitAudit(tx, "workflow.agent.completed", out.runId, { runId: out.runId, seq: out.seq, runnerId });
+          await emitAudit(tx, "workflow.agent.completed", out.runId, { runId: out.runId, seq: out.seq, runnerId, agentId });
         }
         return out;
       });
-      if (res.kind === "advanced") return { kind: "completed", runId: res.runId, seq: res.seq };
+      if (res.kind === "advanced") return { kind: "completed", runId: res.runId, seq: res.seq, agentId };
       // the step was no longer blocked under us (another runner won / already resolved) — safe no-op.
       return { kind: "lost", runId: claimed.runId, seq: claimed.seq };
     }
@@ -217,11 +273,11 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
         // (still awaiting; nothing leaked). Same-state (blocked->blocked) bookkeeping write — guard permits it.
         await tx.update(workflowStep).set({
           checkpoint: { ...cp, runnerAttempt },
-          runnerId: null, runnerClaimedAt: null, runnerLeaseExpiresAt: null,
+          runnerId: null, agentId, runnerClaimedAt: null, runnerLeaseExpiresAt: null,
           error: { message: outcome.error ?? "executor_failed", runnerAttempt }, updatedAt: now,
         }).where(and(eq(workflowStep.runId, claimed.runId), eq(workflowStep.seq, claimed.seq), eq(workflowStep.state, "blocked")));
-        await emitAudit(tx, "workflow.agent.retry", claimed.runId, { runId: claimed.runId, seq: claimed.seq, runnerAttempt, runnerId, backoffMs: backoffBase * runnerAttempt });
-        return { kind: "retry" as const, runId: claimed.runId, seq: claimed.seq, attempt: runnerAttempt };
+        await emitAudit(tx, "workflow.agent.retry", claimed.runId, { runId: claimed.runId, seq: claimed.seq, runnerAttempt, runnerId, agentId, backoffMs: backoffBase * runnerAttempt });
+        return { kind: "retry" as const, runId: claimed.runId, seq: claimed.seq, attempt: runnerAttempt, agentId };
       }
 
       // CAP TRIPPED: terminal. Fail the RUN (blocked->failed, a legal run edge) — the run is NEVER falsely
@@ -236,7 +292,7 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
       await tx.update(workflowStep).set({
         checkpoint: { ...cp, runnerAttempt, agentFailed: true }, awaitingEventId: null,
         error: { message: outcome.error ?? "executor_failed", runnerAttempt, terminal: true },
-        runnerId, runnerClaimedAt: null, runnerLeaseExpiresAt: null, updatedAt: now,
+        runnerId, agentId, runnerClaimedAt: null, runnerLeaseExpiresAt: null, updatedAt: now,
       }).where(and(eq(workflowStep.runId, claimed.runId), eq(workflowStep.seq, claimed.seq), eq(workflowStep.state, "blocked")));
       // run blocked->failed (the escalation edge). transition guarded in-app; DB trigger is the backstop.
       const [run] = await tx.select({ state: workflowRun.state }).from(workflowRun).where(eq(workflowRun.id, claimed.runId)).limit(1);
@@ -245,9 +301,39 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
         await tx.update(workflowRun).set({ state: "failed", terminalAt: now, blockedReason: `agent step ${claimed.seq} failed after ${runnerAttempt} attempt(s)`, updatedAt: now })
           .where(and(eq(workflowRun.id, claimed.runId), eq(workflowRun.state, "blocked")));
       }
-      await emitAudit(tx, "workflow.agent.failed", claimed.runId, { runId: claimed.runId, seq: claimed.seq, runnerAttempt, runnerId, reason: "max_attempts_exhausted" });
+      await emitAudit(tx, "workflow.agent.failed", claimed.runId, { runId: claimed.runId, seq: claimed.seq, runnerAttempt, runnerId, agentId, reason: "max_attempts_exhausted" });
       await emitAudit(tx, "workflow.run.failed", claimed.runId, { runId: claimed.runId, seq: claimed.seq, reason: "agent_max_attempts_exhausted" });
-      return { kind: "failed" as const, runId: claimed.runId, seq: claimed.seq, attempt: runnerAttempt };
+      return { kind: "failed" as const, runId: claimed.runId, seq: claimed.seq, attempt: runnerAttempt, agentId };
+    });
+  }
+
+  // ── failUnrouted — FAIL-CLOSED terminal for a step whose agent requirement resolved to no-match/ambiguous. ──
+  // NEVER routes to an arbitrary agent. Mirrors the cap-trip terminal: fail the RUN (blocked->failed), leave the
+  // step blocked-INERT (correlation key cleared so neither a late callback nor a runner re-opens it), record the
+  // terminal error, and emit honest audits — but does NOT consume the executor retry budget (no executor ran).
+  // The claim is released. Subsequent claims keep draining (one bad step does not block the queue).
+  async function failUnrouted(claimed: ClaimedAgentTask, reason: "no-match" | "ambiguous", now: Date): Promise<RunOnceReport> {
+    return await db.transaction(async (tx: TxLike) => {
+      const [live] = await tx.select({ state: workflowStep.state, checkpoint: workflowStep.checkpoint })
+        .from(workflowStep)
+        .where(and(eq(workflowStep.runId, claimed.runId), eq(workflowStep.seq, claimed.seq)))
+        .limit(1);
+      if (!live || live.state !== "blocked") return { kind: "lost" as const, runId: claimed.runId, seq: claimed.seq };
+      const cp = (live.checkpoint ?? {}) as Record<string, unknown>;
+      await tx.update(workflowStep).set({
+        checkpoint: { ...cp, agentUnrouted: true, agentUnroutedReason: reason }, awaitingEventId: null,
+        error: { message: `agent_unrouted_${reason.replace("-", "_")}`, terminal: true },
+        runnerId, runnerClaimedAt: null, runnerLeaseExpiresAt: null, updatedAt: now,
+      }).where(and(eq(workflowStep.runId, claimed.runId), eq(workflowStep.seq, claimed.seq), eq(workflowStep.state, "blocked")));
+      const [run] = await tx.select({ state: workflowRun.state }).from(workflowRun).where(eq(workflowRun.id, claimed.runId)).limit(1);
+      if (run && run.state === "blocked") {
+        assertLegalRunTransition("blocked", "failed");
+        await tx.update(workflowRun).set({ state: "failed", terminalAt: now, blockedReason: `step ${claimed.seq} agent requirement unresolvable (${reason})`, updatedAt: now })
+          .where(and(eq(workflowRun.id, claimed.runId), eq(workflowRun.state, "blocked")));
+      }
+      await emitAudit(tx, "workflow.agent.failed", claimed.runId, { runId: claimed.runId, seq: claimed.seq, runnerId, reason: `agent_unrouted_${reason}` });
+      await emitAudit(tx, "workflow.run.failed", claimed.runId, { runId: claimed.runId, seq: claimed.seq, reason: `agent_unrouted_${reason}` });
+      return { kind: "unrouted" as const, runId: claimed.runId, seq: claimed.seq, reason };
     });
   }
 

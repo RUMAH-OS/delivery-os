@@ -34,10 +34,11 @@
           "migrations/0034_workflow_engine.sql",
           "migrations/0037_workflow_await_loop.sql",
           "migrations/0038_workflow_await_callback_effect.sql",
-          "migrations/0039_workflow_agent_runner.sql"
+          "migrations/0039_workflow_agent_runner.sql",
+          "migrations/0041_workflow_agent_id.sql"
         ],
         "ignoreColumns": [],
-        "note": "Canonical 0001_engine_core.sql == app 0034 + 0038 (0034 creates workflow_step with a 3-value effect CHECK; 0038 widens it via DROP+ADD CONSTRAINT to the canonical 4-value set incl. await-callback — final state equivalent). Canonical 0002_engine_await_loop.sql == app 0037 (DDL byte-identical after comment/whitespace normalisation). Canonical 0003_engine_agent_runner.sql == app 0039 (the runner claim/lease columns + the partial claim index — byte-identical DDL after comment/whitespace normalisation). The app's outbox COMMENT ON COLUMN (0034) is installer-owned infra, NOT engine DDL — canonical 0001 deliberately omits the outbox; the structural check ignores non-engine objects."
+        "note": "Canonical 0001_engine_core.sql == app 0034 + 0038 (0034 creates workflow_step with a 3-value effect CHECK; 0038 widens it via DROP+ADD CONSTRAINT to the canonical 4-value set incl. await-callback — final state equivalent). Canonical 0002_engine_await_loop.sql == app 0037 (DDL byte-identical after comment/whitespace normalisation). Canonical 0003_engine_agent_runner.sql == app 0039 (the runner claim/lease columns + the partial claim index — byte-identical DDL after comment/whitespace normalisation). Canonical 0004_engine_agent_id.sql == app 0041 (the per-step agent_requirement jsonb + resolved agent_id text columns + the partial agent_id index — byte-identical DDL after comment/whitespace normalisation). The app's outbox COMMENT ON COLUMN (0034) is installer-owned infra, NOT engine DDL — canonical 0001 deliberately omits the outbox; the structural check ignores non-engine objects."
       }
     }
   ],

@@ -169,6 +169,14 @@ export function createEngine(ctx: EngineContext): Engine {
               : isAwaitCallback(s.effect)
                 ? (s.awaitSource ?? "system-callback")
                 : null,
+          // MULTI-AGENT (Slice 1): materialize the step's agent REQUIREMENT ({id?, skill?}) so the runner can
+          // resolve it (selectAgentFor) WITHOUT loading the definition — the runner stays self-contained + the
+          // requirement is a DB fact the per-agent report can read. Only meaningful on agent-result steps; NULL
+          // elsewhere (an in-process step runs the engine handler, not an agent executor).
+          agentRequirement:
+            (isAwaitCallback(s.effect) && (s.awaitSource ?? "system-callback") === "agent-result" && s.agent)
+              ? (s.agent as Record<string, unknown>)
+              : null,
         });
       }
       assertLegalRunTransition("queued", "planned");
