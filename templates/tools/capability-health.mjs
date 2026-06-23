@@ -45,6 +45,9 @@ const WIRING = {
   "capability-health": ["capability-health", "health:check"], // self-measurement (no exemption)
   "learning-review": ["learning-review", "learning:review"],
   "file-lesson": ["file-lesson"],
+  // v6 routers — wired-to-run via their self-test/conformance (sibling of skill-route/agent-route).
+  "knowledge-route": ["knowledge:route", "knowledge-route", "knowledge:check"],
+  "dispatch-route": ["dispatch:route", "dispatch-route", "dispatch:check"],
 };
 
 // pure: classify one capability given whether it's inherited + the project's wiring text.
@@ -95,11 +98,18 @@ function inheritedSet(projectDir) {
   }
   return set;
 }
-function manifestNames(manifestPath) {
-  const m = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const names = [...(m.tools || []), ...(m.contracts || [])].map((t) => t.split("/").pop().replace(/\.mjs$/, ""));
+// RUNNABLE capabilities only = tools + skills. CONTRACTS (m.contracts) are vendored
+// schema/type artifacts validated by import + drift (os-inherit check) — they are NEVER
+// "wired to run" in CI/hooks, so measuring them as wired-to-run is a category error: a
+// contract (and its .d.mts type-declaration face) would ALWAYS read INERT. Their health is
+// drift, not wiring. (This generalizes the former one-off `admin-plos-seam-v1` exclusion.)
+export function namesFromManifest(m) {
+  const names = (m.tools || []).map((t) => t.split("/").pop().replace(/\.mjs$/, ""));
   for (const s of m.skills || []) names.push(s);
-  return names.filter((n) => n !== "admin-plos-seam-v1"); // the contract isn't "run"
+  return names;
+}
+function manifestNames(manifestPath) {
+  return namesFromManifest(JSON.parse(readFileSync(manifestPath, "utf8")));
 }
 
 function measure() {
@@ -161,6 +171,10 @@ function selfTest() {
     { label: "wired-but-not-vendored → ALIVE", got: classify("seam-gate", { inherited: false, wiringText: "seam:check" }), want: "ALIVE" },
     { label: "drift: claims Auto-executed but INERT", got: isDrift("Auto-executed (Admin CI)", "INERT") ? "DRIFT" : "ok", want: "DRIFT" },
     { label: "no-drift: claims Verified + INERT", got: isDrift("Verified — INERT", "INERT") ? "DRIFT" : "ok", want: "ok" },
+    // contracts are NOT runnable capabilities — they must never enter the measured set (else always INERT).
+    { label: "manifest: contracts excluded from runnable set", got: namesFromManifest({ tools: ["t/x.mjs"], contracts: ["c/inventory-properties-v1.mjs", "c/inventory-properties-v1.d.mts"], skills: ["learning-review"] }).join(","), want: "x,learning-review" },
+    { label: "manifest: .d.mts type-face never measured", got: namesFromManifest({ contracts: ["c/foo.d.mts"] }).length === 0 ? "empty" : "nonempty", want: "empty" },
+    { label: "manifest: dispatch-route tool stays in runnable set", got: namesFromManifest({ tools: ["templates/tools/dispatch-route.mjs"] })[0], want: "dispatch-route" },
   ];
   let fail = 0;
   console.error(`capability-health --self-test (validate-the-validator):`);
