@@ -84,15 +84,37 @@ import {
 } from "./knowledge-route.mjs";
 
 // ownership-policy lives under scripts/ (G14) — the SAME source slice-close uses.
-import {
-  loadPolicy,
-  detectWorkTypes,
-  requiredOwner,
-} from "../../../scripts/ownership-gate.mjs";
-
+// LOCATION-ROBUST RESOLUTION (byte-identity-safe): this tool is byte-identical in TWO
+// layouts — the VENDORED runtime copy at `<project>/.claude/os/tools/` (where the project-
+// LOCAL `scripts/ownership-gate.mjs` sits THREE up: `../../../scripts/`) and the CANONICAL
+// source at `delivery-os/templates/tools/` (where the OS's own `scripts/ownership-gate.mjs`
+// sits TWO up: `../../scripts/`, used by the in-place `--self-test`). A single STATIC import
+// can only name ONE depth, so it cannot load in both — which made the canonical `--self-test`
+// un-loadable (ERR_MODULE_NOT_FOUND on a path one level above the repo). We resolve the module
+// at load via the FIRST existing of {vendored depth, canonical depth}; if neither exists we
+// fail CLOSED to the built-in default policy (routing stays ON, never silently disabled).
 const HERE = dirname(fileURLToPath(import.meta.url));
-// repo root = .claude/os/tools → ../../../
+// repo root = .claude/os/tools → ../../../ (vendored) ; templates/tools → ../../ (canonical).
 const ROOT = resolve(HERE, "..", "..", "..");
+
+const { loadPolicy, detectWorkTypes, requiredOwner } = await (async () => {
+  const candidates = [
+    resolve(HERE, "..", "..", "..", "scripts", "ownership-gate.mjs"), // vendored: <project>/scripts (project-LOCAL, the authored runtime intent)
+    resolve(HERE, "..", "..", "scripts", "ownership-gate.mjs"),       // canonical: delivery-os/scripts (the OS's own copy, for --self-test)
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) {
+      try { return await import(pathToFileURL(c).href); } catch { /* try next */ }
+    }
+  }
+  // fail-closed: no ownership-gate on disk → the G14 DEFAULT policy (routing never disabled).
+  const DEFAULT_POLICY = { workTypes: [] };
+  return {
+    loadPolicy: () => DEFAULT_POLICY,
+    detectWorkTypes: () => [],
+    requiredOwner: () => null,
+  };
+})();
 
 const DEFAULT_AGENTS = join(ROOT, ".claude", "agents");
 const DEFAULT_SKILLS = join(ROOT, ".claude", "skills");

@@ -11,6 +11,7 @@
     "templates/tools/skill-route.mjs",
     "templates/tools/agent-frontmatter.mjs",
     "templates/tools/agent-route.mjs",
+    "templates/tools/knowledge-route.mjs",
     "templates/tools/dispatch-route.mjs"
   ],
   "contracts": [
