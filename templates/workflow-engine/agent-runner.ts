@@ -114,7 +114,15 @@ export async function claimAgentTask(ctx: EngineContext, args: ClaimArgs, now: D
 // agent REQUIREMENT to EXACTLY ONE registered agent (selectAgentFor) and routes to THAT agent's executor,
 // recording the resolved agent_id on the step + every workflow.agent.* outbox event. FAIL-CLOSED: a requirement
 // that resolves to no-match/ambiguous fails THAT step cleanly (terminal, no arbitrary agent) without blocking
-// the rest of the drain. Executors run ONE AT A TIME (single-slot — a concurrency pool is Slice 2).
+// the rest of the drain.
+//
+// CONCURRENCY (Slice 2): the runner takes a `concurrency` option (default 1 = single-slot, exact back-compat).
+// start()/drain runs a BOUNDED WORKER POOL of `concurrency` independent worker loops; each loop does a
+// self-contained claim→execute→complete (runOnce) until no claim. Up to `concurrency` agent executors therefore
+// run WALL-CLOCK-CONCURRENTLY. The shared claim is SKIP-LOCKED + leased, so two slots NEVER claim the same step
+// (exactly-once preserved under the pool). Each in-flight execution keeps its OWN per-step retry/backoff/lease-
+// reclaim + per-agent recording (unchanged) and its OWN executorTimeoutMs — so a slow/hung slot blocks ONLY its
+// own worker, never the others. runOnce() stays a single claim+process (deterministic tests drive it directly).
 //
 // BACK-COMPAT: existing callers pass a SINGLE `executor`. That is preserved — a lone `executor` is wrapped as a
 // default single-agent registry (agent id = `default`, skill = a wildcard) and the runner routes every step to
@@ -134,6 +142,13 @@ export interface AgentRunnerArgs {
   maxAttempts?: number; // OPTIONAL override of the per-step cap (default: use the step's own max_attempts)
   backoffMs?: number; // base backoff between executor retries (default 100ms; exponential by attempt)
   executorTimeoutMs?: number; // hard timeout per executor invocation (default 60_000ms)
+  // CONCURRENCY POOL (Slice 2): the maximum number of agent-result steps the runner executes WALL-CLOCK-CONCURRENTLY
+  // under start()/drain. Default 1 = the Slice-1 single-slot/sequential behavior (exact back-compat). With N>1 the
+  // runner maintains UP TO N in-flight executions at once: start() runs N independent WORKER LOOPS, each doing a
+  // self-contained claim→execute→complete (runOnce) until no claim, so a slow/hung slot blocks ONLY its own worker
+  // (each runOnce enforces its OWN executorTimeoutMs). The shared claim is SKIP-LOCKED + leased, so two slots NEVER
+  // claim the same step. runOnce() is UNCHANGED (a single claim+process) for deterministic tests.
+  concurrency?: number;
 }
 
 // The id of the synthetic agent that wraps a single `executor` (back-compat mode). The wildcard skill makes it
@@ -157,7 +172,7 @@ export type RunOnceReport =
   | { kind: "unrouted"; runId: string; seq: number; reason: "no-match" | "ambiguous" } // requirement resolved to no/ambiguous agent -> step+run FAILED (fail-closed, NO arbitrary agent)
   | { kind: "lost"; runId: string; seq: number }; // lost the claim/CAS race (another runner won) — safe no-op
 
-const DEFAULTS = { pollMs: 250, leaseMs: 30_000, backoffMs: 100, executorTimeoutMs: 60_000 };
+const DEFAULTS = { pollMs: 250, leaseMs: 30_000, backoffMs: 100, executorTimeoutMs: 60_000, concurrency: 1 };
 
 export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
   const ctx = args.context;
@@ -179,6 +194,10 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
   const leaseMs = args.leaseMs ?? DEFAULTS.leaseMs;
   const backoffBase = args.backoffMs ?? DEFAULTS.backoffMs;
   const executorTimeoutMs = args.executorTimeoutMs ?? DEFAULTS.executorTimeoutMs;
+  // CONCURRENCY POOL size — how many worker loops start()/drain runs at once. Default 1 = single-slot back-compat.
+  // Clamped to >=1 (a runner with 0 slots would drain nothing); a non-integer/NaN falls back to the default.
+  const rawConcurrency = args.concurrency ?? DEFAULTS.concurrency;
+  const concurrency = Number.isFinite(rawConcurrency) && rawConcurrency >= 1 ? Math.floor(rawConcurrency) : DEFAULTS.concurrency;
 
   let running = false;
   let loopDone: Promise<void> | null = null;
@@ -221,7 +240,8 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
 
     // run the RESOLVED AGENT's executor port (timeout-enforced). The runner does NOT inspect/trust the work
     // beyond the ok/fail signal — the workflow's verify step (the next step) independently checks the real
-    // artifact/result. ONE AT A TIME (single-slot; a concurrency pool is Slice 2).
+    // artifact/result. Under the pool (concurrency>1) up to N of these run concurrently in distinct worker loops;
+    // each invocation is self-contained (its own claim/lease/timeout), so the slots never interfere.
     const outcome = await runExecutor(agent.executor, { runId: claimed.runId, seq: claimed.seq, eventId: claimed.eventId, task: claimed.task });
     const cap = args.maxAttempts ?? claimed.maxAttempts;
 
@@ -342,17 +362,31 @@ export function createAgentRunner(args: AgentRunnerArgs): AgentRunnerHandle {
     await tx.insert(outbox).values({ type, aggregateType: "workflow_run", aggregateId: runId, payload });
   }
 
+  // ── ONE worker loop — the unit of the concurrency pool. It does a self-contained claim→execute→complete
+  // (runOnce) back-to-back while there is work, and sleeps a poll interval when the queue is empty. Each worker is
+  // INDEPENDENT: a slow/hung executor in one worker's runOnce (bounded by executorTimeoutMs) leaves the OTHER
+  // workers free to claim + drain. Because the claim is SKIP-LOCKED + leased, two workers NEVER claim the same step.
+  async function workerLoop(): Promise<void> {
+    while (running) {
+      let report: RunOnceReport;
+      try { report = await runOnce(); } catch { report = { kind: "idle" }; }
+      // idle -> sleep a poll interval; otherwise drain immediately (back-to-back) until the queue empties.
+      if (report.kind === "idle") await sleep(pollMs);
+    }
+  }
+
+  // start the poll loop — a BOUNDED WORKER POOL of `concurrency` independent worker loops (default 1 = single-slot,
+  // exact Slice-1 behavior). The pool maintains UP TO `concurrency` in-flight executions concurrently: each worker
+  // claims its own step (SKIP-LOCKED => never the same step), runs that step's agent executor under its own timeout,
+  // completes it, and claims the next — until stop(). stop() resolves only after EVERY worker's in-flight iteration
+  // has settled (clean drain-complete semantics). With async executors the K executions overlap in wall-clock time;
+  // a hung slot blocks only its own worker (the others keep draining).
   function start(): void {
     if (running) return;
     running = true;
-    loopDone = (async () => {
-      while (running) {
-        let report: RunOnceReport;
-        try { report = await runOnce(); } catch { report = { kind: "idle" }; }
-        // idle -> sleep a poll interval; otherwise drain immediately (back-to-back) until the queue empties.
-        if (report.kind === "idle") await sleep(pollMs);
-      }
-    })();
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < concurrency; i++) workers.push(workerLoop());
+    loopDone = Promise.all(workers).then(() => undefined);
   }
 
   async function stop(): Promise<void> {
