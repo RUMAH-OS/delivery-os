@@ -27,7 +27,10 @@ import {
   type StepEffect,
 } from "./state-machine.js";
 import { runHandler, type StepContext } from "./handlers.js";
-import { getVerifier, type Verdict, type VerifierInput } from "./verifiers.js";
+import {
+  getVerifier, getVerifierRung, gateDecision,
+  type Verdict, type VerifierInput, type VerifierRung, type GateDecision,
+} from "./verifiers.js";
 
 const LEASE_SECONDS = 30; // visibility-timeout lease window; a dead process's lease expires after this.
 
@@ -366,6 +369,12 @@ export function createEngine(ctx: EngineContext): Engine {
     }
     const verifier = getVerifier(defStep.verifierId);
     if (!verifier) return await failVerifyStep(tx, step, leaseToken, now, `unknown verifier ${defStep.verifierId}`);
+    const rung: VerifierRung = getVerifierRung(defStep.verifierId) ?? "T1";
+
+    // ── ADVISE-vs-GATE (the safety crux, ku-verifier-must-be-evaluated): is the GATING verifier eligible to
+    // drive this run to completion? T1/T5 are exempt; a T2-T4 JUDGMENT verifier is eligible ONLY if it has a
+    // recorded passing calibration (eval-the-evaluator). An un-calibrated T2-T4 verifier is ADVISE-ONLY. ──
+    const gate: GateDecision = gateDecision(defStep.verifierId);
 
     // the candidate the act step prepared: read it from the act step's checkpoint (PII-free refs). The engine
     // treats this checkpoint as an OPAQUE candidate — it does NOT read its keys. A domain verifier destructures
@@ -374,7 +383,7 @@ export function createEngine(ctx: EngineContext): Engine {
       .from(workflowStep).where(and(eq(workflowStep.runId, step.run_id), eq(workflowStep.seq, defStep.retryBackToSeq))).limit(1);
     const cp = (actStep?.checkpoint ?? {}) as Record<string, unknown>;
 
-    // ── (1) run the Verifier capability IN-PROCESS (T1; the engine dispatches by id, never embeds logic). ──
+    // ── (1) run the GATING Verifier capability IN-PROCESS (the engine dispatches by id, never embeds logic). ──
     // The candidate is the opaque checkpoint; attempt is the act step's attempt (for a verifier's proof hook).
     const input: VerifierInput = { tx, candidate: cp, attempt: actStep?.attempt ?? 0 };
     let verdict: Verdict;
@@ -384,12 +393,55 @@ export function createEngine(ctx: EngineContext): Engine {
       return await failVerifyStep(tx, step, leaseToken, now, `verifier threw: ${e instanceof Error ? e.message : String(e)}`);
     }
 
+    // ── (1b) run OPTIONAL ADVISORY verifiers ALONGSIDE the gating one (run + record, NEVER gate). A not-yet-
+    // calibrated judge can shadow/advise safely here — its verdict is recorded but can never affect the loop. ──
+    const advisory: Array<{ verifierId: string; rung: VerifierRung; verdict: Verdict }> = [];
+    for (const advId of defStep.advisoryVerifierIds ?? []) {
+      const advFn = getVerifier(advId);
+      if (!advFn) continue; // an unknown advisory verifier is simply skipped (it never gates; nothing to fail-close).
+      const advRung = getVerifierRung(advId) ?? "T1";
+      let advVerdict: Verdict;
+      try { advVerdict = await advFn({ tx, candidate: cp, attempt: actStep?.attempt ?? 0 }); }
+      catch (e) { advVerdict = { verdict: "fail", reasons: ["advisory_verifier_threw"] }; void e; }
+      advisory.push({ verifierId: advId, rung: advRung, verdict: advVerdict });
+      await emitTx(tx, "workflow.verify.advisory", step.run_id, { runId: step.run_id, seq: step.seq, verifierId: advId, rung: advRung, verdict: advVerdict.verdict, reasons: advVerdict.reasons });
+    }
+
     // ── (2) store the Verdict on the verify step (D4) + emit it (observable rung; PII-free coded reasons, S4). ──
-    await tx.update(workflowStep).set({ verdict, updatedAt: now })
+    // The stored verdict carries the RUNG + the gate decision + any ADVISORY verdicts (recorded DISTINCTLY from
+    // the gating verdict — an advisory verdict never drives the loop). Reuses the existing jsonb verdict column.
+    const storedVerdict = {
+      ...verdict,
+      verifierId: defStep.verifierId, rung,
+      gateEligible: gate.eligible, gateReason: gate.reason,
+      advisory: advisory.map((a) => ({ verifierId: a.verifierId, rung: a.rung, verdict: a.verdict.verdict, reasons: a.verdict.reasons, advisoryOnly: true })),
+    };
+    await tx.update(workflowStep).set({ verdict: storedVerdict, updatedAt: now })
       .where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
-    await emitTx(tx, "workflow.verify.completed", step.run_id, { runId: step.run_id, seq: step.seq, verdict: verdict.verdict, reasons: verdict.reasons });
+    await emitTx(tx, "workflow.verify.completed", step.run_id, { runId: step.run_id, seq: step.seq, rung, gateEligible: gate.eligible, verdict: verdict.verdict, reasons: verdict.reasons });
+
+    // ── ADVISE-ONLY FAIL-CLOSED: the gating verifier is a T2-T4 JUDGMENT verifier that is NOT calibrated. Its
+    // verdict MUST NOT drive the loop — an un-calibrated judgment can NEVER cause a run to reach `completed`.
+    // FAIL-CLOSED CHOICE = ESCALATE-TO-HUMAN: the engine records the advisory verdict and BLOCKS on the human
+    // gate (the run NEVER auto-completes/auto-fails on an un-calibrated judgment; a human owns the call). This
+    // is preferred over reject-at-registration because it lets the same definition run safely while a judge is
+    // still being calibrated (it shadows + escalates instead of refusing to load). The gateSeq human gate is
+    // REQUIRED for a non-exempt gating verifier (else there is no fail-closed landing).
+    if (!gate.eligible) {
+      if (defStep.gateSeq === undefined) {
+        return await failVerifyStep(tx, step, leaseToken, now, `gating verifier ${defStep.verifierId} (${rung}) is not calibrated and no human gate configured (fail-closed)`);
+      }
+      // the verify step completes its job (it ran + advised); the run escalates to the human gate (NOT completed).
+      await tx.update(workflowStep).set({
+        state: "done", result: { verdict: verdict.verdict, reasons: verdict.reasons, rung, adviseOnly: true, escalated: true }, leaseToken: null, leaseUntil: null, updatedAt: now,
+      }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
+      await emitTx(tx, "workflow.verify.advise_only", step.run_id, { runId: step.run_id, seq: step.seq, verifierId: defStep.verifierId, rung, reason: gate.reason });
+      await blockHumanGate(tx, step.run_id, defStep.gateSeq, { verdict: "needs_improvement", reasons: [...verdict.reasons, "uncalibrated_verifier_escalated"] }, now);
+      return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `gating verifier ${rung} not calibrated -> ADVISE-ONLY -> escalated to human gate seq ${defStep.gateSeq} (fail-closed; never auto-completes)` };
+    }
 
     // ── (3) evaluate the declarative stopCondition predicate over the Verdict (PURE; engine-evaluated, D4). ──
+    // Reached ONLY when the gating verifier IS gate-eligible (T1/T5 exempt, or a calibrated T2-T4).
     const met = evaluateStopCondition(step.stop_condition, verdict);
 
     if (met) {
@@ -424,10 +476,18 @@ export function createEngine(ctx: EngineContext): Engine {
       // honoring the hard cap. The done->ready re-open IS the loop back-edge: it is whitelisted in BOTH the app
       // validator (LEGAL_STEP_EDGES) and the DB step trigger (0002). assertLegalStepTransition guards it.
       assertLegalStepTransition("leased", "ready"); // the verify step is leased; reset it to ready (back-edge)
-      await tx.update(workflowStep).set({ state: "ready", verdict, leaseToken: null, leaseUntil: null, updatedAt: now })
+      await tx.update(workflowStep).set({ state: "ready", verdict: storedVerdict, leaseToken: null, leaseUntil: null, updatedAt: now })
         .where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
-      await reopenActStep(tx, step.run_id, defStep.retryBackToSeq, now);
-      await emitTx(tx, "workflow.loop.retry", step.run_id, { runId: step.run_id, seq: step.seq, actSeq: defStep.retryBackToSeq, attempt: actAttempt, maxAttempts: actCap, reasons: verdict.reasons });
+      // IMPROVE-FEEDBACK: on a `needs_improvement` verdict, thread the gating verdict's suggestedImprovement +
+      // reasons INTO the act step's next execution so the agent/handler re-executes WITH the feedback (not
+      // blind). The engine carries it as an OPAQUE `_feedback` envelope on the act step's checkpoint; the domain
+      // handler reads it on its own side. A plain `fail` (no improvement guidance) re-opens cleanly (null
+      // checkpoint) exactly as before — so the existing T1 fail->retry loop is byte-for-byte unchanged.
+      const feedback = verdict.verdict === "needs_improvement"
+        ? { attempt: actAttempt, fromVerifier: defStep.verifierId, rung, verdict: verdict.verdict, reasons: verdict.reasons, suggestedImprovement: verdict.suggestedImprovement ?? null }
+        : undefined;
+      await reopenActStep(tx, step.run_id, defStep.retryBackToSeq, now, feedback);
+      await emitTx(tx, "workflow.loop.retry", step.run_id, { runId: step.run_id, seq: step.seq, actSeq: defStep.retryBackToSeq, attempt: actAttempt, maxAttempts: actCap, verdict: verdict.verdict, reasons: verdict.reasons });
       return { advanced: true, runId: step.run_id, from: step.run_state, to: "executing", detail: `verify fail -> back-edge retry act seq ${defStep.retryBackToSeq} (attempt ${actAttempt}/${actCap})` };
     }
 
@@ -445,14 +505,19 @@ export function createEngine(ctx: EngineContext): Engine {
 
   // re-open the act step for the loop back-edge: done -> ready (the whitelisted loop back-edge). The engine is a
   // trusted writer; the act step is reset to ready so the next tick re-leases it (bumping its attempt, D3).
-  async function reopenActStep(tx: TxLike, runId: string, seq: number, now: Date): Promise<void> {
+  async function reopenActStep(tx: TxLike, runId: string, seq: number, now: Date, feedback?: Record<string, unknown>): Promise<void> {
     // the act step is `done`; re-open it to `ready`. assertLegalStepTransition guards this in the app; the DB
     // step trigger whitelists done->ready (0002). Idempotent: if already ready, the same-state write is a no-op.
     const [s] = await tx.select({ state: workflowStep.state }).from(workflowStep)
       .where(and(eq(workflowStep.runId, runId), eq(workflowStep.seq, seq))).limit(1);
     if (!s) throw new Error(`act step seq ${seq} not found for back-edge`);
     if (s.state !== "ready") assertLegalStepTransition(s.state as "done", "ready"); // done -> ready loop back-edge
-    await tx.update(workflowStep).set({ state: "ready", checkpoint: null, result: null, leaseToken: null, leaseUntil: null, updatedAt: now })
+    // IMPROVE-FEEDBACK delivery: the act step's checkpoint is reset (a fresh attempt) but carries the OPAQUE
+    // `_feedback` envelope from the rejecting verdict (suggestedImprovement + reasons) so the next execution
+    // re-runs WITH the feedback. The engine never reads inside `_feedback` — the domain handler does, on its
+    // side. Reuses the existing checkpoint jsonb column (no schema change). Absent feedback = a plain re-open.
+    const nextCheckpoint = feedback ? { _feedback: feedback } : null;
+    await tx.update(workflowStep).set({ state: "ready", checkpoint: nextCheckpoint, result: null, leaseToken: null, leaseUntil: null, updatedAt: now })
       .where(and(eq(workflowStep.runId, runId), eq(workflowStep.seq, seq)));
   }
 

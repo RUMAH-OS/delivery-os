@@ -23,7 +23,7 @@
 // CapabilityConflictError (fail-closed — a silent last-writer-wins overwrite would mask a collision).
 
 import { registerDefinition, getDefinition, type WorkflowDefinition } from "./definitions.js";
-import { registerVerifier, getVerifier, type Verifier } from "./verifiers.js";
+import { registerVerifier, getVerifier, type Verifier, type VerifierRung } from "./verifiers.js";
 import { registerHandler, type Handler } from "./handlers.js";
 import { createEngine, type EngineContext, type Engine } from "./engine.js";
 import { createWorkflowRoute, type ScopeGuard } from "./workflow-route.js";
@@ -46,7 +46,10 @@ export interface PackHandler {
 export interface CapabilityPack {
   id: string;
   definitions?: WorkflowDefinition[];
-  verifiers?: { id: string; verify: Verifier }[];
+  // a verifier entry carries its RUNG (§10.5 taxonomy). Omitted rung defaults to T1 (a deterministic,
+  // gating-exempt check) — backward-compatible with the Slice-1 verifiers. A T2-T4 JUDGMENT verifier MUST
+  // declare its rung so the engine's advise-vs-gate decision (calibration-required-to-gate) applies.
+  verifiers?: { id: string; verify: Verifier; rung?: VerifierRung }[];
   handlers?: PackHandler[];
   // ── GOAL SELECTION (the front of the chain) — OPTIONAL declarative selectors. Each entry maps one of THIS
   // pack's definition keys to the goals it serves (intent and/or a match predicate — see CapabilitySelector).
@@ -103,7 +106,7 @@ export function registerPacks(packs: CapabilityPack[]): { enqueueKeys: string[];
       const owner = VERIFIER_OWNER.get(v.id);
       if (owner && owner !== pack.id) throw new CapabilityConflictError("verifier", v.id, pack.id);
       VERIFIER_OWNER.set(v.id, pack.id);
-      registerVerifier(v.id, v.verify);
+      registerVerifier(v.id, v.verify, v.rung ?? "T1");
     }
     for (const h of pack.handlers ?? []) {
       const owner = HANDLER_OWNER.get(h.key);

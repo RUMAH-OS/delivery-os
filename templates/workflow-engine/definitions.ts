@@ -43,10 +43,15 @@ export interface DefinitionStep {
   // 'system-callback' (the v1 cross-system primitive) when omitted, so existing definitions are unchanged.
   awaitSource?: "system-callback" | "agent-result"; // (other enum values exist in DDL but are not engine-driven yet)
   // ── Slice 1 (verified-loop, §10.2) — present ONLY on a `verify` step ──
-  verifierId?: string; // the Verifier capability id to run in-process (P2; T1 in Slice 1) — NOT engine logic
+  verifierId?: string; // the GATING Verifier capability id to run in-process — its verdict DRIVES the loop
   stopCondition?: StopCondition; // the declarative predicate the engine evaluates over the stored verdict (D4)
   retryBackToSeq?: number; // the back-edge target: which earlier step to re-ready when the predicate is NOT met
   gateSeq?: number; // on cap-trip, which step becomes the human-response gate (its effect MUST be irreversible)
+  // ── T2-T4 framework — advise-vs-gate (the safety crux) ──
+  // OPTIONAL advisory verifiers that run ALONGSIDE the gating one (run + record their verdict, NEVER gate). A
+  // not-yet-calibrated judge can shadow/advise in production safely via this list — its verdict is recorded as
+  // ADVISORY and can never affect the loop's stop/retry/cap decision. Each id is a registered Verifier id.
+  advisoryVerifierIds?: string[];
 }
 
 export interface WorkflowDefinition {

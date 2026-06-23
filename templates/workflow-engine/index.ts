@@ -29,6 +29,15 @@ export type { Handler, StepContext, HandlerResult } from "./handlers.js";
 // ── verifier registry + types ──
 export { registerVerifier, getVerifier } from "./verifiers.js";
 export type { Verifier, VerifierInput, Verdict, VerifierVerdict } from "./verifiers.js";
+// ── T2-T4 verifier framework: rung + calibration (eval-the-evaluator) + advise-vs-gate ──
+export {
+  getVerifierRung, isGatingExemptRung, isJudgmentRung,
+  evaluateVerifier, evaluateAndRegister, recordCalibration, getCalibration,
+  gateDecision, isGateEligible, __resetVerifiersForTest,
+} from "./verifiers.js";
+export type {
+  VerifierRung, CalibrationCase, CalibrationThresholds, CalibrationResult, GateDecision,
+} from "./verifiers.js";
 
 // ── human-gate doctrine: the port + policy + scopes ──
 export { WORKFLOW_SCOPES, NON_HUMAN_ROLES, isVerifiedHuman } from "./human-principal.js";
