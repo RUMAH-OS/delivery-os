@@ -1,5 +1,5 @@
 {
-  "osVersion": "v5.0-124-g4555d4a",
+  "osVersion": "v5.0-125-geb20a6c",
   "manifestVersion": "v1",
   "key": "workflow-engine",
   "source": "templates/workflow-engine",
@@ -31,7 +31,7 @@
     },
     {
       "rel": ".claude/os/engine/contracts/approvals-v1.ts",
-      "sha256": "d4a463ffb0b3eb16de377fbeda06f44c92bd3d9971fb234bba4c11d53be06ecd"
+      "sha256": "a329eb8f399d7aaf34b890d05e9e0eb3fcd72ebe868fa20adcd3b2efbed21987"
     },
     {
       "rel": ".claude/os/engine/definitions.ts",
@@ -55,11 +55,11 @@
     },
     {
       "rel": ".claude/os/engine/human-principal.ts",
-      "sha256": "ac501cc8c65d36faeeb720c0f40b9e506400b255129ade850c099e49c452ff03"
+      "sha256": "d04dac615105bda24ce4b31e9933a79f33a36612b1d8977124eb215fd02a4b0a"
     },
     {
       "rel": ".claude/os/engine/index.ts",
-      "sha256": "129b0c2c87c4c7c837c7c0a377451fe4cc67d56d27ad32ffa3e5b7bf074c90af"
+      "sha256": "1b1a7a8e2d60c66fcfa5f58cf8285ecb1161ed56e62afead28fcc3ab00efb3c2"
     },
     {
       "rel": ".claude/os/engine/migrations/0001_engine_core.down.sql",

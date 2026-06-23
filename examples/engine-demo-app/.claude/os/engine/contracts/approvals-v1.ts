@@ -1,7 +1,7 @@
 // Human-response gate — v1 ingest contract (Slice 1, §11 2026-06-22 S1/S4). The human-gate completer's
 // inbound body. The UNIFORM callback contract (EXECUTION-MODEL §3) specialised to the human-response source.
 // Validated .strict() so unknown keys 400 (no drift). PII-FREE (S4): refs + a coded decision only — NO free
-// text rationale (free-text rationale stays in PLOS / the UI; never crosses this seam).
+// text rationale (free-text rationale stays in the consuming app / the UI; never crosses this seam).
 import { z } from "zod";
 
 export const ApprovalCallbackV1 = z

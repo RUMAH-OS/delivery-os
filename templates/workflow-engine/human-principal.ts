@@ -30,18 +30,31 @@ export interface Principal {
   email?: string;
 }
 
-// ── NON_HUMAN_ROLES — the machine-role policy (engine doctrine, S2). A service / agent / integration
-// token is a MACHINE, never a verified human principal. These roles may NEVER resolve a human gate even
-// if the scope leaked onto them. This is the trust-boundary the presence-only gate-theater defect missed.
+// ── NON_HUMAN_ROLES — the GENERIC machine-role policy (engine doctrine, S2). A service / agent / system /
+// integration token is a MACHINE, never a verified human principal. These roles may NEVER resolve a human
+// gate even if the scope leaked onto them. This is the trust-boundary the presence-only gate-theater defect
+// missed. The engine is DOMAIN-FREE: this base names NO specific app/seam role. An APP supplies its OWN
+// additional machine roles (e.g. a seam role like a consumer's service identity) via `extraNonHumanRoles`
+// on isVerifiedHuman / its requireHuman impl; the effective policy is BASE ∪ APP-EXTRA.
 export const NON_HUMAN_ROLES: ReadonlySet<string> = new Set(
-  ["service", "agent", "system", "integration", "plos"].map((r) => r.toLowerCase()),
+  ["service", "agent", "system", "integration"].map((r) => r.toLowerCase()),
 );
 
+// isNonHumanRole — the engine's machine-role predicate over BASE ∪ APP-EXTRA (case-insensitive). The app
+// passes its own extra machine roles; the engine never knows what they ARE, only that they are non-human.
+export function isNonHumanRole(role: string, extraNonHumanRoles: readonly string[] = []): boolean {
+  const r = role.toLowerCase();
+  if (NON_HUMAN_ROLES.has(r)) return true;
+  for (const x of extraNonHumanRoles) if (x.toLowerCase() === r) return true;
+  return false;
+}
+
 // returns true iff the principal is a VERIFIED HUMAN allowed to resolve a human gate carrying `requiredScope`:
-// (1) NOT a machine role (rejected by construction even if the scope leaked), AND
+// (1) NOT a machine role — BASE ∪ APP-EXTRA — rejected by construction even if the scope leaked, AND
 // (2) carries the required scope (the 'admin' role — a human operator — bypasses the scope check).
-export function isVerifiedHuman(principal: Principal, requiredScope: string): boolean {
-  if (NON_HUMAN_ROLES.has(principal.role.toLowerCase())) return false;
+// `extraNonHumanRoles` is the app's additional machine-role list (keeps the engine domain-free).
+export function isVerifiedHuman(principal: Principal, requiredScope: string, extraNonHumanRoles: readonly string[] = []): boolean {
+  if (isNonHumanRole(principal.role, extraNonHumanRoles)) return false;
   if (principal.role !== "admin" && !principal.scopes.includes(requiredScope)) return false;
   return true;
 }

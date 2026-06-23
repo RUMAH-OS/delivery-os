@@ -40,7 +40,7 @@ export type {
 } from "./verifiers.js";
 
 // ── human-gate doctrine: the port + policy + scopes ──
-export { WORKFLOW_SCOPES, NON_HUMAN_ROLES, isVerifiedHuman } from "./human-principal.js";
+export { WORKFLOW_SCOPES, NON_HUMAN_ROLES, isVerifiedHuman, isNonHumanRole } from "./human-principal.js";
 export type { HumanPrincipalPort, Principal, WorkflowScope } from "./human-principal.js";
 
 // ── capability-pack contract (the app-agnostic install seam) ──
