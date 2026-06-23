@@ -27,7 +27,10 @@ import {
   type StepEffect,
 } from "./state-machine.js";
 import { runHandler, type StepContext } from "./handlers.js";
-import { getVerifier, type Verdict, type VerifierInput } from "./verifiers.js";
+import {
+  getVerifier, getVerifierRung, gateDecision,
+  type Verdict, type VerifierInput, type VerifierRung, type GateDecision,
+} from "./verifiers.js";
 
 const LEASE_SECONDS = 30; // visibility-timeout lease window; a dead process's lease expires after this.
 
@@ -160,7 +163,23 @@ export function createEngine(ctx: EngineContext): Engine {
           // Slice 1: persist the declarative loop predicate (D4). A human-response gate step records its source
           // so the completer's per-source match (S2) is a DB fact, not an app inference.
           stopCondition: (s.stopCondition ?? null) as Record<string, unknown> | null,
-          awaitSource: s.effect === "irreversible" && s.handler === "engine.human-gate" ? "human-response" : null,
+          // await_source materialization (S2): a human-response gate records 'human-response'; an await-callback
+          // step records its DECLARED source (default 'system-callback') so the engine's block + the completer's
+          // per-source match agree by construction. Any other step records NULL (in-process).
+          awaitSource:
+            s.effect === "irreversible" && s.handler === "engine.human-gate"
+              ? "human-response"
+              : isAwaitCallback(s.effect)
+                ? (s.awaitSource ?? "system-callback")
+                : null,
+          // MULTI-AGENT (Slice 1): materialize the step's agent REQUIREMENT ({id?, skill?}) so the runner can
+          // resolve it (selectAgentFor) WITHOUT loading the definition — the runner stays self-contained + the
+          // requirement is a DB fact the per-agent report can read. Only meaningful on agent-result steps; NULL
+          // elsewhere (an in-process step runs the engine handler, not an agent executor).
+          agentRequirement:
+            (isAwaitCallback(s.effect) && (s.awaitSource ?? "system-callback") === "agent-result" && s.agent)
+              ? (s.agent as Record<string, unknown>)
+              : null,
         });
       }
       assertLegalRunTransition("queued", "planned");
@@ -172,6 +191,15 @@ export function createEngine(ctx: EngineContext): Engine {
 
   // The leasable-step query: a step is leasable when ready, OR leased with an EXPIRED lease (dead process),
   // OR failed and due for retry. SKIP LOCKED so concurrent ticks never contend on the same step.
+  //
+  // TERMINAL-RUN GUARD (non-resurrection): the predicate matches runs in 'planned' or 'executing' ONLY — it
+  // does NOT auto-lease steps of a 'failed' run. A 'failed' run is TERMINAL; the legitimate auto-recovery paths
+  // (#4 kill-and-resume, #5 transient-failure-then-retry) all keep the run in 'executing' while a step is
+  // 'failed'+nextRetryAt or 'leased'+expired-lease — the run only becomes 'failed' when retries are EXHAUSTED
+  // (terminal). Including 'failed' runs here was a silent dead-run-resurrection vector: for an await-callback
+  // step it re-ran the dispatch handler (re-emitting the request + a new awaiting_event_id) and transitioned
+  // the run failed->blocked. The 'failed'->'executing' run edge remains legal for DELIBERATE operator/manual
+  // resume (a distinct, explicit re-lease path), but the unattended tick never auto-resurrects a terminal run.
   async function advanceNextReadyStep(now: Date): Promise<TickReport> {
     const leaseToken = randomUUID();
     const leaseUntil = new Date(now.getTime() + LEASE_SECONDS * 1000);
@@ -183,10 +211,10 @@ export function createEngine(ctx: EngineContext): Engine {
       // of order and consuming a half-built checkpoint. The NOT EXISTS clause enforces strict in-order
       // advancement; combined with FOR UPDATE SKIP LOCKED it stays concurrency-safe.
       const picked = await tx.execute(dsql`
-        SELECT s.id, s.run_id, s.seq, s.attempt, s.max_attempts, s.effect, s.handler, s.checkpoint, s.stop_condition, s.state AS step_state, r.state AS run_state, r.was_interrupted
+        SELECT s.id, s.run_id, s.seq, s.attempt, s.max_attempts, s.effect, s.handler, s.checkpoint, s.stop_condition, s.await_source, s.state AS step_state, r.state AS run_state, r.was_interrupted
         FROM workflow_step s
         JOIN workflow_run r ON r.id = s.run_id
-        WHERE r.state IN ('planned','executing','failed')
+        WHERE r.state IN ('planned','executing')
           AND s.state IN ('ready','leased','failed')
           AND (s.lease_until IS NULL OR s.lease_until < ${now.toISOString()})
           AND (s.next_retry_at IS NULL OR s.next_retry_at <= ${now.toISOString()})
@@ -201,7 +229,7 @@ export function createEngine(ctx: EngineContext): Engine {
       const rows = picked as unknown as Array<{
         id: string; run_id: string; seq: number; attempt: number; max_attempts: number;
         effect: StepEffect; handler: string; checkpoint: Record<string, unknown> | null;
-        stop_condition: StopCondition | null;
+        stop_condition: StopCondition | null; await_source: string | null;
         step_state: string; run_state: RunState; was_interrupted: boolean;
       }>;
       if (rows.length === 0) {
@@ -215,8 +243,9 @@ export function createEngine(ctx: EngineContext): Engine {
       const interrupted = step.step_state === "leased";
 
       // C6: an irreversible step is NEVER run unattended — block the run for a human. The only legal edge
-      // into blocked is executing->blocked, so move the run through executing first (planned->executing or
-      // the self-loop / failed-recovery edge), then executing->blocked. The step itself is left untouched.
+      // into blocked is executing->blocked, so move the run through executing first (planned->executing or the
+      // executing self-loop — never from 'failed', which the lease predicate excludes), then executing->blocked.
+      // The step itself is left untouched.
       if (!isUnattendedSafe(step.effect)) {
         await transitionRun(tx, step.run_id, "executing", now, interrupted ? { wasInterrupted: true } : {});
         await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) is irreversible — human required` });
@@ -225,7 +254,8 @@ export function createEngine(ctx: EngineContext): Engine {
         return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: "irreversible step -> blocked (C6)" };
       }
 
-      // Move the run into executing (legal from planned, executing self-loop, or failed-recovery edge).
+      // Move the run into executing (legal from planned or the executing self-loop; the lease predicate
+      // excludes terminal 'failed' runs, so this never auto-resurrects a dead run).
       await transitionRun(tx, step.run_id, "executing", now, interrupted ? { wasInterrupted: true } : {});
 
       // CAS-lease the step: claim it ONLY if its lease is still free (token write). Idempotent on
@@ -305,7 +335,9 @@ export function createEngine(ctx: EngineContext): Engine {
           state: "failed", nextRetryAt: retryAt, error: { message: outcome.error, attempt: thisAttempt }, leaseToken: null, leaseUntil: null, updatedAt: now,
         }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
         if (wrote.length === 0) return { advanced: false, detail: "CAS miss on retry write-back" };
-        // run stays executing (the recovery edge failed->executing fires on the NEXT tick for this step);
+        // run STAYS executing (the STEP is 'failed'+nextRetryAt; the run is NOT moved to terminal 'failed'),
+        // so the next tick re-leases this 'failed' step UNDER the still-'executing' run — that is the in-process
+        // recovery path (it does NOT depend on leasing under a 'failed' RUN, which is now excluded as terminal).
         // mark interrupted so a later success lands in `recovered`.
         await tx.update(workflowRun).set({ wasInterrupted: true, updatedAt: now }).where(eq(workflowRun.id, step.run_id));
         await emitTx(tx, "workflow.step.failed", step.run_id, { runId: step.run_id, seq: step.seq, attempt: thisAttempt, willRetryAt: retryAt.toISOString() });
@@ -337,6 +369,12 @@ export function createEngine(ctx: EngineContext): Engine {
     }
     const verifier = getVerifier(defStep.verifierId);
     if (!verifier) return await failVerifyStep(tx, step, leaseToken, now, `unknown verifier ${defStep.verifierId}`);
+    const rung: VerifierRung = getVerifierRung(defStep.verifierId) ?? "T1";
+
+    // ── ADVISE-vs-GATE (the safety crux, ku-verifier-must-be-evaluated): is the GATING verifier eligible to
+    // drive this run to completion? T1/T5 are exempt; a T2-T4 JUDGMENT verifier is eligible ONLY if it has a
+    // recorded passing calibration (eval-the-evaluator). An un-calibrated T2-T4 verifier is ADVISE-ONLY. ──
+    const gate: GateDecision = gateDecision(defStep.verifierId);
 
     // the candidate the act step prepared: read it from the act step's checkpoint (PII-free refs). The engine
     // treats this checkpoint as an OPAQUE candidate — it does NOT read its keys. A domain verifier destructures
@@ -345,7 +383,7 @@ export function createEngine(ctx: EngineContext): Engine {
       .from(workflowStep).where(and(eq(workflowStep.runId, step.run_id), eq(workflowStep.seq, defStep.retryBackToSeq))).limit(1);
     const cp = (actStep?.checkpoint ?? {}) as Record<string, unknown>;
 
-    // ── (1) run the Verifier capability IN-PROCESS (T1; the engine dispatches by id, never embeds logic). ──
+    // ── (1) run the GATING Verifier capability IN-PROCESS (the engine dispatches by id, never embeds logic). ──
     // The candidate is the opaque checkpoint; attempt is the act step's attempt (for a verifier's proof hook).
     const input: VerifierInput = { tx, candidate: cp, attempt: actStep?.attempt ?? 0 };
     let verdict: Verdict;
@@ -355,12 +393,55 @@ export function createEngine(ctx: EngineContext): Engine {
       return await failVerifyStep(tx, step, leaseToken, now, `verifier threw: ${e instanceof Error ? e.message : String(e)}`);
     }
 
+    // ── (1b) run OPTIONAL ADVISORY verifiers ALONGSIDE the gating one (run + record, NEVER gate). A not-yet-
+    // calibrated judge can shadow/advise safely here — its verdict is recorded but can never affect the loop. ──
+    const advisory: Array<{ verifierId: string; rung: VerifierRung; verdict: Verdict }> = [];
+    for (const advId of defStep.advisoryVerifierIds ?? []) {
+      const advFn = getVerifier(advId);
+      if (!advFn) continue; // an unknown advisory verifier is simply skipped (it never gates; nothing to fail-close).
+      const advRung = getVerifierRung(advId) ?? "T1";
+      let advVerdict: Verdict;
+      try { advVerdict = await advFn({ tx, candidate: cp, attempt: actStep?.attempt ?? 0 }); }
+      catch (e) { advVerdict = { verdict: "fail", reasons: ["advisory_verifier_threw"] }; void e; }
+      advisory.push({ verifierId: advId, rung: advRung, verdict: advVerdict });
+      await emitTx(tx, "workflow.verify.advisory", step.run_id, { runId: step.run_id, seq: step.seq, verifierId: advId, rung: advRung, verdict: advVerdict.verdict, reasons: advVerdict.reasons });
+    }
+
     // ── (2) store the Verdict on the verify step (D4) + emit it (observable rung; PII-free coded reasons, S4). ──
-    await tx.update(workflowStep).set({ verdict, updatedAt: now })
+    // The stored verdict carries the RUNG + the gate decision + any ADVISORY verdicts (recorded DISTINCTLY from
+    // the gating verdict — an advisory verdict never drives the loop). Reuses the existing jsonb verdict column.
+    const storedVerdict = {
+      ...verdict,
+      verifierId: defStep.verifierId, rung,
+      gateEligible: gate.eligible, gateReason: gate.reason,
+      advisory: advisory.map((a) => ({ verifierId: a.verifierId, rung: a.rung, verdict: a.verdict.verdict, reasons: a.verdict.reasons, advisoryOnly: true })),
+    };
+    await tx.update(workflowStep).set({ verdict: storedVerdict, updatedAt: now })
       .where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
-    await emitTx(tx, "workflow.verify.completed", step.run_id, { runId: step.run_id, seq: step.seq, verdict: verdict.verdict, reasons: verdict.reasons });
+    await emitTx(tx, "workflow.verify.completed", step.run_id, { runId: step.run_id, seq: step.seq, rung, gateEligible: gate.eligible, verdict: verdict.verdict, reasons: verdict.reasons });
+
+    // ── ADVISE-ONLY FAIL-CLOSED: the gating verifier is a T2-T4 JUDGMENT verifier that is NOT calibrated. Its
+    // verdict MUST NOT drive the loop — an un-calibrated judgment can NEVER cause a run to reach `completed`.
+    // FAIL-CLOSED CHOICE = ESCALATE-TO-HUMAN: the engine records the advisory verdict and BLOCKS on the human
+    // gate (the run NEVER auto-completes/auto-fails on an un-calibrated judgment; a human owns the call). This
+    // is preferred over reject-at-registration because it lets the same definition run safely while a judge is
+    // still being calibrated (it shadows + escalates instead of refusing to load). The gateSeq human gate is
+    // REQUIRED for a non-exempt gating verifier (else there is no fail-closed landing).
+    if (!gate.eligible) {
+      if (defStep.gateSeq === undefined) {
+        return await failVerifyStep(tx, step, leaseToken, now, `gating verifier ${defStep.verifierId} (${rung}) is not calibrated and no human gate configured (fail-closed)`);
+      }
+      // the verify step completes its job (it ran + advised); the run escalates to the human gate (NOT completed).
+      await tx.update(workflowStep).set({
+        state: "done", result: { verdict: verdict.verdict, reasons: verdict.reasons, rung, adviseOnly: true, escalated: true }, leaseToken: null, leaseUntil: null, updatedAt: now,
+      }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
+      await emitTx(tx, "workflow.verify.advise_only", step.run_id, { runId: step.run_id, seq: step.seq, verifierId: defStep.verifierId, rung, reason: gate.reason });
+      await blockHumanGate(tx, step.run_id, defStep.gateSeq, { verdict: "needs_improvement", reasons: [...verdict.reasons, "uncalibrated_verifier_escalated"] }, now);
+      return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `gating verifier ${rung} not calibrated -> ADVISE-ONLY -> escalated to human gate seq ${defStep.gateSeq} (fail-closed; never auto-completes)` };
+    }
 
     // ── (3) evaluate the declarative stopCondition predicate over the Verdict (PURE; engine-evaluated, D4). ──
+    // Reached ONLY when the gating verifier IS gate-eligible (T1/T5 exempt, or a calibrated T2-T4).
     const met = evaluateStopCondition(step.stop_condition, verdict);
 
     if (met) {
@@ -395,10 +476,18 @@ export function createEngine(ctx: EngineContext): Engine {
       // honoring the hard cap. The done->ready re-open IS the loop back-edge: it is whitelisted in BOTH the app
       // validator (LEGAL_STEP_EDGES) and the DB step trigger (0002). assertLegalStepTransition guards it.
       assertLegalStepTransition("leased", "ready"); // the verify step is leased; reset it to ready (back-edge)
-      await tx.update(workflowStep).set({ state: "ready", verdict, leaseToken: null, leaseUntil: null, updatedAt: now })
+      await tx.update(workflowStep).set({ state: "ready", verdict: storedVerdict, leaseToken: null, leaseUntil: null, updatedAt: now })
         .where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken)));
-      await reopenActStep(tx, step.run_id, defStep.retryBackToSeq, now);
-      await emitTx(tx, "workflow.loop.retry", step.run_id, { runId: step.run_id, seq: step.seq, actSeq: defStep.retryBackToSeq, attempt: actAttempt, maxAttempts: actCap, reasons: verdict.reasons });
+      // IMPROVE-FEEDBACK: on a `needs_improvement` verdict, thread the gating verdict's suggestedImprovement +
+      // reasons INTO the act step's next execution so the agent/handler re-executes WITH the feedback (not
+      // blind). The engine carries it as an OPAQUE `_feedback` envelope on the act step's checkpoint; the domain
+      // handler reads it on its own side. A plain `fail` (no improvement guidance) re-opens cleanly (null
+      // checkpoint) exactly as before — so the existing T1 fail->retry loop is byte-for-byte unchanged.
+      const feedback = verdict.verdict === "needs_improvement"
+        ? { attempt: actAttempt, fromVerifier: defStep.verifierId, rung, verdict: verdict.verdict, reasons: verdict.reasons, suggestedImprovement: verdict.suggestedImprovement ?? null }
+        : undefined;
+      await reopenActStep(tx, step.run_id, defStep.retryBackToSeq, now, feedback);
+      await emitTx(tx, "workflow.loop.retry", step.run_id, { runId: step.run_id, seq: step.seq, actSeq: defStep.retryBackToSeq, attempt: actAttempt, maxAttempts: actCap, verdict: verdict.verdict, reasons: verdict.reasons });
       return { advanced: true, runId: step.run_id, from: step.run_state, to: "executing", detail: `verify fail -> back-edge retry act seq ${defStep.retryBackToSeq} (attempt ${actAttempt}/${actCap})` };
     }
 
@@ -416,14 +505,19 @@ export function createEngine(ctx: EngineContext): Engine {
 
   // re-open the act step for the loop back-edge: done -> ready (the whitelisted loop back-edge). The engine is a
   // trusted writer; the act step is reset to ready so the next tick re-leases it (bumping its attempt, D3).
-  async function reopenActStep(tx: TxLike, runId: string, seq: number, now: Date): Promise<void> {
+  async function reopenActStep(tx: TxLike, runId: string, seq: number, now: Date, feedback?: Record<string, unknown>): Promise<void> {
     // the act step is `done`; re-open it to `ready`. assertLegalStepTransition guards this in the app; the DB
     // step trigger whitelists done->ready (0002). Idempotent: if already ready, the same-state write is a no-op.
     const [s] = await tx.select({ state: workflowStep.state }).from(workflowStep)
       .where(and(eq(workflowStep.runId, runId), eq(workflowStep.seq, seq))).limit(1);
     if (!s) throw new Error(`act step seq ${seq} not found for back-edge`);
     if (s.state !== "ready") assertLegalStepTransition(s.state as "done", "ready"); // done -> ready loop back-edge
-    await tx.update(workflowStep).set({ state: "ready", checkpoint: null, result: null, leaseToken: null, leaseUntil: null, updatedAt: now })
+    // IMPROVE-FEEDBACK delivery: the act step's checkpoint is reset (a fresh attempt) but carries the OPAQUE
+    // `_feedback` envelope from the rejecting verdict (suggestedImprovement + reasons) so the next execution
+    // re-runs WITH the feedback. The engine never reads inside `_feedback` — the domain handler does, on its
+    // side. Reuses the existing checkpoint jsonb column (no schema change). Absent feedback = a plain re-open.
+    const nextCheckpoint = feedback ? { _feedback: feedback } : null;
+    await tx.update(workflowStep).set({ state: "ready", checkpoint: nextCheckpoint, result: null, leaseToken: null, leaseUntil: null, updatedAt: now })
       .where(and(eq(workflowStep.runId, runId), eq(workflowStep.seq, seq)));
   }
 
@@ -464,6 +558,10 @@ export function createEngine(ctx: EngineContext): Engine {
   // leased->blocked + executing->blocked + blocked->done edges. DOMAIN-FREE: the engine never reads the
   // request payload or the outcome — the handler emits, the optional outcomeArrived hook decides the race.
   async function runAwaitCallbackStep(tx: TxLike, step: LeasedStep, leaseToken: string, thisAttempt: number, now: Date): Promise<TickReport> {
+    // S2: the block source the step DECLARED (materialized at plan time). The completer that resolves this step
+    // MUST match this source (a 'system-callback' post can never resolve an 'agent-result' step, and vice-versa).
+    // Default 'system-callback' (the v1 primitive) preserves the prior behaviour for definitions that omit it.
+    const awaitSource = step.await_source ?? "system-callback";
     // ── run the handler — it emits the REQUEST event in-txn (transactional outbox) + returns awaitEventId. ──
     const sctx: StepContext = {
       tx, runId: step.run_id, seq: step.seq, attempt: thisAttempt, checkpoint: step.checkpoint ?? null,
@@ -520,12 +618,12 @@ export function createEngine(ctx: EngineContext): Engine {
     if (raced) {
       assertLegalStepTransition("leased", "done");
       const wrote = await tx.update(workflowStep).set({
-        state: "done", result: { ...outcome.result, resolvedBy: "system-callback", race: "callback-before-block" }, checkpoint: outcome.checkpoint,
-        awaitSource: "system-callback", awaitingEventId: null, leaseToken: null, leaseUntil: null, updatedAt: now,
+        state: "done", result: { ...outcome.result, resolvedBy: awaitSource, race: "callback-before-block" }, checkpoint: outcome.checkpoint,
+        awaitSource, awaitingEventId: null, leaseToken: null, leaseUntil: null, updatedAt: now,
       }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
       if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await race-advance write-back (lost lease)" };
       // run stays executing (the next tick advances the following step). Emit the completion + a coded marker.
-      await emitTx(tx, "workflow.step.completed", step.run_id, { runId: step.run_id, seq: step.seq, source: "system-callback", race: true });
+      await emitTx(tx, "workflow.step.completed", step.run_id, { runId: step.run_id, seq: step.seq, source: awaitSource, race: true });
       return { advanced: true, runId: step.run_id, from: step.run_state, to: "executing", detail: `await seq ${step.seq} outcome already arrived -> advanced (callback-before-block race handled)` };
     }
 
@@ -534,13 +632,13 @@ export function createEngine(ctx: EngineContext): Engine {
     // The request event was emitted by the handler; awaiting_event_id = its id (R1: emit + set key + block atomic). ──
     assertLegalStepTransition("leased", "blocked");
     const wrote = await tx.update(workflowStep).set({
-      state: "blocked", awaitSource: "system-callback", awaitingEventId: eventId, checkpoint: outcome.checkpoint,
+      state: "blocked", awaitSource, awaitingEventId: eventId, checkpoint: outcome.checkpoint,
       result: outcome.result, leaseToken: null, leaseUntil: null, updatedAt: now,
     }).where(and(eq(workflowStep.id, step.id), eq(workflowStep.leaseToken, leaseToken))).returning({ id: workflowStep.id });
     if (wrote.length === 0) return { advanced: false, detail: "CAS miss on await block write-back (lost lease)" };
-    await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) awaiting system-callback (eventId ${eventId})` });
-    await emitTx(tx, "workflow.step.blocked", step.run_id, { runId: step.run_id, seq: step.seq, source: "system-callback", awaitingEventId: eventId });
-    return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `await-callback seq ${step.seq} -> blocked on system-callback (eventId ${eventId})` };
+    await transitionRun(tx, step.run_id, "blocked", now, { blockedReason: `step ${step.seq} (${step.handler}) awaiting ${awaitSource} (eventId ${eventId})` });
+    await emitTx(tx, "workflow.step.blocked", step.run_id, { runId: step.run_id, seq: step.seq, source: awaitSource, awaitingEventId: eventId });
+    return { advanced: true, runId: step.run_id, from: step.run_state, to: "blocked", detail: `await-callback seq ${step.seq} -> blocked on ${awaitSource} (eventId ${eventId})` };
   }
 
   // All steps done -> completed, or recovered if the run was ever interrupted/failed (#5 proof state).
@@ -593,7 +691,8 @@ export function createEngine(ctx: EngineContext): Engine {
 type LeasedStep = {
   id: string; run_id: string; seq: number; attempt: number; max_attempts: number;
   effect: StepEffect; handler: string; checkpoint: Record<string, unknown> | null;
-  stop_condition: StopCondition | null; step_state: string; run_state: RunState; was_interrupted: boolean;
+  stop_condition: StopCondition | null; await_source: string | null;
+  step_state: string; run_state: RunState; was_interrupted: boolean;
 };
 
 // the PURE stopCondition predicate (D4) — the ONLY loop decision the engine itself makes. No DSL.
@@ -613,8 +712,21 @@ function backoff(attempt: number): number {
   return Math.round(base * (0.5 + Math.random() * 0.5));
 }
 
-function isUniqueViolation(e: unknown): boolean {
-  return typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "23505";
+// Unique-violation (pg 23505) detection that is robust to query-layer wrapping. The current Drizzle
+// version wraps the underlying pg error in a DrizzleQueryError whose own `.code` is undefined and carries
+// the real driver code under `.cause` (`e.cause.code === '23505'`). A top-level-only check therefore MISSES
+// the violation and the catch site (e.g. enqueue's idempotent SELECT-and-return) is never reached — the
+// error re-throws and a legit idempotent retry surfaces as a bare 500. Walk the `.cause` chain defensively
+// (finite depth, cycle-guarded) so the guarantee survives the wrapping. Mirrors goals-route's pgCode().
+export function isUniqueViolation(e: unknown): boolean {
+  let cur: unknown = e;
+  for (let depth = 0; depth < 8 && cur !== null && typeof cur === "object"; depth++) {
+    if ((cur as { code?: unknown }).code === "23505") return true;
+    const next = (cur as { cause?: unknown }).cause;
+    if (next === cur) break; // defensive cycle guard
+    cur = next;
+  }
+  return false;
 }
 
 export type { WorkflowDefinition };

@@ -30,9 +30,25 @@ export interface WorkflowRouteContext {
 
 const bad = (c: any, message: string) => c.json({ error: { code: "bad_request", message } }, 400);
 
+// The pg error code may be on the error directly OR nested under `.cause` (a query-layer wrapper, e.g.
+// DrizzleQueryError sets its own `.code` undefined and carries the driver code on `.cause`). Walk the cause
+// chain so a duplicate degrades to 409 conflict, never a bare 500. Mirrors goals-route.ts's pgCode().
+// NOTE: with the engine's idempotent enqueue, a duplicate (definitionKey, idempotencyKey) now returns the
+// EXISTING run (created:false → 200) and never reaches here; this 409 path remains for any OTHER
+// unique-violation the boundary might surface (honest envelope, not a 500).
+function pgCode(e: unknown): string | undefined {
+  let cur: unknown = e;
+  for (let depth = 0; depth < 8 && cur !== null && typeof cur === "object"; depth++) {
+    const code = (cur as { code?: string }).code;
+    if (code) return code;
+    const next = (cur as { cause?: unknown }).cause;
+    if (next === cur) break;
+    cur = next;
+  }
+  return undefined;
+}
 function pgError(c: any, e: unknown) {
-  const code = (e as { code?: string }).code;
-  if (code === "23505") return c.json({ error: { code: "conflict", message: "duplicate" } }, 409);
+  if (pgCode(e) === "23505") return c.json({ error: { code: "conflict", message: "duplicate" } }, 409);
   return c.json({ error: { code: "internal", message: e instanceof Error ? e.message : String(e) } }, 500);
 }
 

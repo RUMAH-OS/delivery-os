@@ -29,11 +29,29 @@ export interface DefinitionStep {
   effect: StepEffect; // emit-only | idempotent | irreversible (drives the C6 unattended-vs-blocked gate)
   maxAttempts: number; // per-step retry ceiling (auto-retry with backoff; criterion #5)
   handler: string; // the registered executor key (engine resolves this to a function)
+  // ── MULTI-AGENT requirement (Slice 1; meaningful on an `agent-result` await-callback step) ──
+  // WHICH agent must execute this step's work. `id` pins an exact agent; `skill` requests ANY agent that has
+  // that skill. The engine MATERIALIZES this onto the step at plan time (step.agent_requirement); the runner
+  // resolves it to exactly one registered agent (selectAgentFor) and routes the step to that agent's executor,
+  // recording the resolved agent_id. FAIL-CLOSED: an unresolvable requirement fails THAT step (no arbitrary
+  // agent). Omitted on non-agent-result steps (they run the in-process engine handler, not an agent executor).
+  agent?: { id?: string; skill?: string };
+  // ── await-callback source declaration (S2 per-source least-privilege) ──
+  // ONLY meaningful on an `await-callback` step: which callback SOURCE resolves this step's block. The engine
+  // writes this onto the blocked step's await_source, and the completer matches on it (a 'system-callback' post
+  // can NEVER resolve an 'agent-result' step and vice-versa — the bidirectional guard). Defaults to
+  // 'system-callback' (the v1 cross-system primitive) when omitted, so existing definitions are unchanged.
+  awaitSource?: "system-callback" | "agent-result"; // (other enum values exist in DDL but are not engine-driven yet)
   // ── Slice 1 (verified-loop, §10.2) — present ONLY on a `verify` step ──
-  verifierId?: string; // the Verifier capability id to run in-process (P2; T1 in Slice 1) — NOT engine logic
+  verifierId?: string; // the GATING Verifier capability id to run in-process — its verdict DRIVES the loop
   stopCondition?: StopCondition; // the declarative predicate the engine evaluates over the stored verdict (D4)
   retryBackToSeq?: number; // the back-edge target: which earlier step to re-ready when the predicate is NOT met
   gateSeq?: number; // on cap-trip, which step becomes the human-response gate (its effect MUST be irreversible)
+  // ── T2-T4 framework — advise-vs-gate (the safety crux) ──
+  // OPTIONAL advisory verifiers that run ALONGSIDE the gating one (run + record their verdict, NEVER gate). A
+  // not-yet-calibrated judge can shadow/advise in production safely via this list — its verdict is recorded as
+  // ADVISORY and can never affect the loop's stop/retry/cap decision. Each id is a registered Verifier id.
+  advisoryVerifierIds?: string[];
 }
 
 export interface WorkflowDefinition {

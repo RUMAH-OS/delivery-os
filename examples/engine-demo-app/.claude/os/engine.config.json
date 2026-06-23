@@ -1,0 +1,11 @@
+{
+  "_comment": "PROJECT-LOCAL engine config — this APP's applied engine-migration FILE PATHS, per engine key. `os-inherit engine-check` reads this for the DDL-parity inputs so the drift gate is MULTI-TENANT. The demo-app applies the CANONICAL engine migration set VERBATIM (byte-identical) into its own sequence — the strongest form of structural equivalence. This is exactly the per-app declaration shape PLOS will write on install (with its own renumbered/split paths).",
+  "workflow-engine": {
+    "appMigrations": [
+      "migrations/0001_engine_core.sql",
+      "migrations/0002_engine_await_loop.sql",
+      "migrations/0003_engine_agent_runner.sql",
+      "migrations/0004_engine_agent_id.sql"
+    ]
+  }
+}

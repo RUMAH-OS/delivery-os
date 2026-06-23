@@ -1,15 +1,13 @@
 // DDL parity for the demo app — the app's applied engine migrations vs the VENDORED canonical engine DDL.
 //
-// WHY THIS EXISTS (a flagged N=2 rough edge): `os-inherit engine-check`'s ddlParity reads the app migration
-// PATHS from the SHARED canonical manifest (capabilities/os-foundation.manifest.json), which currently hardcodes
-// the REFERENCE installer's (Admin's) paths — migrations/0034_*, 0037_*, 0038_*. A 2nd app's migration files
-// live elsewhere, so that check's ddlParity portion can't resolve them (the file-HASH drift lock, the actual
-// "engine is OS-owned" guarantee, passes fine). Future polish: make the manifest's appMigrations per-app
-// (e.g. a project-local override the tool reads), so engine-check's DDL parity is multi-tenant.
-//
-// This script proves the DEMO app's equivalent: its applied engine migrations are BYTE-IDENTICAL to the
-// vendored canonical engine DDL (the demo applies them verbatim into its own sequence — the strongest form of
-// structural equivalence). It compares the two engine files; the app-owned 0000_app_role.sql is NOT engine DDL.
+// MULTI-TENANT FIX (platform-debt closure, Item A — NOW SOLVED): `os-inherit engine-check`'s ddlParity used to
+// read the app migration PATHS from the SHARED canonical manifest (which hardcoded the REFERENCE installer's
+// Admin paths), so a 2nd app's ddlParity couldn't resolve. It now reads them PER-APP from a project-local
+// .claude/os/engine.config.json — so this demo's `engine:drift:check` runs FULLY green incl. ddlParity against
+// THIS app's own paths. This script remains as the STRONGEST form of the same proof: the demo applies the
+// canonical engine DDL BYTE-IDENTICALLY (verbatim) into its own sequence, so a sha comparison (not just the
+// structural normalise) passes. It compares the four engine files; the app-owned 0000_app_role.sql / outbox are
+// NOT engine DDL.
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +20,8 @@ const sha = (p: string) => createHash("sha256").update(readFileSync(p)).digest("
 const PAIRS: Array<{ app: string; canonical: string }> = [
   { app: "migrations/0001_engine_core.sql", canonical: ".claude/os/engine/migrations/0001_engine_core.sql" },
   { app: "migrations/0002_engine_await_loop.sql", canonical: ".claude/os/engine/migrations/0002_engine_await_loop.sql" },
+  { app: "migrations/0003_engine_agent_runner.sql", canonical: ".claude/os/engine/migrations/0003_engine_agent_runner.sql" },
+  { app: "migrations/0004_engine_agent_id.sql", canonical: ".claude/os/engine/migrations/0004_engine_agent_id.sql" },
 ];
 
 let ok = true;

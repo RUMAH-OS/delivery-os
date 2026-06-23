@@ -38,8 +38,10 @@ npm run ddl:parity   # proves the applied engine DDL == canonical engine DDL
 ```
 
 ### 3. Supply your ports (your app owns its plane)
-- `src/engine-app/tables.ts` — your Drizzle table objects for `EngineContext.tables`
-  (`workflowRun` / `workflowStep` / `outbox` + `workflowApprovalAudit`), matching the engine DDL.
+- `src/engine-app/tables.ts` — the Drizzle table objects for `EngineContext.tables`
+  (`workflowRun` / `workflowStep` / `outbox` + `workflowApprovalAudit`). These are now **IMPORTED from the
+  engine's shipped schema** (`.claude/os/engine/index.js`) — the engine ships its drizzle tables, so an
+  installer no longer hand-types them. (An installer with a richer outbox can still define its own and pass it.)
 - `src/engine-app/db.ts` — your Drizzle client = `EngineContext.db`.
 - `src/engine-app/ports.ts` — your `HumanPrincipalPort` impl + your `auth` `ScopeGuard` (maps your auth onto
   the engine's `WORKFLOW_SCOPES`). The demo uses a stub principal (sufficient for the demo).
@@ -80,12 +82,19 @@ This app imports **only** its own `src/**` + the vendored `.claude/os/engine/**`
 grep -rn "rumah-admin" src run-demo.ts scripts   # -> no matches
 ```
 
-## Known rough edges (honest flags)
-1. **Per-app table-definition boilerplate** — `src/engine-app/tables.ts` re-types the engine tables (Admin has
-   the identical block). The engine ships the DDL but not a drizzle schema. *Future polish: the engine ships
-   its drizzle table objects so apps import typed tables and own only DDL application + instance rows.*
-2. **`engine-check`'s ddlParity is single-tenant** — it reads the app migration **paths** from the shared
-   canonical manifest, which hardcodes the reference installer's (Admin's) paths. The **file-hash drift lock**
-   (the real "engine is OS-owned" guarantee) is fully multi-tenant and passes here; only the DDL-parity portion
-   needs per-app paths. This app uses `npm run ddl:parity` (byte-identity vs the vendored canonical DDL) as the
-   equivalent. *Future polish: make the manifest's `appMigrations` per-app (a project-local override).*
+## Platform-debt closure (both former rough edges now FIXED)
+1. **Per-app table-definition boilerplate — FIXED.** The engine now ships its drizzle table objects
+   (`templates/workflow-engine/schema.ts`, exported from the engine barrel). `src/engine-app/tables.ts` IMPORTS
+   them instead of re-typing — no hand-typed engine tables in an installer. The shipped schema matches the engine
+   DDL exactly (this demo applies the DDL + uses the schema + runs green = the cross-check).
+2. **`engine-check`'s ddlParity is now MULTI-TENANT — FIXED.** The app's applied engine-migration **paths** are
+   declared PER-APP in a project-local **`.claude/os/engine.config.json`** (`{"workflow-engine":{"appMigrations":
+   ["migrations/…"]}}`); `os-inherit engine-check` reads THAT (falling back to the shared manifest only if absent).
+   The shared `os-foundation.manifest.json` keeps the **canonical** engine migration set (`canonicalDir`) — the
+   source of truth for the SHAPE. So `npm run engine:drift:check` now passes **fully incl. ddlParity** here against
+   THIS app's own paths (it was previously file-hash-only). `npm run ddl:parity` remains as the stronger
+   byte-identity proof (this demo applies the canonical DDL verbatim).
+
+   **What PLOS declares on install:** after `os-inherit sync`, PLOS writes its own
+   `.claude/os/engine.config.json` mapping `workflow-engine.appMigrations` to ITS renumbered/split applied
+   migration files — then its `engine-check` is fully green incl. ddlParity, with zero shared-manifest edits.

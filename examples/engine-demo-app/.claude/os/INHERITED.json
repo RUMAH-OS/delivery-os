@@ -1,5 +1,5 @@
 {
-  "osVersion": "v5.0-114-g2bc2cd3",
+  "osVersion": "v5.0-124-g4555d4a",
   "manifestVersion": "v1",
   "note": "VENDORED from delivery-os via os-inherit. Do NOT hand-edit these files; re-run `os-inherit sync`. `os-inherit check` fails if they drift from canonical.",
   "files": [
@@ -37,7 +37,7 @@
     },
     {
       "rel": ".claude/os/tools/os-inherit.mjs",
-      "sha256": "ea134107d969ad4fd2b552c622b60532cd7ebe9e07c604b9e5195c057375256a"
+      "sha256": "ec13cc84fef260ec82cd9f278b2df8674444a5701d15307b7f65375fc50af444"
     },
     {
       "rel": ".claude/os/tools/seam-gate.mjs",

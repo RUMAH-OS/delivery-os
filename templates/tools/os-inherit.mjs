@@ -30,6 +30,14 @@
 //   It also runs a DDL PARITY check: the app's applied engine migrations must be
 //   STRUCTURALLY equivalent to the engine's canonical migration set (the engine OWNS
 //   the DDL; the app applies an equivalent instance). See ddlParity below.
+//
+//   MULTI-TENANT (per-app) ddlParity: the app's APPLIED migration FILE PATHS are
+//   PROJECT-LOCAL — declared in the consuming project's .claude/os/engine.config.json
+//   ({ "<engineKey>": { "appMigrations": [ "migrations/…" ] } }), NOT hardcoded in the
+//   shared manifest. engine-check reads that per-app declaration (falling back to a
+//   shared-manifest ddlParity.appMigrations only if the local config is absent). The
+//   shared manifest still owns the CANONICAL set (canonicalDir). So every installer
+//   (Admin, the demo-app, PLOS) is fully drift-green against its OWN migration paths.
 // =============================================================================
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync, rmSync } from "node:fs";
@@ -324,15 +332,47 @@ function ddlObjects(statements) {
   return { tables, indexes, triggers, functions, policies, rls };
 }
 
+// PER-APP (multi-tenant) ddlParity resolution. The SHARED manifest declares the CANONICAL engine migration
+// set (canonicalDir) + structural tolerances (ignoreColumns/note) — the source of truth for the SHAPE. But
+// the APP's APPLIED migration FILE PATHS are project-local (each installer renumbers/splits the engine DDL
+// into its OWN migration sequence): Admin's are migrations/0034_*, the demo-app's are migrations/0001_*, PLOS
+// will have its own. Hardcoding them in the shared manifest is single-tenant. We therefore read appMigrations
+// from a PROJECT-LOCAL config in the consuming project (INTO):
+//
+//   .claude/os/engine.config.json  ->  { "<engineKey>": { "appMigrations": [ "migrations/…", … ] }, … }
+//
+// Resolution order (graceful fallback so existing installs keep working):
+//   1) the project-local engine.config.json entry for this engine key (THE multi-tenant path), else
+//   2) the engine's ddlParity.appMigrations in the shared manifest (legacy/reference fallback).
+// The file-hash drift lock (the ownership guarantee) is UNCHANGED — this only governs the DDL-parity inputs.
+function loadEngineConfig() {
+  const cp = join(INTO, ".claude", "os", "engine.config.json");
+  if (!existsSync(cp)) return null;
+  try { return JSON.parse(readFileSync(cp, "utf8")); }
+  catch (e) { return { __error: `engine.config.json is not valid JSON (${e.message})` }; }
+}
+function resolveAppMigrations(eng) {
+  const cfg = loadEngineConfig();
+  if (cfg && cfg.__error) return { error: cfg.__error, list: [] };
+  const local = cfg && cfg[eng.key] && Array.isArray(cfg[eng.key].appMigrations) ? cfg[eng.key].appMigrations : null;
+  if (local) return { list: local, source: ".claude/os/engine.config.json (project-local)" };
+  const fromManifest = (eng.ddlParity && eng.ddlParity.appMigrations) || null;
+  if (fromManifest) return { list: fromManifest, source: "shared manifest (fallback — no project-local engine.config.json)" };
+  return { list: [], source: "none" };
+}
+
 function ddlParity(eng) {
   const p = eng.ddlParity;
   if (!p) return [];
   const violations = [];
   const canonDir = join(FROM, p.canonicalDir);
   if (!existsSync(canonDir)) return [`DDL PARITY: canonical migration dir not found at ${canonDir} (engine "${eng.key}")`];
+  const resolved = resolveAppMigrations(eng);
+  if (resolved.error) return [`DDL PARITY: ${resolved.error} (engine "${eng.key}")`];
+  if (resolved.list.length === 0) return [`DDL PARITY: no applied app migrations declared for engine "${eng.key}" — add an entry to .claude/os/engine.config.json ({"${eng.key}":{"appMigrations":["migrations/…"]}}) or to the shared manifest's ddlParity.appMigrations`];
   const isForward = (f) => f.endsWith(".sql") && !f.endsWith(".down.sql");
   const canonSql = readdirSync(canonDir).filter(isForward).sort().map((f) => readFileSync(join(canonDir, f), "utf8")).join("\n;\n");
-  const appFiles = (p.appMigrations || []).map((rel) => {
+  const appFiles = resolved.list.map((rel) => {
     const ap = join(INTO, rel);
     if (!existsSync(ap)) { violations.push(`DDL PARITY: declared app migration not found: ${rel} (engine "${eng.key}")`); return ""; }
     return readFileSync(ap, "utf8");

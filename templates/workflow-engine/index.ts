@@ -76,3 +76,7 @@ export type { Agent, AgentRequirement, AgentSelectionResult } from "./agent-regi
 
 // ── callback contract (pure zod) ──
 export { ApprovalCallbackV1, ApprovalCallbackResponseV1 } from "./contracts/approvals-v1.js";
+
+// ── SHIPPED drizzle schema (the engine's own table objects — installers import these for EngineContext.tables
+//    instead of re-typing them; domain-free; matches the canonical engine migration set exactly) ──
+export { workflowRun, workflowStep, outbox, workflowApprovalAudit } from "./schema.js";

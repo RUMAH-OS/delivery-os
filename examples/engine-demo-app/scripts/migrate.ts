@@ -17,7 +17,9 @@ const FILES = [
   "0000_app_role.sql",      // app infra: the least-privilege role the engine RLS policies grant
   "0001_engine_core.sql",   // CANONICAL engine core DDL (verbatim)
   "0001a_app_outbox.sql",   // app infra: the outbox the engine emits to (engine DDL deliberately omits it)
-  "0002_engine_await_loop.sql", // CANONICAL engine Slice-1 DDL (verbatim)
+  "0002_engine_await_loop.sql",   // CANONICAL engine Slice-1 DDL (verbatim)
+  "0003_engine_agent_runner.sql", // CANONICAL engine runner claim/lease DDL (verbatim)
+  "0004_engine_agent_id.sql",     // CANONICAL engine per-step agent requirement/resolved-id DDL (verbatim)
 ];
 
 export async function migrate(): Promise<void> {
