@@ -47,12 +47,12 @@ const POLL_INTERVAL_MS = 20000;      // 20s between polls (matches merge-pr gate
 // CI red emits, its diagnosis, the sanctioned fix, and the AUTONOMY BAND that
 // governs whether the orchestrator may apply it unattended.
 //
-// signal fields (a class matches when ALL declared MANDATORY fields match):
+// signal fields (a class matches when its declared MANDATORY discriminator(s) hit):
 //   logRegex[]   — MANDATORY if present: >=1 regex must hit the failing log
 //   mergeable    — MANDATORY if present: gh `mergeable` must equal this
 //   checkName    — MANDATORY if present: a failing check name must match this regex
-//   failingStep  — corroborating: constrains only when evidence carries a step
-//   workflow     — corroborating: constrains only when evidence carries a workflow
+//   failingStep  — CORROBORATING (optional): boosts confidence; never disqualifies
+//   workflow     — CORROBORATING (optional): boosts confidence; never disqualifies
 //   failingFiles — informational: surfaced in the report; not a discriminator
 // =============================================================================
 export const FAILURE_CLASSES = [
@@ -157,11 +157,12 @@ export const FAILURE_CLASSES = [
 ];
 
 // =============================================================================
-// SIGNAL MATCHER — deterministic classification. Mandatory fields (logRegex /
-// mergeable / checkName) must match; corroborating fields (failingStep / workflow)
-// only constrain when the evidence actually carries them. Fail-closed: a class
-// matches only when at least one MANDATORY signal field hit (never on an empty
-// signal), and an unrecognized red returns null (we never guess a fix).
+// SIGNAL MATCHER — deterministic classification. Mandatory discriminators
+// (logRegex / mergeable / checkName) must match; corroborating fields
+// (failingStep / workflow / failingFiles) only boost confidence and can NEVER
+// disqualify a mandatory match. Fail-closed: a class matches only when at least
+// one MANDATORY signal field hit (never on an empty signal), and an unrecognized
+// red returns null (we never guess a fix).
 // =============================================================================
 export function matchesSignal(signal, ev = {}) {
   let mandatoryMatched = false;
@@ -183,13 +184,13 @@ export function matchesSignal(signal, ev = {}) {
     mandatoryMatched = true;
   }
 
-  // corroborating: constrains ONLY when evidence supplies the field
-  if (signal.failingStep && ev.failingStep) {
-    if (!String(ev.failingStep).toLowerCase().includes(signal.failingStep.toLowerCase())) return false;
-  }
-  if (signal.workflow && ev.workflow) {
-    if (!String(ev.workflow).toLowerCase().includes(signal.workflow.toLowerCase())) return false;
-  }
+  // CORROBORATING ONLY (failingStep / workflow / failingFiles): intentionally
+  // NOT evaluated as discriminators. They boost confidence / colour the report,
+  // but must NEVER disqualify a class whose MANDATORY discriminator already
+  // matched. The live `orchestrate` sets ev.failingStep = the CHECK name
+  // (e.g. "verify"), which will never equal a class's STEP name (e.g. F2's
+  // "Build (next build)"). Treating failingStep as mandatory wrongly dropped
+  // real F2 OOMs under the "verify" check to UNCLASSIFIED.
 
   return mandatoryMatched;
 }
@@ -532,7 +533,9 @@ function printReport(report, opts) {
 
 // =============================================================================
 // SELF-TEST — pure, no live calls, no mutation. Asserts:
-//  (1) every F1–F5 fixture classifies to its own class (and unrelated red -> none)
+//  (1) every F1–F5 fixture classifies to its own class (and unrelated red -> none),
+//      using the REAL `orchestrate` evidence contract (failingStep = CHECK name)
+//      so a live-shape F2 OOM under the "verify" check classifies F2 (regression guard)
 //  (2) the safe-to-auto split holds (SAFE:[F2,F3] APPROVAL:[F1,F4] NEVER:[F5])
 //  (3) the merge gate is human-only: never "merge" without --merge, and --merge
 //      cannot override a red/missing required check.
@@ -541,20 +544,42 @@ function selfTest() {
   const fails = [];
   const ok = (cond, msg) => { if (!cond) fails.push(msg); };
 
-  // (1) signal fixtures — canned logs/states modeled on the live session
+  // (1) signal fixtures — built to mirror the REAL `orchestrate` evidence
+  // contract: a failing CHECK emits { checkName, failingChecks:[name], log,
+  // failingStep: <CHECK name>, workflow: <check workflow> } (NOT a step name);
+  // a conflicting PR emits { mergeable }. Using the live shape here is what makes
+  // this test CATCH the F2 regression instead of masking it: F2's OOM surfaces
+  // under the "verify" check (failingStep:"verify"), NOT under "Build (next build)".
   const fixtures = {
-    F1: { log: "AssertionError [ERR_ASSERTION]: expected 29 to be 28", failingChecks: ["verify"], failingStep: "verify" },
-    F2: { log: "<--- Last few GCs --->\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory", failingStep: "Build (next build)" },
-    F3: { log: "Error: Found invalid Node.js Version: 24.x. Please set \"engines\":{\"node\":...}", workflow: "deploy" },
-    F4: { mergeable: "CONFLICTING" },
-    F5: { checkName: "founder-experience-scorecard", failingChecks: ["founder-experience-scorecard"] },
+    // F1 — stale conformance count under the `verify` check (matches on logRegex).
+    F1: { checkName: "verify", failingChecks: ["verify"], failingStep: "verify", workflow: "verify",
+          log: "AssertionError [ERR_ASSERTION]: expected 29 to be 28" },
+    // F2 — LIVE SHAPE: next-build OOM surfaces under the `verify` check, so
+    // failingStep is "verify" (the check name), NOT "Build (next build)". Must
+    // classify F2 purely on its OOM logRegex regardless of the check/step name.
+    F2: { checkName: "verify", failingChecks: ["verify"], failingStep: "verify", workflow: "verify",
+          log: "<--- Last few GCs --->\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory" },
+    // F3 — Vercel invalid-Node deploy red: matches on logRegex; corroborated by workflow=deploy.
+    F3: { checkName: "deploy", failingChecks: ["deploy"], failingStep: "deploy", workflow: "deploy",
+          log: "Error: Found invalid Node.js Version: 24.x. Please set \"engines\":{\"node\":...}" },
+    // F4 — conflicting release PR (pr-state evidence; matches on mergeable).
+    F4: { source: "pr-state", mergeable: "CONFLICTING" },
+    // F5 — human experience gate red (matches on checkName).
+    F5: { checkName: "founder-experience-scorecard", failingChecks: ["founder-experience-scorecard"],
+          failingStep: "founder-experience-scorecard", workflow: "experience" },
   };
   for (const [id, ev] of Object.entries(fixtures)) {
     const fc = classifyFailure(ev);
     ok(fc && fc.id === id, `signal fixture ${id} classified as ${fc ? fc.id : "(none)"} (expected ${id})`);
   }
-  ok(classifyFailure({ checkName: "experience-review", failingChecks: ["experience-review"] })?.id === "F5", "experience-review check must classify to F5");
-  ok(classifyFailure({ log: "ELIFECYCLE eslint found 3 problems" }) === null, "unrelated red must NOT classify (fail-closed)");
+  // REGRESSION GUARD: a `verify`-named check whose failing log is the next-build
+  // OOM must classify F2 even though failingStep is the check name "verify" (not
+  // "Build (next build)"). This is the exact live shape the QA spy-harness flagged.
+  ok(classifyFailure({ checkName: "verify", failingChecks: ["verify"], failingStep: "verify", workflow: "verify",
+                       log: "FATAL ERROR: Ineffective mark-compacts near heap limit - JavaScript heap out of memory" })?.id === "F2",
+     "LIVE-SHAPE F2: OOM under the `verify` check (failingStep='verify') must classify F2, not UNCLASSIFIED");
+  ok(classifyFailure({ checkName: "experience-review", failingChecks: ["experience-review"], failingStep: "experience-review", workflow: "experience" })?.id === "F5", "experience-review check must classify to F5");
+  ok(classifyFailure({ checkName: "verify", failingChecks: ["verify"], failingStep: "verify", workflow: "verify", log: "ELIFECYCLE eslint found 3 problems" }) === null, "unrelated red must NOT classify (fail-closed)");
 
   // (2) safe-to-auto split
   const split = safeToAutoSplit();
@@ -581,7 +606,9 @@ function selfTest() {
     process.exit(1);
   }
   console.error(
-    `ci-release-orchestrator --self-test PASS — ${Object.keys(fixtures).length} signal fixtures classify correctly (F1–F5 + experience-review->F5 + unrelated->none), ` +
+    `ci-release-orchestrator --self-test PASS — ${Object.keys(fixtures).length} LIVE-SHAPE signal fixtures classify correctly ` +
+    `(F1–F5 using the real orchestrate evidence contract [failingStep = CHECK name], incl. LIVE-SHAPE F2 OOM under the 'verify' check -> F2, ` +
+    `+ experience-review->F5 + unrelated->none), ` +
     `safe-to-auto split holds (SAFE:[F2,F3] APPROVAL:[F1,F4] NEVER:[F5], F3-real=NEEDS-APPROVAL), ` +
     `merge gate is human-only (no auto-merge without --merge; --merge cannot override red/missing).`
   );
