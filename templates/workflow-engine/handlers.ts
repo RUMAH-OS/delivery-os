@@ -20,6 +20,12 @@ export interface StepContext {
   seq: number;
   attempt: number;
   checkpoint: Record<string, unknown> | null;
+  // The run's enqueue input — the SAME object passed to enqueue(definitionKey, input, idem), defaulting to {}
+  // if the run had null input. This is per-RUN data (constant across all steps of a run), distinct from the
+  // per-step checkpoint. It lets a handler read the operational parameters the run was started with (e.g. the
+  // specific email a dunning run must act on) instead of closing over a build-time default. Read-only: a
+  // handler MUST NOT mutate it. The engine carries it OPAQUELY (it never reads inside it — ownership boundary).
+  readonly input: Record<string, unknown>;
   emit: (type: string, payload: Record<string, unknown>) => Promise<void>;
 }
 

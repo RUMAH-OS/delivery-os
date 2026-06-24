@@ -302,8 +302,13 @@ export function createEngine(ctx: EngineContext): Engine {
       }
 
       // ── Execute the step handler. Emit-only/idempotent so a crash mid-handler is safe to re-run. ──
+      // Thread the run's enqueue input into the handler ctx (per-run operational params). Localized fetch:
+      // the lease query selects step columns only, so read the run's `input` here (SAME object enqueue stored),
+      // defaulting to {} if null. The engine carries it OPAQUELY — it never reads inside it (ownership boundary).
+      const runInput = await loadRunInput(tx, step.run_id);
       const sctx: StepContext = {
         tx, runId: step.run_id, seq: step.seq, attempt: thisAttempt, checkpoint: step.checkpoint ?? null,
+        input: runInput,
         emit: (type, payload) => emitTx(tx, type, step.run_id, payload),
       };
       let outcome: { ok: true; result: Record<string, unknown>; checkpoint: Record<string, unknown> }
@@ -563,8 +568,13 @@ export function createEngine(ctx: EngineContext): Engine {
     // Default 'system-callback' (the v1 primitive) preserves the prior behaviour for definitions that omit it.
     const awaitSource = step.await_source ?? "system-callback";
     // ── run the handler — it emits the REQUEST event in-txn (transactional outbox) + returns awaitEventId. ──
+    // Thread the run's enqueue input (per-run params) into this handler ctx too — an await-callback request
+    // handler may need the run's input to build its request. Same localized read + {} default as the regular
+    // path; carried opaquely.
+    const runInput = await loadRunInput(tx, step.run_id);
     const sctx: StepContext = {
       tx, runId: step.run_id, seq: step.seq, attempt: thisAttempt, checkpoint: step.checkpoint ?? null,
+      input: runInput,
       emit: (type, payload) => emitTx(tx, type, step.run_id, payload),
     };
     let outcome: { ok: true; result: Record<string, unknown>; checkpoint: Record<string, unknown>; awaitEventId?: string }
@@ -677,6 +687,14 @@ export function createEngine(ctx: EngineContext): Engine {
     }
     assertLegalRunTransition(from, to); // app fail-closed; DB trigger is the backstop.
     await tx.update(workflowRun).set({ state: to, ...extra, updatedAt: now }).where(eq(workflowRun.id, runId));
+  }
+
+  // Read the run's enqueue input for StepContext.input. Returns the SAME object stored by enqueue() (the
+  // run's `input` jsonb), defaulting to {} when the run had null input. Per-run constant; the engine carries
+  // it opaquely (never reads inside it). A missing run row defaults to {} (defensive — the step's run exists).
+  async function loadRunInput(tx: TxLike, runId: string): Promise<Record<string, unknown>> {
+    const [r] = await tx.select({ input: workflowRun.input }).from(workflowRun).where(eq(workflowRun.id, runId)).limit(1);
+    return (r?.input ?? {}) as Record<string, unknown>;
   }
 
   // Transactional outbox emit — same txn as the state write. PII-free.
