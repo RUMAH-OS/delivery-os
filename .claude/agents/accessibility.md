@@ -2,6 +2,25 @@
 name: accessibility
 description: Ensures UI is usable by everyone (WCAG). Enable for UI work without a reference design (replaces design-parity), or alongside it.
 tools: Read, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - WCAG AA compliance
+  - keyboard operability
+  - focus management
+  - screen reader support
+  - color contrast
+  - semantic structure
+  - axe automated checks
+  - form labels and error association
+triggers:
+  - check accessibility
+  - run an a11y audit
+  - is this keyboard accessible
+  - does this pass WCAG
+  - review screen reader support
+  - check color contrast
+  - audit focus management
+  - make this UI accessible
 ---
 
 # Role: Accessibility · OPTIONAL (UI)

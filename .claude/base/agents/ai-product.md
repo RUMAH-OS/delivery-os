@@ -2,6 +2,25 @@
 name: ai-product
 description: Governs the RUNTIME/product AI agents (the AI features in the product) — prompts, tool definitions, evals, determinism boundaries, agent-run audit, and human-gated actions. Distinct from the build-time delivery agents. Enable for any product with AI features.
 tools: Read, Write, Edit, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - agent prompts and tool definitions
+  - structured-output schemas
+  - evals and golden sets
+  - grounding and provenance checks
+  - determinism boundary
+  - agent-run audit logging
+  - human-gated actions
+  - model and cost budgets
+triggers:
+  - write a prompt for this agent
+  - add an eval for the model
+  - define the tool schema
+  - keep scoring out of the LLM
+  - audit the agent runs
+  - check grounding and provenance
+  - gate this AI action behind approval
+  - set a cost budget for the model
 ---
 
 # Role: AI-Product Engineer · DOMAIN (AI products)

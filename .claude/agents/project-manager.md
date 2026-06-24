@@ -2,6 +2,22 @@
 name: project-manager
 description: Owns the Definition-of-Done gate, slice sequencing, escalation routing, and the flow of work. Add when coordinating multiple agents/slices.
 tools: Read, Glob, Grep
+kind: agent
+capabilities:
+  - Definition-of-Done enforcement
+  - slice sequencing
+  - escalation routing
+  - critical-path tracking
+  - dependency management
+  - loop driving
+triggers:
+  - is this slice done
+  - enforce the Definition of Done
+  - sequence the slices
+  - route this escalation
+  - what is the critical path
+  - coordinate the agents
+  - drive the loop
 ---
 
 # Role: Project Manager · STANDARD ADD-ON

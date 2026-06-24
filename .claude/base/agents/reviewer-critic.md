@@ -2,6 +2,22 @@
 name: reviewer-critic
 description: After QA PASS, issues a conformance + simplicity + scope verdict on a slice. Checks it conforms to the design contracts and boundaries, is the simplest thing that works, and contains nothing beyond the slice. Owns no files — verdicts only.
 tools: Read, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - conformance review
+  - simplicity
+  - scope discipline
+  - design-contract adherence
+  - boundary integrity
+  - scope-creep gate
+triggers:
+  - review for conformance
+  - is this the simplest thing
+  - scope check
+  - conformance verdict
+  - anything smuggled into this slice
+  - approve or request changes
+  - is this in scope and on-contract
 ---
 
 # Role: Reviewer / Critic · LEAN DEFAULT

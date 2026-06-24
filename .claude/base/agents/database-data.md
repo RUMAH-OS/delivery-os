@@ -2,6 +2,25 @@
 name: database-data
 description: Owns the data model and safe, reversible migrations. Enable for data-centric apps. Data outlives code — protect it.
 tools: Read, Write, Edit, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - schema design
+  - migrations
+  - reversible DDL and rollback
+  - data integrity and constraints
+  - indexes
+  - expand-contract migrations
+  - data migration and backfill
+  - data retention and archival
+triggers:
+  - design a migration
+  - review the data model
+  - is this migration reversible
+  - add a column safely
+  - design the schema
+  - check for missing indexes
+  - backfill this data
+  - is this migration safe on production data
 ---
 
 # Role: Database / Data · DOMAIN

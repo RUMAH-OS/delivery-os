@@ -2,6 +2,24 @@
 name: design-parity
 description: Ensures the built UI matches a reference design. Enable for design-fidelity work / migrations; skip for backend/API or greenfield design (use accessibility instead).
 tools: Read, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - design-fidelity review
+  - reference design source of truth
+  - token inventory
+  - visual-regression baseline
+  - pixel-parity grading
+  - brand rule enforcement
+  - responsive parity across breakpoints
+triggers:
+  - does this match the design
+  - check design parity
+  - compare against the Figma
+  - review visual fidelity
+  - grade this page against the reference
+  - check the design tokens
+  - is this pixel perfect
+  - diff the UI against the reference design
 ---
 
 # Role: Frontend Design Parity · OPTIONAL (design fidelity)

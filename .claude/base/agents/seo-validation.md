@@ -2,6 +2,21 @@
 name: seo-validation
 description: Guarantees a public site is crawlable, indexable, and free of conflicting signals. Enable only for public, search-driven surfaces.
 tools: Read, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - indexability validation
+  - canonical enforcement
+  - robots/sitemap consistency
+  - structured data
+  - metadata server-rendering
+  - duplicate-page detection
+triggers:
+  - validate SEO
+  - check the canonical tags
+  - is this page indexable
+  - review the sitemap and robots
+  - accidental noindex check
+  - is this public page crawlable
 ---
 
 # Role: SEO Validation · OPTIONAL (public surfaces)

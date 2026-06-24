@@ -20,4 +20,13 @@ if [ -f .claude/tools/check-os-drift.mjs ]; then
     exit 1
   fi
 fi
+
+# Gate 3 — agents:check (S1 ROUTE): every spawnable agent must carry the v6 routing contract
+# (kind/capabilities/triggers) — else it is INVISIBLE to deterministic routing and the founder recalls it by hand.
+if [ -f .claude/tools/agents-check.mjs ]; then
+  if ! node .claude/tools/agents-check.mjs >&2; then
+    echo "✗ push blocked by Delivery OS agents:check: an agent is missing the routing contract (not routable)." >&2
+    exit 1
+  fi
+fi
 exit 0
