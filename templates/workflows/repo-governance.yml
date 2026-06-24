@@ -1,0 +1,144 @@
+# =============================================================================
+# Delivery OS — Repository Governance workflow (TEMPLATE — NOT installed live).
+# Drop into a consumer repo's .github/workflows/ to run the Repository Governance
+# Auditor (templates/tools/repo-governance-auditor.mjs) on a schedule + on PRs.
+#
+# Three jobs, each with the MINIMUM permission it needs (fail-closed by default):
+#   audit   — READ-ONLY. Posts the scoreboard to the step summary. Never mutates.
+#   cleanup — SAFE-ONLY. `--apply-safe --safe-only`: ONLY G1 (delete a provably-merged
+#             branch) + G2 (close a superseded PR). Never merges, never closes other work.
+#   surface — Posts the NEEDS-APPROVAL findings to ONE rolling governance issue.
+#
+# The auditor reuses the CI orchestrator's HUMAN-only merge gate (it imports decideMerge);
+# NOTHING here merges a PR. G5 merge-ready only ever PRINTS `node merge-pr.mjs <n>`.
+# =============================================================================
+name: repo-governance
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily 06:00 UTC — the steady-state hygiene pass
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch: {}
+
+# default to no permissions; each job opts into exactly what it needs.
+permissions: {}
+
+concurrency:
+  group: repo-governance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1) AUDIT — read-only. The scoreboard + every finding, to the step summary.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: audit (read-only)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need full refs for branch ancestry / cherry checks
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+      - name: Run governance audit (read-only, --json)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node templates/tools/repo-governance-auditor.mjs --json | tee governance.json
+      - name: Scoreboard -> step summary
+        if: always()
+        run: |
+          {
+            echo "## Repository Governance — scoreboard"
+            echo '```json'
+            node -e "const r=require('./governance.json');console.log(JSON.stringify(r.board,null,2))"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # 2) CLEANUP — SAFE-ONLY. `--apply-safe --safe-only` = ONLY G1 + G2.
+  #    Narrow write scope; never merges, never closes non-superseded work.
+  # ---------------------------------------------------------------------------
+  cleanup:
+    name: cleanup (safe-only G1+G2)
+    needs: audit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # delete a provably-merged branch (G1)
+      pull-requests: write     # close a superseded PR with a pointer comment (G2)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+      - name: Apply SAFE-only cleanup (G1 delete merged branch, G2 close superseded)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node templates/tools/repo-governance-auditor.mjs --apply-safe --safe-only --json
+
+  # ---------------------------------------------------------------------------
+  # 3) SURFACE — post NEEDS-APPROVAL findings to ONE rolling governance issue.
+  # ---------------------------------------------------------------------------
+  surface:
+    name: surface (rolling issue)
+    needs: audit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+      - name: Audit + post NEEDS-APPROVAL to the rolling governance issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node templates/tools/repo-governance-auditor.mjs --json > governance.json
+          node - <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const fs = require("node:fs");
+          const r = JSON.parse(fs.readFileSync("governance.json", "utf8"));
+          const TITLE = "Repository Governance — NEEDS-APPROVAL queue";
+          const approval = (r.findings || []).filter((f) => f.band === "NEEDS-APPROVAL");
+          const never = (r.findings || []).filter((f) => f.band === "NEVER-AUTO");
+          const lines = [];
+          lines.push(`_Updated ${new Date().toISOString()} by repo-governance (read-only audit)._`);
+          lines.push("");
+          lines.push("### Scoreboard");
+          lines.push("```json");
+          lines.push(JSON.stringify(r.board, null, 2));
+          lines.push("```");
+          const section = (title, items) => {
+            lines.push(`### ${title} (${items.length})`);
+            if (!items.length) { lines.push("_none_"); return; }
+            for (const f of items) lines.push(`- **${f.rule} ${f.name}**${f.pr ? ` — PR #${f.pr}` : f.branch ? ` — branch \`${f.branch}\`` : f.group ? ` — ${f.group}` : ""}${f.command ? ` → \`${f.command}\`` : ""}`);
+          };
+          section("NEEDS-APPROVAL (a human decides)", approval);
+          section("NEVER-AUTO (escalate)", never);
+          const body = lines.join("\n");
+          // find or create the single rolling issue
+          const repo = process.env.GITHUB_REPOSITORY;
+          const found = JSON.parse(execFileSync("gh", ["issue", "list", "--repo", repo, "--state", "open", "--search", `in:title ${TITLE}`, "--json", "number,title"], { encoding: "utf8" }) || "[]");
+          const match = found.find((i) => i.title === TITLE);
+          if (match) {
+            execFileSync("gh", ["issue", "edit", String(match.number), "--repo", repo, "--body", body], { stdio: "inherit" });
+            execFileSync("gh", ["issue", "comment", String(match.number), "--repo", repo, "--body", `Audit refreshed: ${approval.length} NEEDS-APPROVAL · ${never.length} NEVER-AUTO.`], { stdio: "inherit" });
+          } else {
+            execFileSync("gh", ["issue", "create", "--repo", repo, "--title", TITLE, "--body", body], { stdio: "inherit" });
+          }
+          NODE

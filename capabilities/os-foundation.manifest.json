@@ -22,7 +22,8 @@
     "templates/tools/agent-health.mjs",
     "templates/tools/founder-burden-gate.mjs",
     "templates/tools/file-lesson.mjs",
-    "templates/tools/milestone-report.mjs"
+    "templates/tools/milestone-report.mjs",
+    "templates/tools/repo-governance-auditor.mjs"
   ],
   "contracts": [
     "contracts/admin-plos-seam-v1.mjs",
@@ -32,6 +33,7 @@
   "skills": [
     "learning-review",
     "verify-gate",
+    "repo-governance",
     "ci-release-orchestrator",
     "production-readiness-review",
     "deploy-vercel-supabase"
