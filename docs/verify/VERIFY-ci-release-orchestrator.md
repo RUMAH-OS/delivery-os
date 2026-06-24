@@ -1,102 +1,117 @@
 ---
-slice: "ci-release-orchestrator — CI & Release Orchestrator spine (zero-dep Node tool)"
+slice: "ci-release-orchestrator — CI & Release Orchestrator (encoded failure->fix KB + human-gated state machine)"
 verify_status: verified
 author: "implementation-session(coordinated)"
 verifier: "independent-qa-subagent"
 date: "2026-06-25"
 independence_basis: "recorded-distinct-invocation"
 machine_probe: "node templates/tools/ci-release-orchestrator.mjs --self-test"
+test_pins_amended_by: ""
 ---
 
-# VERIFY — Slice ci-release-orchestrator (CI & Release Orchestrator spine)
+# VERIFY — Slice ci-release-orchestrator (CI & Release Orchestrator)
 
 ## Verdict
-**verify_status:** `verified`  ·  one line: self-test PASS (exit 0), syntax valid, zero-dep confirmed, and the load-bearing safety invariant holds — the merge gate is HUMAN-ONLY with no auto-merge path and a fail-closed override guard; no unsafe path found.
+**verify_status:** `verified`  ·  one line: the F2 regression the prior QA caught is genuinely fixed —
+`failingStep`/`workflow` are now CORROBORATING-only (never disqualifying), and a real next-build OOM
+surfacing under the required `verify` check now classifies **F2** on the **live `orchestrate` evidence
+surface** (proven via injected-IO drive, not source-reading). All other classes (F1/F3/F4/F5) still
+classify on their live shapes, unrelated red is fail-closed UNCLASSIFIED, and the human-only merge gate
+plus fail-closed preflight are intact and unchanged.
 
-> A verdict of `verified` is permitted ONLY if: every acceptance criterion PASSes on its OWN surface,
-> every load-bearing claim is Confirmed/Evidence-backed, all required gates are closed, and the
-> verifier was a REAL distinct lens from the author. Otherwise the slice caps at `executed`.
+> Reaches `verified`: every acceptance criterion PASSES on its OWN (live) surface — driven through the
+> real `orchestrate` state machine with a spy IO that emits the exact evidence the live diagnoser builds
+> (`failingStep` = CHECK name). The prior `rejected` run's defect (F2 → UNCLASSIFIED) is reproduced on the
+> OLD matcher shape and shown resolved on the new one. Safety invariants re-confirmed unchanged.
 
 ## Independence header  (Governance §3/§12 — proves author ≠ verifier)
-- Verifier identity / invocation: `independent-qa-subagent` · distinct QA subagent invocation · 2026-06-25 (NOT the build/implementation session)
-- Author identity (code under test): `implementation-session(coordinated)` — authored `templates/tools/ci-release-orchestrator.mjs`
+- Verifier identity / invocation: `independent-qa-subagent` · distinct QA invocation · 2026-06-25 (NOT the build session)
+- Author identity (code under test): `implementation-session(coordinated)` — authored `templates/tools/ci-release-orchestrator.mjs` @ `98c2be2`
 - [x] I assert: the verifier did **not** author the production code under test.
-- [x] Independence was **real** (a true second invocation, not the same context restyled).
+- [x] Independence was **real**: a separate QA invocation that built its OWN injected-IO harness OUTSIDE the
+  repo tree (`/tmp/qa-harness-cro.mjs`, `/tmp/qa-gate.mjs`, both deleted after) and drove the LIVE
+  `orchestrate` path — it did not reuse the engineer's `--self-test` fixtures as its sole evidence.
 
 ## Execution evidence  (Governance §1 — direct runtime output, never a description of what *would* happen)
 | # | Command | Exit | Output (verbatim) |
 |---|---------|------|-------------------|
-| 1 | `node templates/tools/ci-release-orchestrator.mjs --self-test` | 0 | `ci-release-orchestrator --self-test PASS — 5 signal fixtures classify correctly (F1–F5 + experience-review->F5 + unrelated->none), safe-to-auto split holds (SAFE:[F2,F3] APPROVAL:[F1,F4] NEVER:[F5], F3-real=NEEDS-APPROVAL), merge gate is human-only (no auto-merge without --merge; --merge cannot override red/missing).` |
-| 2 | `node --check templates/tools/ci-release-orchestrator.mjs` | 0 | (no output — `SYNTAX_OK`) valid ESM |
-| 3 | `Grep` import scan | n/a | only `node:child_process`, `node:fs`, `node:path`, `node:url` — no npm import |
-| 4 | `Grep` merge/push path scan | n/a | one `pr merge` (line 410); one `push` via `gitCommitPush`→`applySafeFix` (lines 305/314) |
+| 1 | `node templates/tools/ci-release-orchestrator.mjs --self-test` | 0 | `ci-release-orchestrator --self-test PASS — 5 LIVE-SHAPE signal fixtures classify correctly (F1–F5 using the real orchestrate evidence contract [failingStep = CHECK name], incl. LIVE-SHAPE F2 OOM under the 'verify' check -> F2, + experience-review->F5 + unrelated->none), safe-to-auto split holds (SAFE:[F2,F3] APPROVAL:[F1,F4] NEVER:[F5], F3-real=NEEDS-APPROVAL), merge gate is human-only (no auto-merge without --merge; --merge cannot override red/missing).` |
+| 2 | live-drive harness `orchestrate({pr,io:spy})` — F2 OOM under required `verify` check | 0 | `=== F2 live-shape (OOM under 'verify' check) ===` / `classifications: ["F2"]` / `result: awaiting-human` |
+| 2b | same live evidence vs OLD buggy matcher (failingStep mandatory) vs fixed | 0 | `BEFORE (buggy failingStep-mandatory) classifies F2?: false (expected false = the bug)` / `AFTER (fixed classifyFailure) classifies: F2 (expected F2)` |
+| 3 | live-drive F1/F3/F4/F5 + unrelated | 0 | `F1 -> ["F1"]` · `F3 -> ["F3"]` · `F4 -> ["F4"]` · `F5 -> ["F5"]` · `UNRELATED(eslint) -> ["UNCLASSIFIED"] result: escalated` |
+| 4 | merge-gate drive (A–G) | 0 | `A) no --merge: result= awaiting-human mergeGate.action= await-human command= node merge-pr.mjs 1 ghMergeCalled= false` / `B) --merge all-green: result= ok merged= true ghMergeCalled= true args= ["pr","merge","1","--squash"]` / `C) decideMerge oneRed+merge: {"action":"blocked",...,"notPass":["verify"]}` / `D) decideMerge missing+merge: {"action":"blocked","missing":["experience-review","founder-experience-scorecard"]}` / `E) gh-missing: result= error` / `F) gh-unauthed: result= error` / `G) zero-checks: result= blocked` |
+| 5 | `node --check` both copies + `diff` + `sha256sum` | 0 | `templates OK` / `.claude OK` / `IDENTICAL` / both = `6fd2dba50576c928c9464981d0cf4d8e69d53354c9f61b35f6e5bea577543c63` |
 
-> Self-test is pure: no live `gh`/`git` calls, no repo mutation, no merge/push/deploy. Verification was performed off the static module + its pure exports; no live CI→merge→deploy loop was driven (and the tool was not allowed to perform any real merge/push/deploy).
+> Machine-guard line: no shared store/queue/port touched. The harness used an **injected IO** (no real
+> `gh`/`git`/network/filesystem in the dry-run-ish path; `io.git()` throws if invoked, proving no mutation),
+> and lived OUTSIDE the repo tree. Repo working tree was confirmed free of harness/orchestrator artifacts
+> after the run.
 
 ## Acceptance criteria  (each PASS/FAIL + its evidence pointer)
-| # | Criterion | Surface exercised | Evidence (→ cmd #) | PASS/FAIL |
-|---|-----------|-------------------|--------------------|-----------|
-| a | **Zero-dep** — only `node:` builtins + `gh`/`git` via child_process; no npm import | Module import graph (read + grep) | #2, #3 | **PASS** |
-| b | **Merge gate is HUMAN-ONLY** — no path merges without `--merge` AND all 3 required checks green; `--merge` refuses on red/missing (fail-closed) | `decideMerge` + the single `pr merge` call site + self-test asserts | #1, #4 | **PASS** |
-| c | **Autonomy split** — SAFE-TO-AUTO (F2/F3-partial) mutate only under `--apply-safe`; NEEDS-APPROVAL (F1/F4/F3-real) propose-only; F5 NEVER-AUTO/escalate | `safeToAutoSplit`, `applySafeFix` guard, fixer dispatch | #1, #4 | **PASS** |
-| d | **Fail-closed** when `gh` missing/unauthed | `orchestrate` preflight | #1 (logic) + code read | **PASS** |
+| # | Criterion | Surface exercised | Evidence | PASS/FAIL |
+|---|-----------|-------------------|----------|-----------|
+| 1 | Self-test passes, exit 0, uses LIVE-SHAPE fixtures (failingStep = CHECK name; F2 OOM under `verify`) | self-test code path | #1 (+ source: fixtures L553–582 set `failingStep:"verify"`; explicit LIVE-SHAPE F2 guard L578–580) | PASS |
+| 2 | F2 OOM under live `verify`-check evidence classifies **F2** (was UNCLASSIFIED) via the diagnoser `orchestrate` uses | LIVE `orchestrate` state machine, spy IO | #2 | PASS |
+| 2b | Before/after proof: OLD failingStep-mandatory matcher → false on the SAME evidence; fixed → F2 | classifier on identical live evidence | #2b | PASS |
+| 3a | F1 conformance logRegex classifies F1 on live shape | LIVE path | #3 | PASS |
+| 3b | F3 deploy workflow / invalid-Node classifies F3 on live shape | LIVE path | #3 | PASS |
+| 3c | F4 mergeable CONFLICTING classifies F4 on live shape | LIVE path (pr-state evidence) | #3 | PASS |
+| 3d | F5 experience check classifies F5 on live shape | LIVE path | #3 | PASS |
+| 3e | Unrelated red → UNCLASSIFIED, fail-closed (never guesses a fix) | LIVE path | #3 | PASS |
+| 4 | Human-only merge gate: no `gh pr merge` without `--merge` AND all 3 required checks green; `--merge` cannot override red/missing | LIVE `orchestrate` + `decideMerge` | #4 (A: no merge call without `--merge`; B: only merge on all-green+`--merge`; C/D: `--merge` blocked on red/missing) | PASS |
+| 5a | `node --check` both copies clean | syntax | #5 | PASS |
+| 5b | `.claude/tools/` copy byte-identical to `templates/tools/` | sha256/diff | #5 | PASS |
+| 5c | Zero-dep (node: builtins only) | imports L30–33 | source: `node:child_process` `node:fs` `node:path` `node:url` only | PASS |
+| 5d | Fail-closed on gh-missing / gh-unauthed | LIVE preflight | #4 (E,F) | PASS |
 
-### Per-claim proof
-
-**(a) Zero-dep — PASS.** The only imports (lines 30–33) are `node:child_process`, `node:fs`, `node:path`, `node:url`. No npm/package import anywhere; `gh` and `git` are shelled via `execFileSync` (line 231/238) with `shell:false` (array argv, no `shell:true`). `node --check` confirms valid ESM with no resolution needed beyond builtins.
-
-**(b) Human-only merge gate — PASS (load-bearing invariant holds).** There is exactly one merge invocation in the file (line 410), and it is structurally unreachable without `--merge` + all-green:
-- `decideMerge` (lines 217–225) is the sole decision function:
-  ```
-  const allGreen = missing.length === 0 && notPass.length === 0;
-  if (!allGreen) return { action: "blocked", ... reason: "required checks not all green" };
-  if (!merge)    return { action: "await-human", ... };
-  return { action: "merge", ... };
-  ```
-  `"merge"` is returned ONLY when `allGreen === true` AND `merge === true`. A red (`bucket !== "pass"`) or missing required check forces `allGreen=false` → `blocked` **regardless of `--merge`** (the override is impossible).
-- The only `pr merge` shell call sits inside the `decision.action === "merge"` branch, after the `blocked` and `await-human` branches each `return` first:
-  ```
-  // decision.action === "merge" — explicit --merge AND all green: the human authorized it.
-  io.ghText(["pr", "merge", String(opts.pr), ...repoArgsOf(opts), "--squash"]);
-  ```
-- Default (no `--merge`) yields `await-human`: it prints the mechanical gate command (`node merge-pr.mjs <pr>`) and STOPS (lines 401–406).
-- Self-test (#1) independently pins all four corners: `await-human` without `--merge`; never `merge` without `--merge`; `merge` only with `--merge`+green; and `--merge` → `blocked` on a RED required check AND on a MISSING required check (lines 571–576).
-
-No auto-merge path exists. **No unsafe path found — invariant intact.**
-
-**(c) Autonomy split — PASS.** `safeToAutoSplit()` derives bands from the data (`FAILURE_CLASSES`), asserted by self-test as SAFE:[F2,F3] / APPROVAL:[F1,F4] / NEVER:[F5]. Mutation is gated: `applySafeFix` (lines 309–316) is reached only when `effective.safeToAuto === "SAFE-TO-AUTO" && opts.applySafe && !opts.dryRun` (line 459). `applySafeFix` itself only knows F2 and F3-non-escalated; F3 escalated/real throws `"escalated/real fix is NOT auto-appliable"` (line 313). F1/F4/F3-real (NEEDS-APPROVAL) take the propose-only branch (lines 474–478, no mutation). F5 (NEVER-AUTO) escalates with no fix attempt (lines 479–483). The single `push` in the tool is `gitCommitPush` (line 305), reachable only through `applySafeFix` — i.e. only under `--apply-safe` and never under `--dry-run`.
-
-**(d) Fail-closed on gh missing/unauthed — PASS.** `orchestrate` preflight (lines 359–368) returns `result: "error"` with a clear remediation message before any poll/mutate: gh-not-found → "gh CLI not found on PATH … re-run"; gh-not-authed → "Fail-closed: refusing to poll or mutate without an authenticated session." Additionally zero-checks (line 380) and unclassified reds (line 432) both fail-closed (never guess a fix), and the CLI exits non-zero on any non-`ok`/non-`awaiting-human` result (lines 620–621).
+> Every criterion was exercised on its OWN surface: classification criteria driven through the real
+> `orchestrate` diagnoser (which constructs `failingStep = c.name`), not by hand-built classifier fixtures
+> alone. This is the surface the prior `verified` draft bypassed and the prior `rejected` run exposed.
 
 ## Surface statement  (anti-Slice-1.0)
-- The slice's real surface: a zero-dep Node CLI/state-machine module. Driven by: its own pure `--self-test` (deterministic fixtures over the real exports `classifyFailure` / `safeToAutoSplit` / `decideMerge`) + `node --check` + direct source read of every merge/push/mutate call site.
-- [x] No criterion was "verified" via a surface that bypasses the slice. The safety invariants are exercised through the actual decision/dispatch functions, not a paraphrase. The one surface NOT exercised — a live `gh`-driven CI→merge→deploy round-trip — is called out under honest-limits and exercised separately; it does not touch the autonomy/merge-gate logic verified here.
+- The slice's real surface: a deterministic CLI/library state machine (`orchestrate`) over a data-driven
+  failure-class KB, plus a human-gated merge decision. Driven by: an injected `io` spy that returns the
+  exact `gh pr checks` / `gh pr view` / `gh run view --log-failed` shapes the live code consumes, so
+  `orchestrate` builds its own evidence objects (`{checkName, failingChecks, log, failingStep:c.name,
+  workflow}`) — the live shape, not a synthetic one.
+- [x] No criterion was "verified" via a surface that bypasses the slice. The F2 classification was reached
+  through `orchestrate`'s own `classifyFailure(ev)` call on `orchestrate`-constructed evidence (#2), and the
+  before/after proof reuses that identical evidence object against the prior buggy matcher (#2b).
 
 ## Classified open assumptions
-| Claim | Confirmed / Evidence-backed / Assumption | Severity |
-|-------|------------------------------------------|----------|
-| No code path merges without `--merge` + all-green | Confirmed (single call site, structural reachability + self-test) | Blocker (resolved) |
-| `--merge` cannot override red/missing checks | Confirmed (decideMerge + self-test #1) | Blocker (resolved) |
-| Only `node:` builtins imported (zero-dep) | Confirmed (#2, #3) | Should-fix (resolved) |
-| Mutation/push only under `--apply-safe && !--dry-run` for SAFE-TO-AUTO | Confirmed (guard line 459 + applySafeFix) | Blocker (resolved) |
-| Fail-closed when gh absent/unauthed | Confirmed (preflight 359–368) | Should-fix (resolved) |
-| Live `gh`/`git` round-trip behaves as the pure model predicts | Assumption (not driven here; logic verified, live loop exercised separately) | Safe-to-defer |
+| Claim | Status | Severity |
+|-------|--------|----------|
+| F2 next-build OOM under the required `verify` check now classifies F2 on the LIVE diagnoser surface | Confirmed (#2) | — |
+| The prior bug (failingStep-mandatory → UNCLASSIFIED) is the one fixed, on identical evidence | Confirmed (#2b) | — |
+| F1/F3/F4/F5 + unrelated still classify correctly on live shapes (no regression) | Confirmed (#3) | — |
+| Human-only merge gate unchanged: no merge without `--merge`+all-green; `--merge` cannot override red/missing | Confirmed (#4 A–D) | — |
+| Fail-closed on gh-missing/unauthed/zero-checks | Confirmed (#4 E–G) | — |
+| Both copies byte-identical + syntactically valid + zero-dep | Confirmed (#5) | — |
+| The corroborating fields (`failingStep`/`workflow`/`failingFiles`) are genuinely never evaluated as discriminators | Confirmed — `matchesSignal` (L167–196) only branches on `logRegex`/`mergeable`/`checkName`; corroborating fields have no code path | Safe-to-defer |
+| The live SAFE-TO-AUTO fixers (`applyF2`/`applyF3Partial`+commit/push) were NOT exercised against a real workflow file | Unverified (out of scope: requires `--apply-safe` + a real repo mutation; the dry-run-ish path proven never invokes `io.git`) | Safe-to-defer |
 
 ## Gate ledger
 | Gate | Status | Evidence |
 |------|--------|----------|
-| Build/validate green (`node --check` + `--self-test`) | ✅ | →cmd #1, #2 |
-| Dedicated commit + slice id | ⬜ | uncommitted in working tree (branch feat/ci-release-orchestrator); not committed per instruction |
-| CI green — machine-read at merge | ✅ (by design) | the tool ITSELF enforces machine-read merge via `decideMerge` reading the checks API; never piped/watched output |
-| Migration reversible / fresh-DB | n/a | no migration in this slice |
-| Failure paths → honest error, no false success | ✅ | fail-closed preflight, unclassified→escalate, non-zero exits (→cmd #1 + code read) |
-| Merge-gate safety invariant (human-only, no override) | ✅ | →cmd #1 + lines 217–225, 392–414 |
+| Build/validate green (self-test) | ✅ | #1 (exit 0) |
+| Dedicated commit + slice id | ⬜ | HEAD `98c2be2` on `feat/ci-release-orchestrator-tool`; coordinator commits tool-state + this VERIFY together through the gate (per instruction, QA does not commit) |
+| **CI green — machine-read at merge** | ✅ (by design) | Merge routes through `decideMerge` reading the checks API; `--merge` cannot override red/missing (#4 C,D). No piped/watched output path to merge. |
+| Migration reversible | n/a | no DB/migration in this slice |
+| Failure paths → honest error, no false success | ✅ | gh-missing/unauthed → `result: error` (#4 E,F); zero-checks → `blocked` (#4 G); unrelated red → UNCLASSIFIED escalation, never a guessed fix (#3) |
+| Human-only merge gate intact | ✅ | #4 A–D; single `pr merge` call site (L411) guarded by `decision.action === "merge"` |
+| Zero-dep / both-copies-identical | ✅ | #5 |
 
-## FAIL history
-- none
+## FAIL history  (kept in-doc — never overwritten)
+- 2026-06-25 — **FAIL (prior QA run, this slice):** F2 next-build-OOM classified UNCLASSIFIED on the live
+  surface because the matcher treated F2's `failingStep: "Build (next build)"` as a MANDATORY discriminator,
+  while `orchestrate` sets `failingStep` to the CHECK name (`"verify"`). A SAFE-TO-AUTO capability was silently
+  disabled and masked by a non-representative self-test fixture. **Re-verification (this run):** fix confirmed
+  — `matchesSignal` (L167–196) no longer evaluates `failingStep`/`workflow` as discriminators (comment L187–193);
+  live-drive #2 shows `["F2"]`; before/after #2b shows the OLD shape returns `false` and the new returns `F2`
+  on identical evidence; self-test now carries an explicit LIVE-SHAPE F2 guard (L578–580). Status: RESOLVED.
 
 ## Bug reports
-- none — no defects found. No unsafe/auto-merge path exists.
-
-## Honest limits
-Logic + safety invariants were verified off a live repo (pure `--self-test`, `node --check`, and source review of every merge/push/mutate call site); a full live CI→merge→deploy loop (real `gh` polling, real squash-merge, real Vercel deploy watch) is exercised separately and was deliberately NOT driven here — the tool was not permitted to perform any real merge/push/deploy during this verification.
+- None. No new defect found. The single open item is a scoped non-finding: the live SAFE-TO-AUTO file-mutating
+  fixers (`applyF2`/`applyF3Partial`) were not driven end-to-end against a real workflow file (requires
+  `--apply-safe` + an intentional repo mutation, out of scope for this regression verification). The
+  dry-run-ish path was proven to never invoke `io.git` (spy throws if called), so no unintended mutation risk.
