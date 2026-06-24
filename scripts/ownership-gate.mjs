@@ -56,6 +56,11 @@ export const DEFAULT_POLICY = {
     { workType: "verify", globs: ["tests/**", "e2e/**", "evals/**"], taskKeywords: ["verify", "qa", "verification", "independent verification"], requiredOwner: "qa-test", flexibleOwners: [] },
     { workType: "review", globs: [], taskKeywords: ["review", "critique", "adversarial review"], requiredOwner: "reviewer-critic", flexibleOwners: [] },
     { workType: "security", globs: [], taskKeywords: ["security", "pii", "credential", "audit", "compliance"], requiredOwner: "security-compliance", flexibleOwners: [] },
+    // SDLC back-half work-types (canonical-SDLC routing default) — make the specialist the owner, not the catch-all.
+    { workType: "deploy", globs: [".github/workflows/**", ".deploy-lane.json", "vercel.json"], taskKeywords: ["deploy", "deployment", "promote to production", "ship to prod", "vercel deploy", "release deploy"], requiredOwner: "deployment-operator", flexibleOwners: [] },
+    { workType: "release", globs: ["CHANGELOG*", "RELEASE*"], taskKeywords: ["release", "release notes", "cut a release", "promote the release", "version bump"], requiredOwner: "deployment-operator", flexibleOwners: ["software-engineer"] },
+    { workType: "ci", globs: [".github/workflows/ci.yml", ".github/workflows/orchestrator.yml"], taskKeywords: ["ci", "monitor ci", "diagnose the build", "pipeline", "merge when green"], requiredOwner: "software-engineer", flexibleOwners: ["deployment-operator"] },
+    { workType: "cleanup", globs: [], taskKeywords: ["cleanup", "delete branch", "close stale pr", "consolidate prs", "branch hygiene", "prune branches"], requiredOwner: "software-engineer", flexibleOwners: [] },
     // backend / general / tooling is the catch-all builder (G14: src/** non-api, scripts/**, .claude/**).
     { workType: "backend", globs: ["src/**", "scripts/**", ".claude/**"], taskKeywords: ["backend", "tool", "script", "implement", "build"], requiredOwner: "software-engineer", flexibleOwners: [] },
   ],

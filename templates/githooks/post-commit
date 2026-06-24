@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+# Delivery OS — post-commit auto-push (commit-protection workflow, Layer 1). CANONICAL source;
+# vendored into every repo's .githooks/ via `os-inherit sync` (with core.hooksPath=.githooks), so
+# it is the DEFAULT across Admin, PLOS, and future projects. Travels in the repo, fires for any git
+# client (platform-enforced, not agent-obedience).
+#
+# PURPOSE: a verified commit reaches origin IMMEDIATELY, so validated work cannot silently
+# accumulate locally again (the 2026-06-23 CI/billing incident: 50+ commits stranded unseen).
+# It runs AFTER the pre-commit verify-gate has passed, so it only auto-pushes verified commits.
+#
+# SAFETY (preserves branch protection, verification, rollback):
+#   - FEATURE branches ONLY — never main/master. `main` reaches origin solely via PR -> CI ->
+#     merge-pr.mjs, so branch protection is fully intact.
+#   - FAST-FORWARD only, never --force — so rollback is always `git revert` / abandon-branch,
+#     never a history rewrite.
+#   - NEVER blocks the commit (exit 0 always) — auto-push is best-effort backup.
+#   - LOUD on failure (a billing/CI outage is shouted, never silent) — pairs with the scheduled
+#     repo-hygiene monitor as the safety net.
+#   - Explicit, logged opt-out: AUTO_PUSH_OFF=1.
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$branch" in main|master|HEAD|"") exit 0 ;; esac     # protected/detached → never auto-push
+[ -n "$AUTO_PUSH_OFF" ] && exit 0                          # explicit, logged escape hatch
+
+if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+  git push origin "$branch" >/dev/null 2>&1 \
+    || printf '\xE2\x9A\xA0  AUTO-PUSH FAILED for %s — work is NOT backed up; push manually.\n' "$branch" >&2
+else
+  git push -u origin "$branch" >/dev/null 2>&1 \
+    || printf '\xE2\x9A\xA0  AUTO-PUSH FAILED (no upstream) for %s — push manually.\n' "$branch" >&2
+fi
+exit 0
