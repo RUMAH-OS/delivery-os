@@ -101,10 +101,29 @@ export function createWorkflowRoute(ctx: WorkflowRouteContext): Hono<{ Variables
     const [run] = await db.select().from(workflowRun).where(eq(workflowRun.id, id)).limit(1);
     if (!run) return c.json({ error: { code: "not_found", message: "run not found" } }, 404);
     const steps = await db.select().from(workflowStep).where(eq(workflowStep.runId, id)).orderBy(workflowStep.seq);
+    // G4 — surface the engine.verify verdict on the read projection so a founder surface can show pass/reasons
+    // WITHOUT reading steps directly. The stored verdict is PII-free by construction (coded reasons only, S4).
+    // Top-level `verify` = the FIRST verify step by seq (steps are seq-ordered above). Today's definitions
+    // carry exactly one engine.verify step; a multi-verify definition would surface the first here — per-step
+    // `verdict` below still carries every verify step, so no verdict is lost. `verify: null` = not yet verified.
+    const verifyStep = steps.find((s: any) => s.handler === "engine.verify");
+    const vv = (verifyStep?.verdict ?? null) as null | {
+      verdict?: string; reasons?: string[]; rung?: string; verifierId?: string;
+      gateEligible?: boolean; gateReason?: string;
+    };
     return c.json({ data: {
       id: run.id, definitionKey: run.definitionKey, state: run.state, attempt: run.attempt,
       wasInterrupted: run.wasInterrupted, blockedReason: run.blockedReason, terminalAt: run.terminalAt,
-      steps: steps.map((s: any) => ({ seq: s.seq, state: s.state, stepType: s.stepType, owner: s.owner, handler: s.handler, effect: s.effect, attempt: s.attempt, maxAttempts: s.maxAttempts, nextRetryAt: s.nextRetryAt })),
+      // G4 — top-level verdict summary (null until the verify step has run). PII-free coded fields only.
+      verify: vv ? {
+        verdict: vv.verdict ?? null, reasons: vv.reasons ?? [], rung: vv.rung ?? null,
+        verifierId: vv.verifierId ?? null, gateEligible: vv.gateEligible ?? null, gateReason: vv.gateReason ?? null,
+      } : null,
+      // G4 — per-step verdict projected as a CODED SUBSET (verdict/reasons/rung), never the raw stored jsonb:
+      // keeps the observe surface PII-free BY CONSTRUCTION (omits suggestedImprovement/advisory/score, whose
+      // PII-freeness is only a verifier convention). QA advisory on the first G4 pass.
+      steps: steps.map((s: any) => ({ seq: s.seq, state: s.state, stepType: s.stepType, owner: s.owner, handler: s.handler, effect: s.effect, attempt: s.attempt, maxAttempts: s.maxAttempts, nextRetryAt: s.nextRetryAt,
+        verdict: s.verdict ? { verdict: s.verdict.verdict ?? null, reasons: s.verdict.reasons ?? [], rung: s.verdict.rung ?? null } : null })),
     } });
   });
 
