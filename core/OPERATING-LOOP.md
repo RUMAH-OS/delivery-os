@@ -64,6 +64,7 @@ The loop's status transitions are not honor-system. A scaffolder-installed `.cla
 
 ## Irreversible-action gate
 Merges **and** outward/irreversible business actions (sending, charging, publishing, migrating, deleting) require **explicit human approval**. Automated/AI agents **draft**, they do not act. (See `core/GOVERNANCE.md`.)
+These gates are **founder boundaries** (Governance §16): a `/goal` runs autonomously up to one, then **terminates with a Founder Action Package and the `/goal resume` command — it never waits/polls/idles at the gate.** Reaching a boundary is the autonomous segment *succeeding*, not stalling. Contract: `capabilities/GOAL-EXECUTION-CONTRACT.md`.
 
 ## Where the gates attach (by surface)
 - UI-affecting → design-parity / accessibility review.

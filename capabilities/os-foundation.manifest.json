@@ -26,7 +26,10 @@
     "templates/tools/repo-governance-auditor.mjs",
     "templates/tools/founder-review-package.mjs",
     "templates/tools/release-notes.mjs",
-    "templates/tools/smoke.mjs"
+    "templates/tools/smoke.mjs",
+    "templates/tools/goal-init.mjs",
+    "templates/tools/goal-stop.mjs",
+    "templates/tools/boundary-classify.mjs"
   ],
   "contracts": [
     "contracts/admin-plos-seam-v1.mjs",
@@ -40,7 +43,8 @@
     "ci-release-orchestrator",
     "production-readiness-review",
     "deploy-vercel-supabase",
-    "founder-review-package"
+    "founder-review-package",
+    "founder-action-package"
   ],
   "workflows": [
     "templates/workflows/dev-preview.yml",

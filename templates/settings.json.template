@@ -29,6 +29,12 @@
         "hooks": [
           { "type": "command", "command": "node .claude/hooks/verify-gate.mjs stop" }
         ]
+      },
+      {
+        "_comment": "The /goal Execution Contract Stop-hook (a SECOND Stop entry — Claude runs all Stop hooks; the turn ends only when ALL allow it). No active goal -> exit 0. An active goal blocks the stop (continue autonomous work) until objective_complete OR a fresh valid FAP at a genuine founder boundary; the H1 cap forces a failure-FAP. See capabilities/GOAL-EXECUTION-CONTRACT.md.",
+        "hooks": [
+          { "type": "command", "command": "node .claude/tools/goal-stop.mjs" }
+        ]
       }
     ]
   }

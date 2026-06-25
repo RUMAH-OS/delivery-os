@@ -1,0 +1,62 @@
+---
+goal_id: <slug>                       # the goal this FAP terminates (must equal .goal-state.json goal_id)
+disposition: boundary                 # complete | boundary | failure
+boundary_class: merge-to-main         # §3 taxonomy, REQUIRED iff disposition:boundary
+                                      #   approval | merge-to-main | credentials | deploy-auth | manual-testing
+                                      #   | external-login | legal | payment | physical | cross-repo-coordination | other
+boundary_evidence_kind: gate_state    # tool_denial | credential_absent | gate_state | cap_tripped
+                                      #   (no_tool is NEVER valid alone — H4: it must co-occur with one of the above,
+                                      #    e.g. "no_tool, gate_state")
+boundary_evidence: "merge-pr.mjs exit 1: required checks green but no founder-approved label (gh api labels=[])"
+founder_burden_category: per_action_authorization   # the founder-burden-gate.mjs category this boundary counts as
+autonomous_work_done: true            # §6.3 progress floor — commits/dispatch since start_ref (false only on an immediate hard wall)
+verify_clean: true                    # §6.4 — verified, OR blocked-at-boundary naming THIS boundary (H2). Never a fake pass.
+resume_goal: "/goal resume FAP-<slug>"  # the EXACT one line that starts the next autonomous segment
+# escalated: true                     # H7 — set ONLY on a resume that reproduced an unchanged prior boundary (the founder's fix did not land)
+---
+
+# Founder Action Package — <goal_id>
+
+> I ran the autonomous part of this objective as far as a machine can. The next required step is a
+> **founder action** — something only you can do. This is not "unfinished": reaching this point is the
+> goal **succeeding** at its job. Do the one action below, then paste the resume line in §7 to continue.
+
+## 1. Status (one screen)
+<one plain line: where we are. e.g. "The invoicing feature is built, verified, and live in DEV. It is
+waiting only for your go-ahead to merge to production.">
+
+## 2. What I completed
+<bullets — each linked to a commit / PR / VERIFY artifact. Real references only, never a description.>
+- <e.g. Built X — commit `abc1234`, PR #12>
+- <e.g. Verified X independently — `docs/verify/VERIFY-<slice>.md` (verify_status: verified)>
+- <e.g. Deployed to DEV — <dev-url>>
+
+## 3. What remains
+<the rest of the objective, AFTER this founder action — what the next /goal resume segment will do
+autonomously. Plain language.>
+
+## 4. WHY I stopped (the boundary)
+<"The next step is **<the action>**; only you can do it because **<the reason>**." Then cite the
+machine evidence verbatim — the same `boundary_evidence` from the frontmatter, so the Stop-hook and the
+founder are reading the SAME fact.>
+- **Boundary class:** `<boundary_class>`  ·  **evidence kind:** `<boundary_evidence_kind>`
+- **Evidence:** `<the verbatim denial / probe result / gate state>`
+
+## 5. Exactly what to do (zero technical knowledge)
+<numbered, one action per step, in the FOUNDER-RUNBOOK voice: open <link> · click <exact label> ·
+expect <result>. For an approval/merge boundary, EMBED the founder-review-package output here. For a
+credentials/provisioning boundary, reuse the FOUNDER-RUNBOOK-DEV-PROVISIONING voice.>
+1. Go to **<link>**.
+2. Click **<exact button label>**.
+3. **Success looks like:** <the visible result>. ✅
+
+## 6. Rollback (if relevant)
+<the exact undo + the restorable ref. "If anything looks wrong, you can return everything to how it was:
+<exact steps>. The safe restore point is `<start_ref sha>`."  — or "N/A — nothing to undo.">
+
+## 7. Resume the next autonomous phase
+Paste this one line to start the next autonomous segment (it picks up exactly where I stopped):
+
+```
+/goal resume FAP-<slug>
+```
