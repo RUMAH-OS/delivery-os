@@ -1,0 +1,45 @@
+{
+  "id": "release-notes",
+  "name": "Release Notes Generator",
+  "description": "After a merge to main, draft a CHANGELOG-style, conventional-commit-grouped release section from the merged PR(s) + commits. Read-first: it PRINTS the notes by default; the only mutation (prepending to CHANGELOG.md) is gated behind --write, and --gh-release only PRINTS the `gh release create` command — it never cuts a release.",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/release-notes.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    null,
+    "wiki":     null
+  },
+
+  "composesUnder": "skills/ci-release-orchestrator/SKILL.md",
+  "note": "Mechanical after-merge documentation step of the release lifecycle; no skill file of its own — it composes under the ci-release-orchestrator skill (the merge/deploy gate runs first, then this drafts the notes).",
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/release-notes.mjs [--since <tag>] [<from>..<to>] [--pr <n>] [--version <v>] [--write] [--gh-release] [--json] [--dry-run]",
+    "input": {
+      "since":     { "type": "string",  "required": false },
+      "range":     { "type": "string",  "required": false },
+      "pr":        { "type": "number",  "required": false },
+      "repo":      { "type": "string",  "required": false },
+      "version":   { "type": "string",  "required": false },
+      "write":     { "type": "boolean", "required": false },
+      "ghRelease": { "type": "boolean", "required": false }
+    },
+    "output": "a CHANGELOG-style markdown section to stdout; structured report under --json",
+    "sideEffect": "write",
+    "idempotent": false,
+    "observability": { "outcome": "the rendered release section + report { range, commitCount, prCount, wrote, ghReleaseCmd }; --write prepends to CHANGELOG.md (gated, fail-closed)" },
+    "errors": null
+  },
+
+  "health": null
+}

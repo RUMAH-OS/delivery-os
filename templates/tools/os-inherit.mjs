@@ -16,6 +16,10 @@
 // Vendored layout in the project:
 //   .claude/os/tools/<basename>      <- tools + contracts (flat, byte-identical)
 //   .claude/skills/<name>/           <- OS-foundational skills (whole dir)
+//   .github/workflows/<basename>     <- OS-foundational CI/CD workflow TEMPLATES (manifest `workflows[]`);
+//                                       vendored to the RUNNABLE location so they execute as CI. Byte-identical
+//                                       + drift-checked; per-repo secrets are GitHub secrets the founder fills
+//                                       (the file is never hand-edited). See templates/workflows/README.md.
 //   .claude/os/engine/               <- OS-foundational engine (whole dir, byte-identical)
 //   .claude/os/INHERITED.json        <- {osVersion, manifestVersion, files:[{rel, sha256}]}  (tools/contracts/skills)
 //   .claude/os/INHERITED-<key>.json  <- {osVersion, source, files:[{rel, sha256}]}           (one per engine)
@@ -73,7 +77,7 @@ function loadManifest() {
 }
 function fail(code, msg) { console.error(`os-inherit: ${msg}`); process.exit(code); }
 
-// Resolve the manifest tools/contracts/skills into concrete (sourceAbsPath, vendorRelPath) pairs.
+// Resolve the manifest tools/contracts/skills/workflows into concrete (sourceAbsPath, vendorRelPath) pairs.
 function plan(man) {
   const items = [];
   for (const t of [...(man.tools || []), ...(man.contracts || [])]) {
@@ -83,6 +87,16 @@ function plan(man) {
     const sdir = join(FROM, ".claude", "skills", s);
     if (!existsSync(sdir)) fail(2, `manifest skill "${s}" not found at ${sdir}`);
     for (const f of listFiles(sdir)) items.push({ src: f, rel: join(".claude", "skills", s, relative(sdir, f)) });
+  }
+  // WORKFLOWS class — GitHub Actions templates vendored into the consumer's RUNNABLE
+  // location `.github/workflows/<basename>` (NOT under .claude/os/), so they actually
+  // execute as CI. They are byte-identical to canonical (drift-checked exactly like
+  // tools): the per-repo secrets they reference are GitHub repository secrets the
+  // founder sets once — the FILE is never hand-edited, so it stays drift-green.
+  for (const w of man.workflows || []) {
+    const src = join(FROM, w);
+    if (!existsSync(src)) fail(2, `manifest workflow "${w}" not found at ${src}`);
+    items.push({ src, rel: join(".github", "workflows", basename(w)) });
   }
   return items;
 }

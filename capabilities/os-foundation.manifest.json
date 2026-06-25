@@ -22,7 +22,11 @@
     "templates/tools/agent-health.mjs",
     "templates/tools/founder-burden-gate.mjs",
     "templates/tools/file-lesson.mjs",
-    "templates/tools/milestone-report.mjs"
+    "templates/tools/milestone-report.mjs",
+    "templates/tools/repo-governance-auditor.mjs",
+    "templates/tools/founder-review-package.mjs",
+    "templates/tools/release-notes.mjs",
+    "templates/tools/smoke.mjs"
   ],
   "contracts": [
     "contracts/admin-plos-seam-v1.mjs",
@@ -32,9 +36,16 @@
   "skills": [
     "learning-review",
     "verify-gate",
+    "repo-governance",
     "ci-release-orchestrator",
     "production-readiness-review",
-    "deploy-vercel-supabase"
+    "deploy-vercel-supabase",
+    "founder-review-package"
+  ],
+  "workflows": [
+    "templates/workflows/dev-preview.yml",
+    "templates/workflows/promote-to-prod.yml",
+    "templates/workflows/repo-governance.yml"
   ],
   "enginesNote": "ENGINES are OS-OWNED runtime capability packs vendored as a WHOLE DIRECTORY (byte-identical) into the consuming app, with a per-engine INHERITED-<key>.json sha-record. They are the LOCK that makes Delivery OS the platform/runtime and the app a mere INSTALLER: `os-inherit sync` installs the engine; `os-inherit engine-check` is the fail-closed drift gate (installed-vs-recorded AND recorded-vs-canonical) plus a DDL PARITY check. ddlParity declares the canonical engine migration set (source of truth for the SHAPE) and the app's APPLIED instance migrations (renumbered/split per the app's sequence) — the check asserts they are STRUCTURALLY equivalent (same tables/columns/CHECK bodies/indexes/triggers/functions/policies/RLS), so the engine OWNS the DDL and divergence is caught. The app applies an equivalent instance; it does NOT re-run the canonical files.",
   "engines": [
