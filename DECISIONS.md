@@ -1,0 +1,18 @@
+# Delivery OS — Decisions Ledger (question-keyed; Governance §7/§11)
+
+> One row per CONSEQUENTIAL decision: the question, the ruling, the panel/lenses, the date, and a supersedes
+> link. Created 2026-06-25 to close the standing §7 gap the SDLC-v2 board review surfaced (consequential
+> decisions had been made — dev-first, the goal-execution-contract — without a recorded ledger entry).
+
+| # | Question | Ruling | Class | Panel / lenses | Date | Links |
+|---|---|---|---|---|---|---|
+| D1 | What is the canonical SDLC branch model? | **DEV-first** (feature → PR-to-DEV → founder review → merge MAIN → prod); a long-lived `dev` branch + per-repo DEV environment. | architectural | 4-lens panel (architecture · PR-governance · founder-review/DEV · V6) | 2026-06-25 | `capabilities/CANONICAL-SDLC.md` |
+| D2 | How does a `/goal` end — wait for the founder, or terminate? | A `/goal` is the **maximum autonomous segment**; it **terminates at the founder boundary with a Founder Action Package** — never waits/polls/idles. Boundary = success. | architectural | lead-architect design + reviewer-critic §11 (NOT-READY → 6 must-fixes folded as H1–H8) + independent QA | 2026-06-25 | `capabilities/GOAL-EXECUTION-CONTRACT.md`, `core/GOVERNANCE.md` §16 |
+| D3 | Should Class-A changes **auto-merge to main with no human** (SDLC v2)? | **DEFERRED — not ratified.** Board review = NOT-READY: it contradicts the canon's C6 (irreversible needs a human) and `CANONICAL-SDLC.md` "block any engine-autonomous auto-merge". Requires a **founder-signed canon amendment + an independent §11 ratification + a pre-registered SHADOW cohort** (kill metric: one false-A on any C-semantics change = halt). Until then: **the classifier ships in SHADOW only** (classify + log, no merge fired). | architectural ∩ security ∩ prod-readiness | lead-architect + CI/reliability + governance/security adversarial lens | 2026-06-25 | `docs/adr/ADR-001-canonical-sdlc-v2.md` |
+| D4 | Should the long-lived `dev` branch be collapsed → trunk + per-PR previews (SDLC v2)? | **DEFERRED — its own §11 ruling required.** Overturns D1 (same-day 4-lens decision); must not bundle with D3. Conservative `dev` fallback retained for now. | architectural | governance/security lens flagged; awaits a dedicated panel + founder ruling | 2026-06-25 | ADR-001 (B5) |
+| D5 | May a self-healing/orchestration mechanism **bypass a kernel gate** (verify-gate / merge gate) to break a loop? | **NO.** A bypass that proceeds past a gate is a §13 kernel-mechanism swap. Orchestration self-healing may only **escalate to a `failure` Founder Action Package** (the goal-contract H1 terminal); it is structurally incapable of skipping a gate or boundary. | architectural (kernel) | governance/security lens (B4) | 2026-06-25 | ADR-001 (B4), `core/GOVERNANCE.md` §13/§16 |
+
+## Open founder decisions (the SDLC-v2 boundary)
+- **Ratify or reject D3** (Class-A auto-merge) after reviewing the SHADOW-cohort false-A rate — requires a founder signature amending `CANONICAL-SDLC.md`.
+- **Rule on D4** (collapse `dev`) in a dedicated §11 panel.
+- **Provision the Auto-Merge Authorization** (the merge-capable bot + signed marker) — only after D3 is ratified and `merge-pr.mjs` is hardened to enforce label + CODEOWNER + author≠clearer (ADR-001 B3).
