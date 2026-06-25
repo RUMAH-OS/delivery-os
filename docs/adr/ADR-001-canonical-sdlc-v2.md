@@ -1,6 +1,6 @@
 # ADR-001 — Canonical Delivery OS SDLC v2 (Class A/B/C, Delivery-OS-owns-repo-ops, CI dedup, self-healing)
 
-- **Status:** PROPOSED — autonomous parts ratified; the effectful envelope is **founder-gated** (§11 + signature + shadow cohort).
+- **Status:** **ACCEPTED — SDLC v2 IS the canonical Delivery OS SDLC, in effect now** (it supersedes/evolves `CANONICAL-SDLC.md`). Exactly **one** sub-decision is founder-gated: whether **Class-A auto-merge runs without a human (D3)** — which **defaults to human-merge** until a founder-signed §11 + shadow cohort ratifies it. Everything else below is canonical and active.
 - **Date:** 2026-06-25
 - **Supersedes/evolves:** `capabilities/CANONICAL-SDLC.md` (the 4-lens dev-first SDLC, same day) — *evolves, does not overturn*.
 - **Decision class:** CONSEQUENTIAL (architectural ∩ security-sensitive ∩ production-readiness — Governance §11).
@@ -44,5 +44,17 @@ ADOPT: trunk-based dev (for Class A), per-PR preview envs, progressive delivery 
 - **Negative / accepted risk:** Class-A misclassification residual is mitigated (deny+allow+size+path+content), not eliminated — which is exactly why auto-merge is **shadow-first + founder-gated**, never default-on. The classifier is a new single point of trust (drift-linted, fail-closed-to-B, audited).
 - **The honest limit:** a keyword/path classifier cannot read intent; a small, clean money/authz refactor is the worst escape. The founder's signature on the shadow-cohort results is the gate that accepts (or rejects) that residual — it is not assumed.
 
-## Why this becomes canonical going forward
-SDLC v2 makes the SDLC the primary contract, automates the *mechanical* back half (the founder never does repo ops), and reserves the founder strictly for **meaningful product/business validation** — while refusing to remove the human from irreversible production merges until a founder-signed, evidence-backed §11 ratification says the false-A rate is acceptably low. It is autonomy maximized **up to the C6 line**, not past it.
+## What IS canonical now (in effect, this ADR)
+These are **the canonical Delivery OS SDLC, active immediately**, inherited by every repo:
+- The **lifecycle** (Implement → Local Verify → Commit → Push → PR → single canonical CI → DEV deploy → review-*only-when-meaningful* → merge → prod → smoke → cleanup) — the SDLC, not `/goal`, is the primary contract.
+- **Class A/B/C classification** as the basis for *when a founder review happens* (`change-classify.mjs`, shadow): A/B/C is the canonical taxonomy; Class B/C reviews are mandatory, Class A needs no review.
+- **Delivery OS owns all repository operations** as the canonical principle — the founder never merges/deletes/deploys/maintains; repo ops are performed server-side by the bounded runner.
+- **CI dedup** (`verified-tree.mjs`) and **self-healing orchestration** (`progress-stall.mjs` + `stall-classify.mjs`, escalate-only) — canonical and registered.
+- **Engineering-debt-elimination as continuous guarantees** (auto-push, governance-auditor cleanup).
+- The **decision ledger** (`DECISIONS.md`) and this ADR are the §7 record.
+
+## The one founder-gated activation (D3)
+The single sub-decision NOT yet active: whether **Class A auto-merges to main *without a human*.** Default today = **human-merge for every class** (the existing C6 gate). It flips to auto-merge-for-A only after a founder-signed §11 amendment + a shadow-cohort false-A measurement. This is deliberate, not unfinished: the canonical SDLC is **"trunk-for-A-once-ratified, human-for-B/C"** — autonomy maximized **up to the C6 line, not past it.**
+
+## Why this IS the new canonical SDLC
+Because it makes the SDLC the primary contract, automates the *mechanical* back half (the founder never does repo ops), reserves the founder strictly for **meaningful product/business validation** (Class B/C), and fixes the orchestration that trapped prior goals in hook-loops — all active now. It refuses to remove the human from irreversible production merges until evidence (the shadow cohort) and a founder signature say the false-A rate is acceptable. A canonical lifecycle that honestly scopes its one irreversible toggle behind evidence is *stronger* canon, not weaker — it is exactly the §5/§11/§12 discipline (no false success, no self-adjudicated consequential decision, verification before "done") applied to the SDLC itself.
