@@ -1,0 +1,43 @@
+{
+  "id": "founder-review-package",
+  "name": "Founder Review Package",
+  "description": "Turns a slice's PR into a founder-readable review package: a durable markdown artifact (docs/review/REVIEW-<pr>-<slice>.md) and a condensed PR comment. Every section is pulled from a cited source (gh PR view, git log/diff, the PR body, the VERIFY artifact). The 'how to test it yourself' guide is engineer-seeded + URL-interpolated (never diff-invented), screenshots are real-or-explicit-N/A (never fabricated), and posting the PR comment is effectful + fail-closed (default prints, only --post posts).",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/founder-review-package.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    "skills/founder-review-package/SKILL.md",
+    "wiki":     null
+  },
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/founder-review-package.mjs <pr-number>",
+    "input": {
+      "pr":      { "type": "string", "required": true },
+      "repo":    { "type": "string", "required": false },
+      "slice":   { "type": "string", "required": false },
+      "dev-url": { "type": "string", "required": false },
+      "post":    { "type": "boolean", "required": false }
+    },
+    "output": {
+      "artifact": "docs/review/REVIEW-<pr>-<slice>.md (durable markdown package)",
+      "comment":  "a condensed PR comment (printed by default; posted only with --post)"
+    },
+    "sideEffect": "write",
+    "idempotent": true,
+    "observability": { "outcome": "the rendered package + the effect log (wrote <artifact>; comment printed-only vs posted); structured --json report" },
+    "errors": null
+  },
+
+  "health": null
+}
