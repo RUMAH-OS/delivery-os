@@ -130,6 +130,25 @@ Before building any **cross-system** producer or consumer surface, READ (1) the 
 
 **Runtime-repro (extends §1).** Reproduce a production bug **on the running thing under realistic conditions** (e.g. real concurrency) **before** declaring a fix, and leave a **checked-in regression guard** (e.g. a post-deploy smoke). Recorded N17: a prod data-corruption bug took three iterations — two fixes from assumptions/curl, one of which (`max:1`) made it *worse* — because curl and unit tests never reproduced the concurrent-shared-connection failure; the session-pooler fix was proven only by a concurrency repro against the running thing, now guarded on every deploy.
 
+## 16. Autonomous execution terminates at the founder boundary — the boundary is success
+A `/goal` is the **maximum autonomous execution segment** toward an objective, **not the objective**. It runs the
+loop continuously (§2) — unlimited parallel main-loop spawns (G9 — the main loop spawns, never the engine), build ·
+verify · merge-to-dev · diagnose · learn — **up to a hard kill-switch cap** (turn/wall-clock/cost; tripping it forces
+a `failure` Founder Action Package, not an infinite retry). **The moment the next *required* action can only be done by
+a human** (approval · credentials · deploy-auth · manual testing · external login · legal · payment · physical ·
+cross-repo) — detected as a permission-classifier denial, a missing credential (presence, never value — §1/§15), a
+fail-closed gate state, or a no-tool wall — **the autonomous phase has ended SUCCESSFULLY.** The goal emits a **Founder
+Action Package** (`docs/goals/FAP-<id>.md`: status · done · remaining · WHY-stopped · zero-tech steps · links ·
+rollback · the exact one-line `/goal resume` command) and **terminates immediately — never waits, polls, idles, or
+remains running awaiting input.** Reaching a boundary is **not "unfinished"**; the next autonomous segment is a
+brand-new `/goal` after the founder acts. Per §13 this is a **mechanism+policy pair**: the `goal-stop.mjs` exit-gate is
+**kernel mechanism** (thin, fires without consent, fails closed — a goal clears only on `objective_complete` or a
+valid, evidence-backed FAP); the boundary taxonomy + FAP content are **governance policy**. The SDLC's HUMAN-GATED
+tier (C6 greenlight · merge-to-main · prod-auth · rollback) **are** the boundaries — zero SDLC redesign. Canonical
+home + the H1–H8 hardening: `capabilities/GOAL-EXECUTION-CONTRACT.md`. *(Earned 2026-06-25: a goal phrased as "merged
+to main" looped its Stop-hook dozens of times because merge-to-main is a C6 human gate, never autonomously satisfiable
+— the infinite-idle incident this rule kills.)*
+
 ## Reusable prompts
 - **Red-team audit** — independent skeptic; classify findings **Blocker / Should-fix / Safe-to-defer**; don't implement during the audit.
 - **Multi-reviewer readiness audit** — N independent lenses vote ready / ready-with-conditions / not-ready; gate the release on the conditions.
