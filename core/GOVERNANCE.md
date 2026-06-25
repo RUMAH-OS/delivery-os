@@ -17,8 +17,12 @@ No slice is DONE without: implement → build/validate green → dedicated commi
 ## 5. Honest failure — never a false success
 Surfaces report real state. A system that cannot deliver returns an error, not a success. Fail-closed on sensitive paths.
 
-## 6. Irreversible actions require human approval
-Merges and outward/irreversible business actions are human-gated. **Automated/AI agents draft; humans act** (no agent holds a "send"/"charge"/"publish"/"delete" tool unguarded). Before any irreversible change, **capture restoreable state** and define the rollback.
+## 6. Irreversible actions require human approval — but distinguish the *deploy authorization* from the *irreversible business act*
+Two different gates, never conflated:
+- **Deploy authorization is state-gated, not person-gated (founder directive 2026-06-25 — `DECISIONS.md` D7).** A production deploy is **authorized by SDLC state against a policy the founder sets ONCE**, mechanically enforced — **never** by a per-deploy founder signature. Authorization depends on the *state* (verification + required approvals + Founder-Review-if-founder-verifiable + merge-to-main + CI green + lane scope all satisfied), **never on who runs the agent.** The load-bearing invariant is **fail-closed: never authorize a deploy past an unfinished governance step.** DEV/Preview deploys auto-authorize on verification + CI green. The check is the `deployment-auth.mjs` capability; the founder's one-time inputs are the lane **policy** (allowed action classes/targets/guards) + an optional **FREEZE** kill-switch — not a per-deploy ratification. Canonical home: `capabilities/CANONICAL-SDLC.md` + `docs/deploy-lane-setup.md`.
+- **Outward / irreversible BUSINESS actions stay explicit-human-gated (UNCHANGED).** Merges-to-main and any outward irreversible business act — **send money / charge / publish / send / delete** — remain human-gated: **automated/AI agents draft; humans act** (no agent holds a "send"/"charge"/"publish"/"delete" tool unguarded). A Class C / irreversible-business-act gate (money/send/publish) is human-gated regardless of SDLC state — state-auth authorizes *deploying the code*, never *performing the business act* (§11/§16).
+
+Before any irreversible change of either kind, **capture restoreable state** and define the rollback.
 
 ## 7. One source of truth per concern
 - Business → `project-context.md`. Conflicts are escalated **before** implementation.

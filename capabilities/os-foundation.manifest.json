@@ -16,6 +16,7 @@
     "templates/tools/ci-release-orchestrator.mjs",
     "templates/tools/merge-pr.mjs",
     "templates/tools/deploy-lane.mjs",
+    "templates/tools/deployment-auth.mjs",
     "templates/tools/check-os-drift.mjs",
     "templates/tools/render-kernel.mjs",
     "templates/tools/agents-check.mjs",
@@ -48,7 +49,8 @@
     "production-readiness-review",
     "deploy-vercel-supabase",
     "founder-review-package",
-    "founder-action-package"
+    "founder-action-package",
+    "deployment-authorization"
   ],
   "workflows": [
     "templates/workflows/dev-preview.yml",

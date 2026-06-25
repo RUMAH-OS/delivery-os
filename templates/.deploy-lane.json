@@ -1,12 +1,11 @@
 {
-  "_comment": "Delivery OS — the standing deploy lane (OS v6 #7). RATIFIED ONCE per repo via the decision-ratification skill, then NEVER hand-edited casually: it is the founder's standing pre-authorization for the deployment-operator agent. Anything not declared here is OUT OF SCOPE and fails closed. The agent reads this file through templates/tools/deploy-lane.mjs; it does NOT widen it. Copy this file to the repo root as `.deploy-lane.json`, fill the targets, ratify, and add the matching .claude/settings.json allow-rules (docs/deploy-lane-setup.md) ONCE.",
+  "_comment": "Delivery OS — the standing deploy lane POLICY (OS v6 #7; SDLC-state-authorized as of founder directive 2026-06-25). This file is POLICY, not authorization: it declares WHAT may run (named action classes), to WHICH target env, and the irreversible/destructive guard denylist. It does NOT decide whether a deploy may run — that is decided per-invocation by templates/tools/deployment-auth.mjs from live SDLC state (verification + approvals + founder-review-if-applicable). Authorization depends on STATE, never on who runs the agent: an agent may deploy iff the SDLC state authorizes the target env, and the lane wrapper never deploys past an unfinished governance step. The deployment-operator reads this file through templates/tools/deploy-lane.mjs; it does NOT widen it. Copy this file to the repo root as `.deploy-lane.json`, fill the targets + target_env, and add the matching .claude/settings.json allow-rules (docs/deploy-lane-setup.md) ONCE.",
 
-  "version": 1,
-  "ratified": {
-    "_comment": "Provenance of the standing authorization. Set by the founder at ratification (decision-ratification skill). The agent treats an unratified lane (by=\"\") as OUT OF SCOPE for everything.",
-    "by": "",
-    "date": "",
-    "decision_ref": ""
+  "version": 2,
+
+  "freeze": {
+    "_comment": "Founder kill-switch (OPTIONAL). frozen=true is a hard stop on ALL deploys regardless of SDLC state — the one founder override that REMOVES authorization. It never GRANTS it: an absent/false freeze does NOT block; SDLC state-auth governs. This replaces the old per-repo `ratified.by` signature, which is gone — authorization is now state, not a one-time signature.",
+    "frozen": false
   },
 
   "actor_default": "deployment-operator",
@@ -14,12 +13,13 @@
   "audit_log": "docs/deploy-lane/audit.log.jsonl",
 
   "actions": {
-    "_comment": "Each key is a named action CLASS the founder pre-authorized. `cmd`+`args` are the exact underlying command run for an in-scope invocation; extra args passed on the CLI are APPENDED. `forward_only:true` marks a migration class the operator may run unattended; a down/rollback must NOT be declared here (it is irreversible ⇒ out of scope by design). Remove a class to revoke that authorization.",
+    "_comment": "Each key is a named action CLASS in the deploy POLICY. `cmd`+`args` are the exact underlying command run for an in-scope invocation; extra args passed on the CLI are APPENDED. `target_env` (dev|preview|prod) is the SDLC environment deployment-auth.mjs is asked to authorize for this class — an unknown/missing value is treated as `prod` (fail-closed, strictest). `forward_only:true` marks a migration class the operator may run unattended once authorized; a down/rollback must NOT be declared here (it is irreversible ⇒ out of scope by design). Remove a class to drop it from the policy.",
 
     "vercel-deploy-prod": {
       "description": "Production deploy of the API/SPA on the Vercel+Supabase plane.",
       "cmd": "vercel",
       "args": ["deploy", "--prod"],
+      "target_env": "prod",
       "targets": ["__FILL_VERCEL_PROJECT_OR_ALIAS__"],
       "forward_only": false
     },
@@ -28,13 +28,14 @@
       "description": "Apply pending forward-only migrations to the system-of-record DB (via the session pooler, per the deploy-vercel-supabase playbook).",
       "cmd": "npm",
       "args": ["run", "db:migrate"],
+      "target_env": "prod",
       "targets": ["__FILL_SUPABASE_PROJECT_REF__"],
       "forward_only": true
     }
   },
 
   "guards": {
-    "_comment": "Belt-and-braces fail-closed denylist. Even if a class is somehow declared, an underlying command matching any of these substrings is REFUSED. Irreversible/destructive ops are never in any lane.",
+    "_comment": "Belt-and-braces fail-closed denylist, enforced by deploy-lane.mjs AFTER state-authorization. Even if a class is somehow declared and authorized, an underlying command matching any of these substrings is REFUSED. Irreversible/destructive ops are never in any lane.",
     "deny_substrings": ["drop ", "migrate:down", "db:reset", "--rollback", "delete from", "truncate", "force-push", "push --force"]
   }
 }

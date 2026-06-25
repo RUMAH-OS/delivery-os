@@ -1,0 +1,42 @@
+{
+  "id": "deployment-authorization",
+  "name": "Deployment Authorization",
+  "description": "Decides WHETHER a deploy to a given target env (dev|preview|prod) may run RIGHT NOW from live SDLC STATE — not from a founder signature. Reads the SDLC signals for the target (verification done, approvals present, founder-review-if-applicable) and returns a per-signal verdict {authorized, target, reason, signals{...}} with exit 0 iff authorized. It is the AUTHORIZATION half of the deploy lane: the deployment-operator's deploy-lane.mjs wrapper calls it before every action and never deploys past an unfinished governance step (fail-closed). Read-only and idempotent — it judges state, it never changes it.",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/deployment-auth.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    "skills/deployment-authorization/SKILL.md",
+    "wiki":     null
+  },
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/deployment-auth.mjs check --target <dev|preview|prod> [--pr <n>] [--base <ref>] [--lane <path>]",
+    "input": {
+      "target": { "type": "string", "required": true },
+      "pr":     { "type": "string", "required": false },
+      "base":   { "type": "string", "required": false },
+      "lane":   { "type": "string", "required": false }
+    },
+    "output": {
+      "verdict": "JSON {authorized, target, reason, signals{...}} on stdout (the per-signal SDLC-state verdict)",
+      "exit":    "0 iff authorized, 1 otherwise"
+    },
+    "sideEffect": "read",
+    "idempotent": true,
+    "observability": { "outcome": "the {authorized, target, reason, signals} verdict — each signal (verification / approvals / founder-review-if-applicable) reported with its own pass/fail so a refusal names the exact unfinished governance step the deploy must not pass" },
+    "errors": null
+  },
+
+  "health": null
+}

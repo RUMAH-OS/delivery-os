@@ -32,7 +32,8 @@ Three actors, by construction (never blurred):
 | Founder Review | review package on the live DEV deploy — **founder-verifiable changes only** (§2a) | **NEW** | `change-classify.mjs` (`founder_verifiable`) gates `founder-review-package` generator |
 | Scorecard | experience scorecard required check | REUSE | `experience-gate.mjs`, `founder-experience-scorecard` |
 | Greenlight → Merge | `founder-approved` label = C6 gate; then merge | REUSE | `approvals-route.ts` (C6) + `merge-pr.mjs` (no override) |
-| Production Deploy | audited, forward-only lane | REUSE | `deploy-lane.mjs` + `.deploy-lane.json` + `deployment-operator` |
+| Auto Deploy DEV/Preview | auto-authorized on verification + CI green (no founder action) | REUSE | `deployment-auth.mjs` (state-auth) + `deploy-lane.mjs` |
+| Production Deploy | **SDLC-state authorized** (verify + required approvals + Founder-Review-done-if-founder-verifiable + merge-to-main + CI green + lane scope), checked by `deployment-auth.mjs`; audited, forward-only lane | REUSE | `deployment-auth.mjs` + `deploy-lane.mjs` + `.deploy-lane.json` (now POLICY + optional FREEZE) + `deployment-operator` |
 | Smoke / Prod Verify | post-deploy probe + deploy-watch | REUSE+**NEW-thin** | orchestrator `--watch-deploy` + `smoke.mjs` |
 | Release Notes | gh+git log → CHANGELOG | **NEW-thin** | `release-notes.mjs` |
 | Branch/PR Cleanup | delete merged branch; sweep stale | ⭐REUSE+**NEW** | `merge-pr.mjs` + `repo-governance-auditor.mjs` |
@@ -62,7 +63,8 @@ The whole lifecycle is **one engine workflow definition** (`delivery-lifecycle`,
 | Tier | What | Why |
 |---|---|---|
 | **AUTONOMOUS (built)** | monitor · diagnose known classes · the verify-loop on the deterministic checks-green rule · deploy-watch · report · merge/deploy *mechanics* (fail-closed) | deterministic rules, no calibration needed |
-| **HUMAN-GATED (built)** | founder greenlight (C6 approval) · merge-to-main · prod authorization (lane ratified once) · NEEDS-APPROVAL fixes · rollback | irreversible → C6 |
+| **HUMAN-GATED (built)** | founder greenlight (C6 approval) · merge-to-main · Class C / irreversible-business-act (send money/publish/delete) · NEEDS-APPROVAL fixes · rollback | irreversible → C6 |
+| **STATE-AUTHORIZED (built)** | prod deploy authorization — `deployment-auth.mjs` checks SDLC state vs a founder-set-once policy (verify + approvals + Founder-Review-done + merge + CI + lane scope); DEV/Preview auto-authorize on verify + CI; fail-closed (never deploy past an unfinished governance step). Replaces "lane ratified once". Founder sets the policy + holds a FREEZE kill-switch, not a per-deploy signature (`DECISIONS.md` D7) | state-gated, not person-gated |
 | **ASPIRATIONAL (NOT built — forbidden to fake)** | the engine autonomously running the whole lifecycle with self-spawned agents + lights-out auto-merge | violates G9 (engine never self-spawns) + C6 (irreversible needs a human). Gated on G2 heartbeat (pg_cron) + S4 agent-runner |
 
 **Today: GitHub Actions is the trigger + runner + heartbeat, and Claude's main loop is the spawner.** Build the lifecycle *engine-shaped* now (the GH pipeline *models* the `delivery-lifecycle` definition) so it folds into the durable engine with zero retrofit when G2/S4 land. The **`founder-approved` label is the C6 human gate** — a verified-human decision (a CODEOWNER), *not* the forbidden parsed-green auto-merge; the Action only executes the merge the human authorized, fail-closed on red CI / unverified VERIFY / non-CODEOWNER label.
