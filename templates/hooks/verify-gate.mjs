@@ -1,29 +1,50 @@
 #!/usr/bin/env node
-// Delivery OS — verify-gate (Governance §12). The ONLY enforcement element that fires
-// without the orchestrator choosing to. Cross-platform (Node ESM, no bash dependency).
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// SAFETY: this hook is advisory ONLY. The binding author≠verifier + VERIFY-coverage enforcement is the
+// required CI check `verify-coverage` behind branch protection — that MUST be in place
+// (see templates/workflows/verify-coverage.yml + setup-branch-protection.mjs). Without it,
+// verification is unenforced. This local demotion (block→warn) is SAFE ONLY because the board
+// sequenced the CI gate FIRST (board decision 2026-06-25): CI verify-coverage + branch protection +
+// CODEOWNERS at the PR/merge is now the binding gate; this local hook informs and auto-remediates.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// Delivery OS — verify-gate (Governance §12). The enforcement element that fires without the
+// orchestrator choosing to. Cross-platform (Node ESM, no bash dependency).
 //
 //   node .claude/hooks/verify-gate.mjs <mode>
-//   mode = pre-commit | post-write | stop   (dispatched from .claude/settings.json)
+//   mode = pre-commit | post-write | stop | pre-push   (dispatched from .claude/settings.json + .githooks/pre-push)
 //
-// It blocks a slice from advancing when IMPLEMENTATION files changed without a fresh,
-// passing, INDEPENDENT docs/verify/VERIFY-<slice>.md. It checks that such an artifact
-// EXISTS and is well-formed — it cannot prove the verification was truthful (see §12
-// "Honest limit"). The committed .githooks/pre-push is the model-independent backstop.
+// ENFORCEMENT MODEL (board decision 2026-06-25):
+//   LOCAL = fast advisory + auto-verify, NEVER blocks; the binding gate is the required CI
+//   verify-coverage check + branch protection + CODEOWNERS at the PR/merge. A local commit is
+//   reversible; the merge is the gate. So the local modes now INFORM and REMEDIATE, they do not deny:
+//     • pre-commit  → WARN (advisory), exit 0. Never blocks git commit/push.
+//     • stop        → WARN + AUTO-VERIFY: prints a machine-readable advisory the orchestrator reads to
+//                     spawn the independent verifier (qa-test); writes a marker. Never blocks turn-end.
+//     • post-write  → advisory warn (unchanged).
+//     • pre-push    → the committed belt-and-suspenders backstop for the NO-CI path ONLY: stays
+//                     fail-closed for pushes to a PROTECTED ref (dev/main + tags); for feature-branch
+//                     pushes it WARNs only. The REAL gate is the CI verify-coverage required check.
 //
-// v4 additions (Governance §12/§14):
+// It detects when IMPLEMENTATION files changed without a fresh, passing, INDEPENDENT
+// docs/verify/VERIFY-<slice>.md. It checks that such an artifact EXISTS and is well-formed — it
+// cannot prove the verification was truthful (see §12 "Honest limit").
+//
+// v4 detection (UNCHANGED — only the ENFORCEMENT posture changed from block→warn):
 //  - WRITE-SCOPING: impl changes arriving TOGETHER with tests/e2e/evals changes require the
 //    VERIFY artifact to carry a QA-signed `test_pins_amended_by:` (incident 8: the old NONIMPL
 //    regex exempted exactly where the author/QA boundary lives).
 //  - PROBE RE-EXECUTION: if the artifact declares `machine_probe:`, the gate re-runs it and the
 //    artifact only counts while the probe exits 0.
-//  - §14 CONTINUOUS-DELIVERY TRIGGERS (pre-push): review-artifact detector + N-merges backstop,
-//    HARD-BLOCK (founder ruling F7) — the release-tag trigger alone never fired in the field.
+//  - SEMANTIC FRESHNESS: verifyCoversImpl (impl_fingerprint) with the mtime staleness fallback.
+//  - §14 CONTINUOUS-DELIVERY TRIGGERS (pre-push): review-artifact detector + N-merges backstop —
+//    fail-closed for PROTECTED refs (the no-CI backstop), advisory on feature branches.
 //
-// Bypass (loud, logged, deliberate): set DELIVERY_OS_GATE_BYPASS=1 to allow through.
-// Use only during bootstrap/debugging — every bypass prints a visible warning.
+// Bypass (loud, logged): set DELIVERY_OS_GATE_BYPASS=1. Now MOOT for the local modes (nothing blocks)
+// but kept harmless; it still short-circuits the pre-push backstop. Every bypass prints a warning.
 
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -31,6 +52,10 @@ const MODE = process.argv[2] || "stop";
 const ROOT = process.cwd();
 const STATE = join(ROOT, ".claude", ".verify-state.json");
 const CONFIG = join(ROOT, ".claude", ".verify-config.json");
+// ADVISORY marker the orchestrator reads after a turn to decide whether to spawn the independent
+// verifier (board 2026-06-25). Written in stop mode when impl changed without a covering VERIFY;
+// cleared when coverage is fresh. Lives under .claude/ so it never trips the gate's own change scan.
+const ADVISORY_MARKER = join(ROOT, ".claude", ".verify-advisory.json");
 const VERIFY_DIRS = ["docs/verify", "docs"];
 
 // Implementation surfaces the gate protects. Everything else (tests, docs, evals, build output) is exempt.
@@ -182,6 +207,8 @@ function freshPassArtifact(impl, tests = []) {
 // --- output helpers (Claude Code hook protocol) ---
 const emit = (o) => { process.stdout.write(JSON.stringify(o)); process.exit(0); };
 const warn = (msg) => { process.stderr.write(`[verify-gate] ${msg}\n`); process.exit(0); };
+// non-terminal advisory print (does NOT exit) — lets a mode emit several advisories then exit 0 itself.
+const note = (msg) => { process.stderr.write(`[verify-gate] ${msg}\n`); };
 
 function releaseBlocked(tag) {
   return `BLOCKED by Delivery OS — OS Feedback Loop (Governance §14).\n` +
@@ -200,6 +227,37 @@ function blocked(impl) {
     `docs/verify/VERIFY-<slice>.md exists (verify_status: verified, author ≠ verifier, and its impl_fingerprint still matches the current code — re-verify only when the verified behavior changes).\n` +
     `This is "ready for QA" — not "done". Run an INDEPENDENT verifier on the running thing ` +
     `(template: delivery-os/templates/VERIFY.md.template), capture real execution evidence, then proceed.`;
+}
+
+// ── ADVISORY POSTURE (board 2026-06-25): local modes inform + remediate, they never block. ──────────
+const BINDING = `LOCAL is advisory; the binding gate is the required CI verify-coverage check + branch ` +
+  `protection + CODEOWNERS at the PR/merge (board 2026-06-25). A local commit is reversible; the merge is the gate.`;
+
+function advisoryMsg(impl) {
+  const list = impl.slice(0, 6).join(", ") + (impl.length > 6 ? ` …(+${impl.length - 6})` : "");
+  return `ADVISORY (NOT blocking): implementation files changed (${list}) without a fresh, passing, ` +
+    `INDEPENDENT docs/verify/VERIFY-<slice>.md (verify_status: verified, author ≠ verifier, impl_fingerprint ` +
+    `still matching). This is "ready for QA" — not "done". ${BINDING}`;
+}
+
+function clearAdvisoryMarker() { try { if (existsSync(ADVISORY_MARKER)) unlinkSync(ADVISORY_MARKER); } catch { /* non-fatal */ } }
+
+// stop-mode AUTO-VERIFY: print a clear machine-readable advisory the orchestrator parses to spawn the
+// independent verifier (qa-test), list the changed impl files, and drop a marker. NEVER blocks the turn.
+function autoVerifyAdvisory(impl) {
+  const list = impl.slice(0, 12).join(", ") + (impl.length > 12 ? ` …(+${impl.length - 12})` : "");
+  note(`ADVISORY: impl changed without a covering VERIFY — launching independent verifier (qa-test) recommended`);
+  note(`changed impl files: ${list}`);
+  note(BINDING);
+  try {
+    writeFileSync(ADVISORY_MARKER, JSON.stringify({
+      ts: new Date().toISOString(),
+      advisory: "impl_changed_without_covering_verify",
+      recommend: "spawn-independent-verifier:qa-test",
+      changed_impl: impl,
+      binding_gate: "ci:verify-coverage + branch-protection (board 2026-06-25)",
+    }, null, 2) + "\n");
+  } catch { /* non-fatal — the stderr advisory is the primary signal */ }
 }
 
 // ── ENGINE-OWNERSHIP ENFORCEMENT (Delivery-OS-as-platform) ───────────────────────────────────────
@@ -280,22 +338,25 @@ try {
   if (MODE === "pre-commit") {
     const cmd = input?.tool_input?.command || "";
     if (!/\bgit\s+(commit|push)\b/.test(cmd)) process.exit(0); // only guard commit/push
-    // ENGINE-OWNERSHIP enforcement (commit-gating path only): a hand-edited / stale vendored engine
-    // cannot be committed. Runs BEFORE the VERIFY check so the ownership block is unambiguous.
+    // ADVISORY ONLY (board 2026-06-25): WARN, never DENY. A local commit is reversible; the binding
+    // gate is the CI verify-coverage required check + branch protection at the PR/merge. We print the
+    // advisory and exit 0 — git commit/push is NOT blocked.
     const engineBlock = engineDriftBlock();
-    if (engineBlock)
-      emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: engineBlock } });
+    if (engineBlock) note(`ADVISORY (engine ownership drift — CI enforces hard, not blocking here): ${engineBlock.split("\n")[0]}`);
     const impl = changedImpl();
-    if (impl.length && !freshPassArtifact(impl, changedTests()))
-      emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: blocked(impl) } });
+    if (impl.length && !freshPassArtifact(impl, changedTests())) note(advisoryMsg(impl));
     process.exit(0);
   }
 
   if (MODE === "stop") {
+    // ADVISORY + AUTO-VERIFY (board 2026-06-25): never blocks turn-end. Print the advisory, and when
+    // impl changed without a covering VERIFY, emit the machine-readable line + marker so the
+    // orchestrator can spawn the independent verifier (qa-test). Exit 0 regardless.
     const engineBlock = engineDriftBlock();
-    if (engineBlock) emit({ decision: "block", reason: engineBlock });
+    if (engineBlock) note(`ADVISORY (engine ownership drift — CI enforces hard, not blocking here): ${engineBlock.split("\n")[0]}`);
     const impl = changedImpl();
-    if (impl.length && !freshPassArtifact(impl, changedTests())) emit({ decision: "block", reason: blocked(impl) });
+    if (impl.length && !freshPassArtifact(impl, changedTests())) autoVerifyAdvisory(impl);
+    else clearAdvisoryMarker(); // coverage is fresh (or nothing changed) → no pending advisory
     process.exit(0);
   }
 
@@ -303,13 +364,22 @@ try {
     // git feeds ref lines on stdin: "<localRef> <localSha> <remoteRef> <remoteSha>".
     // The model-independent backstop: inspect the COMMITTED push RANGE (not the working tree),
     // so a change committed via bare git and pushed with a clean tree is still caught.
+    //
+    // POSTURE (board 2026-06-25): the REAL gate is now the CI verify-coverage required check + branch
+    // protection at the PR/merge. This pre-push stays fail-closed as belt-and-suspenders for the NO-CI
+    // path, but ONLY for pushes to a PROTECTED ref (dev/main + release tags) — the degenerate backstop.
+    // Pushes to a feature branch WARN only (the PR/CI is where they get gated). If the target ref can't
+    // be determined, we treat it as protected (conservative).
     const Z = /^0+$/;
+    const PROTECTED_REF = /^refs\/(heads\/(main|master|dev|develop|release(\/.*)?)|tags\/)/;
     const sh = (cmd) => { try { return execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
-    const changed = new Set(); const tags = []; let tip = "HEAD";
+    const changed = new Set(); const tags = []; let tip = "HEAD"; let protectedPush = false; let sawRef = false;
     for (const line of RAWIN.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
-      const [localRef, localSha, , remoteSha] = line.split(/\s+/);
+      const [localRef, localSha, remoteRef, remoteSha] = line.split(/\s+/);
       if (!localSha || Z.test(localSha)) continue;            // ref deletion
       tip = localSha;
+      sawRef = true;
+      if (PROTECTED_REF.test(remoteRef || "")) protectedPush = true; // pushing to dev/main/release/tag
       const tagm = (localRef || "").match(/^refs\/tags\/(.+)$/);
       if (tagm) tags.push({ name: tagm[1], sha: localSha });   // a tag = a release (OS Feedback Loop trigger)
       let files = "";
@@ -320,6 +390,16 @@ try {
       }
       files.split("\n").map((s) => s.trim()).filter(Boolean).forEach((f) => changed.add(f));
     }
+    // Conservative: if we never saw a parseable ref line, treat as protected (fail-closed backstop).
+    if (!sawRef) protectedPush = true;
+    // REF-GATED ENFORCEMENT: protected ref → hard-block (exit 1, the no-CI backstop); feature branch →
+    // advisory warn (exit 0, leave it to the CI verify-coverage required check at the PR/merge).
+    const enforce = (msg) => {
+      if (protectedPush) { process.stderr.write(msg + "\n"); process.exit(1); }
+      process.stderr.write(
+        `[verify-gate] ADVISORY (feature-branch push — NOT blocking; the binding gate is the CI verify-coverage ` +
+        `required check + branch protection at the PR/merge, board 2026-06-25):\n` + msg + "\n");
+    };
     // RELEASE TRIGGER (OS Feedback Loop, Governance §14): a release (a pushed tag) cannot complete
     // without an OS-feedback triage existing in the tagged tree — the mechanism creates the
     // opportunity to learn; the triage's content is human judgment ("no framework lessons" is valid).
@@ -327,7 +407,7 @@ try {
       // require THIS release's own triage (tag-named) — a stale OS-FEEDBACK from a prior release
       // must not satisfy a new one ("each release asks its own question").
       const named = sh(`git cat-file -t ${t.sha}:docs/feedback/OS-FEEDBACK-${t.name}.md`).trim() === "blob";
-      if (!named) { process.stderr.write(releaseBlocked(t.name) + "\n"); process.exit(1); }
+      if (!named) enforce(releaseBlocked(t.name));
     }
     const all = [...changed];
 
@@ -344,13 +424,12 @@ try {
     const reviewArtifacts = all.filter(isReviewClass);
     const carriesTriage = all.some((f) => /(^|\/)docs\/feedback\/OS-FEEDBACK-.+\.md$/i.test(f));
     if (reviewArtifacts.length && !carriesTriage) {
-      process.stderr.write(
+      enforce(
         `BLOCKED by Delivery OS — OS Feedback Loop (Governance §14, review-artifact detector, fail-closed per F7).\n` +
         `This push carries review-class artifact(s): ${reviewArtifacts.slice(0, 4).join(", ")}${reviewArtifacts.length > 4 ? " …" : ""}\n` +
         `but no docs/feedback/OS-FEEDBACK-<event>.md. A review that files no triage is the recorded failure mode\n` +
         `this detector closes. Template: delivery-os/templates/OS-FEEDBACK.md.template — "No framework lessons\n` +
-        `discovered." is a VALID answer, but the triage must exist in the same push.\n`);
-      process.exit(1);
+        `discovered." is a VALID answer, but the triage must exist in the same push.`);
     }
 
     const impl = all.filter((f) => isImpl(f) && !NONIMPL.test(f));
@@ -365,12 +444,11 @@ try {
       const range = lastFb ? `${lastFb}..${tip}` : tip;
       const count = parseInt(sh(`git rev-list --count ${range}`).trim() || "0", 10);
       if (count > N) {
-        process.stderr.write(
+        enforce(
           `BLOCKED by Delivery OS — OS Feedback Loop (Governance §14, N-merges backstop, fail-closed per F7).\n` +
           `${count} commits since the last docs/feedback/ triage (backstop: ${N}; configure via\n` +
           `.claude/.verify-config.json {"feedback_backstop_commits": N}). File an OS-feedback triage in this\n` +
-          `push — "No framework lessons discovered." is a valid answer, but the triage must exist.\n`);
-        process.exit(1);
+          `push — "No framework lessons discovered." is a valid answer, but the triage must exist.`);
       }
     }
     // a verified, independent VERIFY artifact must be part of the pushed tree (read at the tip commit)
@@ -380,14 +458,17 @@ try {
       const fm = fmText(sh(`git show ${tip}:${vp}`));
       if (String(fm.verify_status).toLowerCase() === "verified" && fm.author && fm.verifier && fm.author !== fm.verifier) { ok = true; break; }
     }
-    if (!ok) { process.stderr.write(blocked(impl) + "\n"); process.exit(1); }
+    if (!ok) enforce(blocked(impl));
     process.exit(0);
   }
 } catch (err) {
-  // fail-closed on commit/stop (honest failure, Governance §5); fail-open on post-write
-  const reason = `verify-gate could not evaluate (${err?.message || err}). Failing closed — verification cannot be confirmed.`;
-  if (MODE === "pre-commit") emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } });
-  if (MODE === "stop") emit({ decision: "block", reason });
+  // POSTURE (board 2026-06-25): the LOCAL modes are advisory — an evaluation error degrades to a LOUD
+  // warning (exit 0), NOT a block. A local commit is reversible; the binding gate is the CI
+  // verify-coverage required check + branch protection at the PR/merge. (The pre-push backstop reaches
+  // its own process.exit before this handler; an error here on pre-push fails OPEN by design — CI is
+  // the hard backstop.)
+  const reason = `verify-gate could not evaluate (${err?.message || err}). ADVISORY only — NOT blocking ` +
+    `(binding gate = CI verify-coverage + branch protection).`;
   warn(reason);
 }
 process.exit(0);

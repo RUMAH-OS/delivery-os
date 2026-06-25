@@ -1,0 +1,150 @@
+# =============================================================================
+# Delivery OS — VERIFY-COVERAGE workflow (board decision 2026-06-25).
+#
+# WHAT THIS IS
+#   The SERVER-SIDE verification gate. It MOVES the binding verify floor from the
+#   local pre-push hook to the PR/merge: on every PR to `dev` or `main` it proves,
+#   on a clean runner, that a FRESH, INDEPENDENTLY-AUTHORED VERIFY semantically
+#   covers EVERY changed implementation file — then re-runs that VERIFY's machine
+#   probe. The job is fail-closed at every step.
+#
+#   Four proofs, in order (any failure blocks merge):
+#     (a) COVERAGE   — a `verify_status: verified` VERIFY's impl_fingerprint covers
+#                      EVERY changed impl file (SEMANTIC, via verifyCoversImpl — a
+#                      behavioral change → not covered; comments/whitespace → covered).
+#     (b) INDEPENDENCE — author≠verifier proven from GIT COMMITTER IDENTITY: the impl
+#                      committers and the VERIFY committers are disjoint sets.
+#     (c) PROBE      — the covering VERIFY's `machine_probe` command, re-run on the
+#                      clean runner (exit non-zero fails).
+#
+# REQUIRED CHECK
+#   This is a REQUIRED status check — but a workflow file alone does NOT block merge.
+#   Branch protection makes it binding. Run ONCE per repo, as an admin:
+#       node .claude/os/tools/setup-branch-protection.mjs --repo <owner/name> --branch main --apply
+#       node .claude/os/tools/setup-branch-protection.mjs --repo <owner/name> --branch dev  --apply
+#   That sets required_status_checks:[verify-coverage] + require_code_owner_reviews
+#   (the platform half of author≠verifier — a different human must approve /docs/verify/).
+#
+# ORTHOGONAL TO THE C6 HUMAN-MERGE GATE
+#   This does NOT replace the founder-approved label gate (promote-to-prod.yml). It
+#   STRENGTHENS the verification floor only. Both gates apply.
+#
+# SCAFFOLDER-COPIED (manifest workflows[]) — vendored byte-identical into a consumer's
+#   .github/workflows/ by `os-inherit sync`; the CI tools it calls are vendored under
+#   .claude/os/tools/ (with templates/tools/ as the OS-repo fallback).
+# =============================================================================
+
+name: verify-coverage
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# Read-only: this gate never mutates the repo. It only reads code + PR metadata.
+permissions:
+  contents: read
+  pull-requests: read
+
+# One run per PR; a newer push supersedes an in-flight run.
+concurrency:
+  group: verify-coverage-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-coverage:
+    name: verify-coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history — we diff against the merge-base and read commit identities
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      # ── (1) compute the merge-base + the changed-file set ─────────────────────
+      # base = merge-base(origin/<base-branch>, HEAD) so we measure ONLY this PR's work,
+      # not unrelated commits already on the base branch.
+      - name: Compute merge-base
+        id: base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF"
+          BASE="$(git merge-base "origin/$BASE_REF" HEAD)"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "Merge-base with origin/$BASE_REF: $BASE"
+          echo "Changed files in this PR:"
+          git diff --name-only "$BASE" HEAD
+
+      # Resolve the vendored CI tools (consumer: .claude/os/tools; OS repo: templates/tools).
+      - name: Resolve verify CI tools
+        id: tools
+        run: |
+          set -euo pipefail
+          for d in ".claude/os/tools" "templates/tools"; do
+            if [ -f "$d/verify-coverage-ci.mjs" ] && [ -f "$d/verify-independence-ci.mjs" ]; then
+              echo "dir=$d" >> "$GITHUB_OUTPUT"
+              echo "Using verify CI tools in: $d"
+              exit 0
+            fi
+          done
+          echo "::error::verify-coverage-ci.mjs / verify-independence-ci.mjs not found (.claude/os/tools or templates/tools). Run \`os-inherit sync\`. Fail-closed."
+          exit 1
+
+      # ── (a) COVERAGE — a verified VERIFY covers EVERY changed impl file ───────
+      - name: Coverage — a fresh verified VERIFY covers every changed impl file
+        id: coverage
+        run: |
+          set -euo pipefail
+          DIR="${{ steps.tools.outputs.dir }}"
+          # 1) Capture the JSON report for the probe step (machine_probes). Don't gate here,
+          #    so coverage.json always exists even when coverage fails (|| true).
+          node "$DIR/verify-coverage-ci.mjs" --base "${{ steps.base.outputs.base }}" --json > coverage.json || true
+          cat coverage.json
+          # 2) Gate + emit per-file ::error:: annotations (this run's exit code blocks merge).
+          node "$DIR/verify-coverage-ci.mjs" --base "${{ steps.base.outputs.base }}"
+
+      # ── (b) INDEPENDENCE — author≠verifier from git committer identity ────────
+      - name: Independence — author ≠ verifier (from git committer identity)
+        run: |
+          set -euo pipefail
+          DIR="${{ steps.tools.outputs.dir }}"
+          node "$DIR/verify-independence-ci.mjs" \
+            --base "${{ steps.base.outputs.base }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --author "${{ github.event.pull_request.user.login }}"
+
+      # ── (c) PROBE — re-run the covering VERIFY's machine_probe on the clean runner ─
+      - name: Re-run the covering VERIFY's machine_probe(s)
+        run: |
+          set -euo pipefail
+          # Read the deduped machine_probe commands the coverage tool surfaced.
+          mapfile -t PROBES < <(node -e "const r=require('./coverage.json');(r.machine_probes||[]).forEach(p=>console.log(p))")
+          if [ "${#PROBES[@]}" -eq 0 ]; then
+            echo "::error::No machine_probe found on the covering VERIFY(s). A verified VERIFY must declare a machine_probe to re-run. Fail-closed."
+            exit 1
+          fi
+          for probe in "${PROBES[@]}"; do
+            echo "::group::machine_probe: $probe"
+            # Run the recorded probe verbatim on the clean runner; non-zero exit fails the gate.
+            bash -c "$probe"
+            echo "::endgroup::"
+          done
+          echo "All machine_probe(s) re-ran green on the clean runner."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## verify-coverage (server-side verification gate)"
+            echo ""
+            echo "- Merge-base: \`${{ steps.base.outputs.base }}\`"
+            echo "- Coverage report: see \`coverage.json\` step output"
+            echo "- Required check: branch protection (setup-branch-protection.mjs) makes this binding."
+            echo "- Orthogonal to the C6 founder-approved label gate — both apply."
+          } >> "$GITHUB_STEP_SUMMARY"
