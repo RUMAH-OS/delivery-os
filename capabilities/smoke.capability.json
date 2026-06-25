@@ -1,0 +1,41 @@
+{
+  "id": "smoke",
+  "name": "Smoke / Production-Verify Probe",
+  "description": "After a deploy lands, GET a battery of health paths against the deployed URL and gate CI on the verdict. Read-only: it issues GETs and classifies them, mutating nothing. Fail-closed — a connection error, timeout, wrong status, or missing body substring is a FAIL, and ANY failing check fails the overall verdict (exit non-zero) so CI gates on it.",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/smoke.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    null,
+    "wiki":     null
+  },
+
+  "composesUnder": "skills/ci-release-orchestrator/SKILL.md",
+  "note": "Mechanical post-deploy verify step of the release lifecycle; no skill file of its own — it composes under the ci-release-orchestrator skill (after the deploy lands, this probes the running surface).",
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/smoke.mjs --url <base> [--config <file>] [--timeout <ms>] [--json] [--dry-run]",
+    "input": {
+      "url":     { "type": "string", "required": true },
+      "config":  { "type": "string", "required": false },
+      "timeout": { "type": "number", "required": false }
+    },
+    "output": "a PASS/FAIL/SKIP line per check + an overall PASS/FAIL verdict; structured report under --json; exit non-zero on any FAIL",
+    "sideEffect": "read",
+    "idempotent": true,
+    "observability": { "outcome": "per-check verdict { path, status, verdict, reason } + overall { verdict, counts }; exit code gates CI (0 only when PASS)" },
+    "errors": null
+  },
+
+  "health": null
+}

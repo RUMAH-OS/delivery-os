@@ -1,0 +1,154 @@
+# =============================================================================
+# Delivery OS — DEV PREVIEW workflow (TEMPLATE — NOT installed live in delivery-os).
+#
+# WHAT THIS IS
+#   The DEV-first half of the canonical SDLC (capabilities/CANONICAL-SDLC.md §3).
+#   On every PR that targets `dev`, this:
+#     1. builds + deploys a Vercel **PREVIEW** (NOT production — no `--prod`, and a
+#        dedicated DEV project id), using the same robust prebuilt CLI flow as the
+#        production deploy.yml, and
+#     2. posts the Founder Review Package as a PR comment (the live DEV url + the
+#        plain-language "what/why/how-to-try-it" package) so the founder reviews the
+#        running slice in DEV, never a diff.
+#
+# WHY A SEPARATE DEV PROJECT
+#   DEV testing must NEVER touch production rows. A dedicated DEV Vercel project
+#   (VERCEL_PROJECT_ID_DEV) + a dedicated DEV Supabase project (its DATABASE_URL is a
+#   DEV secret, set in the DEV Vercel project's env) keep DEV and prod fully isolated.
+#   See FOUNDER-RUNBOOK-DEV-PROVISIONING.md for the one-time provisioning.
+#
+# WHAT THIS IS DELIBERATELY NOT
+#   This NEVER deploys to production and never merges anything. Promotion to prod is a
+#   separate, founder-gated workflow (promote-to-prod.yml) driven by the
+#   `founder-approved` label — the C6 human gate. This file only previews + reports.
+#
+# SCAFFOLDER-COPIED + FOUNDER-FILLED
+#   Vendored into a consumer's `.github/workflows/` by `os-inherit sync` (manifest
+#   `workflows[]`). It is byte-identical to canonical (drift-checked); the per-repo
+#   secrets it references are GitHub repository secrets the founder sets once — the
+#   FILE is never hand-edited.
+#
+# ── ONE-TIME SETUP (founder; see the runbook for exact clicks) ───────────────
+#   Create these GitHub repository secrets (repo → Settings → Secrets and variables
+#   → Actions → "New repository secret"):
+#     1) VERCEL_TOKEN           — a Vercel access token (https://vercel.com/account/tokens)
+#     2) VERCEL_ORG_ID          — the Vercel team/org id
+#     3) VERCEL_PROJECT_ID_DEV  — the id of the DEDICATED DEV Vercel project
+#   If any are absent this job FAILS CLOSED with a readable message (the Guard step),
+#   not a cryptic Vercel error.
+# =============================================================================
+
+name: DEV Preview (Vercel preview + founder review package)
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# Minimal permissions: read the code, write ONE PR comment (the review package).
+# No `contents: write` — this workflow never merges, pushes, or deploys to prod.
+permissions:
+  contents: read
+  pull-requests: write
+
+# One preview per PR ref; a newer push supersedes an in-flight preview.
+concurrency:
+  group: dev-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dev-preview:
+    name: Build DEV preview + post review package
+    runs-on: ubuntu-latest
+
+    # The app lives in apps/web (the pnpm-monorepo default, matching deploy.yml).
+    # If a consumer's app is elsewhere, change this one value.
+    env:
+      APP_DIR: apps/web
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      # NOTE: the DEV project id — NOT the prod VERCEL_PROJECT_ID. This is what keeps
+      # the preview pointed at the DEV project (and thus the DEV Supabase data).
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DEV }}
+
+    steps:
+      # ── Fail-closed guard: DEV Vercel secrets must be provisioned ─────────────
+      - name: Guard — required DEV Vercel secrets are set
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          missing=0
+          for var in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required DEV secret: $var"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo ""
+            echo "DEV preview is not provisioned yet. Set these THREE GitHub repository"
+            echo "secrets (repo → Settings → Secrets and variables → Actions):"
+            echo ""
+            echo "  1. VERCEL_TOKEN           — a Vercel access token (https://vercel.com/account/tokens)"
+            echo "  2. VERCEL_ORG_ID          — the Vercel team/org id"
+            echo "  3. VERCEL_PROJECT_ID_DEV  — the DEDICATED DEV Vercel project id"
+            echo ""
+            echo "See FOUNDER-RUNBOOK-DEV-PROVISIONING.md for exact clicks. Fail-closed by design."
+            exit 1
+          fi
+          echo "All three DEV Vercel secrets are present."
+
+      - uses: actions/checkout@v5
+
+      # Version comes from package.json "packageManager" (do NOT also set `version:`).
+      - uses: pnpm/action-setup@v4
+
+      # F3 FOOT-GUN PIN: DEV is pinned to Node 22.x so the Node-24 Vercel failure
+      # surfaces in DEV, never in prod (capabilities/CANONICAL-SDLC.md §3).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@39
+
+      # Pull PREVIEW project settings + env into APP_DIR/.vercel (NOT production).
+      - name: Pull Vercel environment (preview)
+        working-directory: ${{ env.APP_DIR }}
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      # Build the PREVIEW artifacts locally (prebuilt flow) — NO `--prod`.
+      - name: Build (preview, prebuilt)
+        working-directory: ${{ env.APP_DIR }}
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+
+      # Deploy the prebuilt PREVIEW — NO `--prod`. Capture the deployment URL so the
+      # review package can point the founder at the running DEV slice.
+      - name: Deploy (preview, prebuilt)
+        id: deploy
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          URL="$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})"
+          echo "Preview deployed: $URL"
+          echo "dev_url=$URL" >> "$GITHUB_OUTPUT"
+
+      # ── Post the Founder Review Package as a PR comment ───────────────────────
+      # Uses the VENDORED tool (os-inherit puts it at .claude/os/tools/). It writes
+      # the durable artifact AND posts the condensed comment (--post is effectful;
+      # the tool is fail-closed if gh is unavailable). Guarded on the tool's presence
+      # so a not-yet-inherited consumer reports clearly instead of crashing.
+      - name: Post founder review package (DEV url)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEV_URL: ${{ steps.deploy.outputs.dev_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          TOOL=".claude/os/tools/founder-review-package.mjs"
+          if [ ! -f "$TOOL" ]; then
+            echo "::warning::$TOOL not found — run \`os-inherit sync\` to inherit it. Skipping review-package post."
+            exit 0
+          fi
+          node "$TOOL" "$PR_NUMBER" --dev-url "$DEV_URL" --post

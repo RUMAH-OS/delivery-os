@@ -1,0 +1,38 @@
+{
+  "id": "repo-governance-auditor",
+  "name": "Repository Governance Auditor",
+  "description": "Read-and-recommend auditor that classifies a repo's branch + PR health against a G1–G10 governance knowledge base — squash-merge-aware merged-branch detection, superseded-PR detection, merge-readiness (human-only gate), stale/orphaned/limit-breach surfacing, and main-deployability escalation — applying only safe cleanup (delete a provably-merged branch, close a superseded PR) and surfacing everything else. It never merges, never closes non-superseded work, and never mutates without --apply-safe.",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/repo-governance-auditor.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    "skills/repo-governance/SKILL.md",
+    "wiki":     null
+  },
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/repo-governance-auditor.mjs",
+    "input": {
+      "repo":      { "type": "string", "required": false },
+      "applySafe": { "type": "boolean", "required": false },
+      "safeOnly":  { "type": "boolean", "required": false }
+    },
+    "output": null,
+    "sideEffect": "read",
+    "idempotent": true,
+    "observability": { "outcome": "the structured --json audit report (findings + scoreboard: active PRs vs target/soft-limit, merged-undeleted/cherry-merged branch counts, merge-ready/superseded/stale/orphaned, main deployability) + per-finding autonomy band" },
+    "errors": null
+  },
+
+  "health": null
+}

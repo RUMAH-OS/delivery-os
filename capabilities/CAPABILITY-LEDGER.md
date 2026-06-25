@@ -11,6 +11,13 @@
 `in-OS` (canonical in delivery-os) → `propagated` (every project inherits via the upgrade path).
 **Class:** `OS-foundational` = inherited by every project · `project-earned` = stays local (earned per project).
 
+> **2026-06-25 — Canonical SDLC merged to `main` (#5 + #8), founder-approved → status `in-OS`.** The
+> SDLC lifecycle capabilities advanced `candidate → verified → in-OS`: ci-release-orchestrator,
+> repo-governance-auditor, founder-review-package, release-notes, smoke (+ the os-inherit `workflows`
+> class). All independently verified (author≠verifier); post-merge smoke = 5/5 tool self-tests PASS.
+> Registered in `os-foundation.manifest.json` (25 tools, 7 skills, 3 workflows). Next stage `propagated`
+> = `os-inherit sync` into PLOS/Admin (runs in the consumer repos). Release notes: `docs/RELEASE-NOTES-canonical-sdlc.md`.
+
 ## THE single canonical path (founder-ratified 2026-06-14 — no parallel mechanisms)
 **delivery-os is the source of truth. PLOS consumes. Future projects inherit automatically.** One path:
 ```
@@ -54,6 +61,8 @@ There is exactly ONE propagation mechanism (os-sync + os-inherit) and ONE capabi
 | **deployment-operator + audited lane (#7)** | deployment ownership confusion; per-action auth dance | agent+automation | MED | the founder-burden lane (one-time ratification) |
 | **cross-repo seam-contract hash check (Admin↔PLOS)** | api-integration agent review (2026-06-15): the seam contract is vendored per-repo with NO mechanism ensuring both copies are identical bytes; a new valid event type Admin ships would be silently REJECTED by a stale PLOS copy until it hits prod | gate | MED | the seam-gate proves producer↔contract conformance within a repo, but nothing proves Admin's contract == PLOS's contract; os-sync the contract + fail CI on a vendored-hash mismatch |
 | **ci-release-orchestrator** (watch CI · diagnose red→named root-cause+owner-ward fix · safe infra fixes auto · gate merge on the verify floor · watch deploy · route release go/no-go to §11) | the founder polled `gh run watch` by hand, learned of red builds late, re-diagnosed the same CI failure classes (stale conformance pins · next-build OOM · Vercel node-24 · merge conflict) ad hoc, and merged-when-green from memory with no record the verify floor / readiness gate was actually closed | skill+automation | MED | turns the by-hand CI-watch + merge-when-green loop into a read-and-recommend procedure (`templates/tools/ci-release-orchestrator.mjs`) that CITES verify-gate (merge floor) and routes release go/no-go to principle-11-review; effectful steps stay human-gated. Field-earned 2026-06-24/25; independent QA `docs/verify/VERIFY-ci-release-orchestrator.md` (verified) |
+| **repo-governance-auditor** (audit branch+PR health · squash-merge-aware merged detection · the 3/5 PR-limit · superseded auto-close + merged-branch delete SAFE-TO-AUTO · merge/consolidate/close-abandoned NEEDS-APPROVAL) | PRs + branches accumulated unbounded (PLOS: 195 remote branches, only ~13 ancestry-detectable because squash-merge hides the rest; 7 open PRs over the soft-limit of 5; superseded duplicates closed by hand); no continuous audit kept a repo release-ready | skill+automation | **HIGH** | the Repository-Governance lifecycle of the canonical SDLC — keeps every repo at ≤3 active PRs with no stale branches; reuses `decideMerge`/`merge-pr.mjs` (human merge gate, no override). Field-earned 2026-06-25; independent QA `docs/verify/VERIFY-repo-governance-auditor.md` (verified) — human-only-merge + squash-merge guard hold |
+| **founder-review-package** (on a slice's PR, generate the Founder Review Package: what/why/changed/decisions/risks/screenshots/links + a zero-tech numbered test guide; post as a PR comment) | the founder reviewed prod by hand with no structured package — no what-changed/why/how-to-test/links artifact; review happened against main at the merge gate, not on a DEV deploy | skill+automation | **HIGH** | the Founder Review lifecycle of the canonical SDLC — the DEV-first founder-facing artifact. Testing guide is engineer-seeded + URL-interpolated (NEVER diff-invented); screenshots real-or-explicit-N/A; the `--post` comment is effectful + fail-closed. Field-earned 2026-06-25; independent QA `docs/verify/VERIFY-founder-review-package.md` |
 
 ## Maturity stage tracker (the victory-gate — updated every milestone; no early wins)
 Stage ladder: **Documented → Built → Verified → Used → Inherited → Auto-executed.** A capability still
