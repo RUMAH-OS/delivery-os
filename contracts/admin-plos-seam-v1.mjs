@@ -201,9 +201,13 @@ const REGISTRY = {
   // attach the real BTW/VAT invoice PDF to the customer email. NO PII (url/filename
   // are scanned; PII-strict). Inline base64 (shape B) is rejected — keep the event
   // lean. See pdfRef enforcement block in validateSeamEvent below.
+  // period / periodLabel (OPTIONAL, additive — version-safe; pre-period consumers ignore them) carry the
+  // BILLED MONTH so PLOS renders the SAME period wording the Admin notice already contains. `period` is the
+  // raw stored 'YYYY-MM'; `periodLabel` is the display form ("July 2026", from the shared formatPeriod).
+  // DISPLAY ONLY — refs+display, PII-free (no name/email). Absent on a one-off (deposit, period=null) emit.
   "invoice.send_requested": {
     required: ["invoiceId", "number", "tenantId", "contractId", "totalCents", "dueDate", "billerName", "notice"],
-    optional: ["pdfRef"],
+    optional: ["pdfRef", "period", "periodLabel"],
     notice: { required: ["subject", "body"], optional: ["bodyHtml"], text: ["body"] },
     pdfRef: { required: ["url", "mimeType", "filename"], optional: ["expiresAt"] },
   },
@@ -213,9 +217,12 @@ const REGISTRY = {
     optional: [],
   },
   // L1495 (reminders/run). Operator-equivalent send request the executor acts on.
+  // period / periodLabel (OPTIONAL, additive — version-safe) carry the BILLED MONTH so the PLOS reminder
+  // renderer shows the SAME period wording as the invoice email/PDF. raw 'YYYY-MM' + display "July 2026"
+  // (shared formatPeriod). DISPLAY ONLY, PII-free. Absent when the invoice has no period (one-off).
   "reminder.send_requested": {
     required: ["invoiceId", "number", "tenantId", "contractId", "dueDate", "balanceCents"],
-    optional: [],
+    optional: ["period", "periodLabel"],
   },
   // L1504 (reminders/run). The "became overdue" fact, emitted once per invoice.
   "invoice.overdue": {
