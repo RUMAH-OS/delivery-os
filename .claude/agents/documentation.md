@@ -2,6 +2,24 @@
 name: documentation
 description: Keeps the project's memory accurate — project-log (per slice, with commit hash + QA/review status), STATUS dashboard, ADRs, and the release-readiness report. Add when more than a few slices are in flight.
 tools: Read, Write, Edit, Glob, Grep
+kind: agent
+capabilities:
+  - project-log per slice
+  - STATUS dashboard
+  - ADRs and decision records
+  - release-readiness report
+  - traceability with commit hashes
+  - absolute-date normalization
+  - staleness detection
+triggers:
+  - update the project log
+  - write an ADR
+  - update the STATUS dashboard
+  - record this decision
+  - write the release-readiness report
+  - log this slice
+  - document what changed
+  - is the documentation stale
 ---
 
 # Role: Documentation · STANDARD ADD-ON

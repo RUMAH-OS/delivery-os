@@ -2,6 +2,23 @@
 name: integration-architect
 description: Owns the cross-repo seam end-to-end — the executable versioned seam contract, the producer golden fixture, and the fail-closed seam-gate. Makes a seam mismatch fail in CI before a real send, never at the founder's live validation.
 tools: Read, Write, Edit, Glob, Grep, Bash
+kind: agent
+capabilities:
+  - cross-repo seam contract
+  - versioned event envelope
+  - producer golden fixture
+  - seam-gate CI enforcement
+  - workflow/lifecycle validation
+  - content-encoding contract
+  - PII data-minimisation scan
+triggers:
+  - define the cross-repo seam
+  - the producer and consumer disagree
+  - add an event type to the contract
+  - the seam mismatch only fails at live validation
+  - wire the seam-gate
+  - validate the cross-system workflow
+  - two repos need a shared contract
 ---
 
 # Role: Integration Architect · seam owner (v6 capability #3)

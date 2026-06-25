@@ -1,0 +1,37 @@
+{
+  "id": "ci-release-orchestrator",
+  "name": "CI & Release Orchestrator",
+  "description": "Read-and-recommend orchestrator that watches CI, diagnoses a red build to a named root cause, applies only safe infra fixes, checks the merge floor, watches the deploy, and surfaces the release go/no-go — it never merges, deploys, or concludes alone.",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/ci-release-orchestrator.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    "skills/ci-release-orchestrator/SKILL.md",
+    "wiki":     null
+  },
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/ci-release-orchestrator.mjs <pr-number>",
+    "input": {
+      "pr":     { "type": "string", "required": false },
+      "branch": { "type": "string", "required": false }
+    },
+    "output": null,
+    "sideEffect": "read",
+    "idempotent": true,
+    "observability": { "outcome": "the CI/deploy run terminal status (gh run view --json status,conclusion) + the slice's VERIFY-<slice>.md probe; structured --json run report" },
+    "errors": null
+  },
+
+  "health": null
+}
