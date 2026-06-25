@@ -56,6 +56,15 @@ A boundary is a **non-automatable next step**. The classes map 1:1 onto the foun
 | `cross-repo-coordination` | `cross_repo_coordination` | a sibling repo's gate must fire first |
 | `other` | `other` | must cite explicit evidence — flagged for review |
 
+**Founder-verifiable gates the validation boundary (founder directive 2026-06-25 — `DECISIONS.md` D6).** The
+`approval` / founder-review boundary fires **only when the change is `founder_verifiable`** (`change-classify.mjs` — UI/UX,
+customer-facing copy/emails, public surfaces, user-facing workflows, business behavior the founder can click + validate).
+A **non-founder-verifiable** slice raises **no `approval` boundary** — it auto-continues after automated verification. When
+the boundary does fire, the FAP for it **embeds the full zero-tech Founder Review Package** as its §5 (business summary ·
+exact URLs · simplest local-or-DEV path · click-by-click · expected results · pass/fail checklist · rollback if relevant),
+with all implementation details hidden. This is **orthogonal to** the irreversible Class C boundaries (`merge-to-main`,
+`deploy-auth`, `payment`, …), which stay human-gated whether or not the change is founder-verifiable.
+
 **Detection signals (the four enforcement layers, incl. the permission classifier — Governance §15):**
 1. **Tool denial** — the auto-mode permission classifier refuses (deploy, token mint, prod write, merge-to-main). Capture the verbatim denial + tool + timestamp.
 2. **Missing credential** — a presence probe returns absent.

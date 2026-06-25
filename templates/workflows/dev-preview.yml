@@ -135,12 +135,56 @@ jobs:
           echo "Preview deployed: $URL"
           echo "dev_url=$URL" >> "$GITHUB_OUTPUT"
 
+      # ── Classify the change: does the FOUNDER need to VALIDATE it? ────────────
+      # TWO ORTHOGONAL GATES. This is the VALIDATION gate: the Founder Review Package
+      # fires ONLY on a `founder_verifiable` change — something the founder can CLICK /
+      # SEE / VALIDATE (UI pages/components, customer copy/emails, public surfaces).
+      # A NON-founder-facing change (api/db/backend refactor, infra, CI, scripts, docs,
+      # deps, non-customer-facing migrations) -> founder_verifiable=false -> AUTO-CONTINUE
+      # with NO founder interruption (automated verification still runs).
+      # The SAFETY gate (class C: money/auth/migrations/secrets/control-plane) is separate
+      # and UNCHANGED — promote-to-prod.yml still human-gates it regardless of this output.
+      # FAIL-CLOSED: if the classifier is missing or errors, default founder_verifiable=true
+      # (review, to be safe — never silently skip the founder on an ambiguous change).
+      - name: Classify change (founder-verifiable?)
+        id: classify
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          CLASSIFY=".claude/os/tools/change-classify.mjs"
+          if [ ! -f "$CLASSIFY" ]; then
+            echo "::warning::$CLASSIFY not found — run \`os-inherit sync\` to inherit it. Fail-closed: treating change as founder-verifiable (review required)."
+            echo "founder_verifiable=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Diff this PR head against its base branch (depth-1 fetch of the base ref).
+          git fetch --no-tags --depth=1 origin "$BASE_REF" || true
+          if FV="$(node "$CLASSIFY" --base "origin/$BASE_REF" --founder-verifiable)"; then
+            case "$FV" in
+              true)
+                echo "founder_verifiable=true" >> "$GITHUB_OUTPUT"
+                echo "Founder-verifiable change — the Founder Review Package will be posted." ;;
+              false)
+                echo "founder_verifiable=false" >> "$GITHUB_OUTPUT"
+                echo "Auto-continue: not founder-verifiable — no founder review required." ;;
+              *)
+                echo "::warning::change-classify returned an unexpected value ('$FV') — fail-closed: review required."
+                echo "founder_verifiable=true" >> "$GITHUB_OUTPUT" ;;
+            esac
+          else
+            echo "::warning::change-classify errored — fail-closed: treating change as founder-verifiable (review required)."
+            echo "founder_verifiable=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # ── Post the Founder Review Package as a PR comment ───────────────────────
       # Uses the VENDORED tool (os-inherit puts it at .claude/os/tools/). It writes
       # the durable artifact AND posts the condensed comment (--post is effectful;
       # the tool is fail-closed if gh is unavailable). Guarded on the tool's presence
       # so a not-yet-inherited consumer reports clearly instead of crashing.
+      # GATED: runs ONLY when the change is founder_verifiable (the VALIDATION gate above);
+      # a non-founder-verifiable change auto-continues without interrupting the founder.
       - name: Post founder review package (DEV url)
+        if: steps.classify.outputs.founder_verifiable == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEV_URL: ${{ steps.deploy.outputs.dev_url }}
@@ -152,3 +196,11 @@ jobs:
             exit 0
           fi
           node "$TOOL" "$PR_NUMBER" --dev-url "$DEV_URL" --post
+
+      # When NOT founder-verifiable, make the auto-continue explicit in the run log.
+      - name: Auto-continue (not founder-verifiable)
+        if: steps.classify.outputs.founder_verifiable != 'true'
+        run: |
+          echo "Auto-continue: not founder-verifiable — no founder review required."
+          echo "The DEV preview is built and deployed; automated verification still applies."
+          echo "(Founder Review fires only on founder-verifiable changes — UI / copy / emails / public surfaces.)"

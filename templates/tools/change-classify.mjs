@@ -20,7 +20,16 @@
 //
 //   import { classify, DEFAULTS } from "./change-classify.mjs"
 //   classify(changedFiles, diffBody?, config?, { configError? })
-//     -> { class: "A"|"B"|"C", reason, signals }
+//     -> { class: "A"|"B"|"C", reason, signals,
+//          founder_verifiable: boolean, founder_verifiable_why }
+//
+// TWO ORTHOGONAL GATES (a change may trip both):
+//   - SAFETY (CONSEQUENCE): class A/B/C — does this need a human / never-auto? (below)
+//   - VALIDATION (founder_verifiable): does the FOUNDER need to click/see/validate it?
+//     true iff a founder-FACING surface (the visibleB UI globs) is touched — a UI page,
+//     customer copy/email, or public surface. NON-founder-facing (api/db/backend/infra/
+//     CI/scripts/docs/deps) -> false -> auto-continue, no founder interruption.
+//     ORTHOGONAL: a pricing-page *.tsx is founder_verifiable AND class C.
 //   changedFiles: string[] | { path, additions?, deletions?, loc? }[]
 //
 // Data-driven: the deny/allow/keyword tables below are the DEFAULTS; a project may
@@ -197,7 +206,22 @@ export function classify(changedFiles, diffBody = "", config = DEFAULTS, opts = 
   }
   signals.loc = totalLoc(files, diffBody);
 
-  const mk = (klass, reason) => ({ class: klass, reason, signals });
+  // --- FOUNDER-VERIFIABLE (orthogonal to A/B/C) ------------------------------
+  // A change is founder_verifiable iff it touches a founder-FACING surface — a thing
+  // the founder can CLICK / SEE / VALIDATE: UI (*.tsx/*.jsx, components/, ui/),
+  // customer-facing copy/emails (emails/, *.email.*), or public surfaces (public/).
+  // That is EXACTLY the visibleB UI globs — NOT reviewB (api/db: not founder-clickable)
+  // and NOT autoA (tests/scripts/docs/infra/CI). This gate (VALIDATION: does the founder
+  // need to look?) is ORTHOGONAL to the A/B/C safety gate (CONSEQUENCE): a pricing-page
+  // *.tsx is BOTH founder_verifiable AND class C. Computed over ALL files independent of
+  // which bucket each fell into in the first-match routing above.
+  const founderVisible = files.filter((f) => matchAny(f.path, cfg.visibleB));
+  const founder_verifiable = founderVisible.length > 0;
+  const founder_verifiable_why = founder_verifiable
+    ? `founder-verifiable: founder-facing surface(s) touched: ${founderVisible.map((f) => f.path).join(", ")} — founder can click/see/validate (Founder Review required).`
+    : `not founder-verifiable: no founder-facing surface (UI/email/public) touched — auto-continue, no founder review (automated verification still applies).`;
+
+  const mk = (klass, reason) => ({ class: klass, reason, signals, founder_verifiable, founder_verifiable_why });
 
   // 1) C WINS — any control-plane/deny path OR any body keyword. ALWAYS, first.
   if (signals.C.length || signals.keywordC.length) {
@@ -325,6 +349,33 @@ function selfTest() {
   ok(classify(["infra/terraform/main.tf"], "", custom).class === "A", "overridden autoA -> infra/** becomes A");
   ok(classify(["infra/terraform/main.tf"]).class === "B", "without the override, infra/** is unmatched -> B");
 
+  // =========================================================================
+  // FOUNDER-VERIFIABLE (the VALIDATION gate — orthogonal to the A/B/C SAFETY gate).
+  // true iff a founder-FACING surface (visibleB UI globs) is touched; false for pure
+  // api/db/backend/migrations/CI/scripts/docs. A pricing *.tsx is BOTH (true + class C).
+  // =========================================================================
+  const fvTsx = classify(["src/pages/Dashboard.tsx"], "+<div>hi</div>");
+  ok(fvTsx.founder_verifiable === true, "*.tsx -> founder_verifiable=true (founder can see the UI)");
+  log.push(`  [founder-verifiable] src/pages/Dashboard.tsx -> founder_verifiable=${fvTsx.founder_verifiable}  "${fvTsx.founder_verifiable_why}"`);
+
+  const fvApi = classify(["src/api/users.ts"], "+export const handler = () => {};");
+  ok(fvApi.founder_verifiable === false, "src/api/**.ts -> founder_verifiable=false (not founder-clickable; auto-continue)");
+  log.push(`  [founder-verifiable] src/api/users.ts        -> founder_verifiable=${fvApi.founder_verifiable}  "${fvApi.founder_verifiable_why}"`);
+
+  const fvMig = classify(["db/migrations/0007_x.sql"], "+ALTER TABLE foo ADD COLUMN bar text;");
+  ok(fvMig.founder_verifiable === false, "migrations/ -> founder_verifiable=false (not founder-facing; safety gate still makes it class C)");
+  ok(fvMig.class === "C", "migrations/ still class C (safety gate UNCHANGED)");
+
+  // the orthogonal case: a pricing PAGE — founder_verifiable=true AND class C
+  const fvPricingTsx = classify(["src/pages/Pricing.tsx"], "+const PRICE_CENTS = 1999; // displayed monthly price");
+  ok(fvPricingTsx.founder_verifiable === true, "pricing *.tsx -> founder_verifiable=true (founder validates the price the user sees)");
+  ok(fvPricingTsx.class === "C", "pricing *.tsx -> class C (money keyword; safety gate still human-gates it)");
+  log.push(`  [founder-verifiable] src/pages/Pricing.tsx   -> founder_verifiable=${fvPricingTsx.founder_verifiable} + class=${fvPricingTsx.class} (ORTHOGONAL: both gates fire)`);
+
+  // founder_verifiable keys are present on EVERY return path (e.g. the empty-change fail-safe)
+  ok(typeof classify([]).founder_verifiable === "boolean", "founder_verifiable is present on the empty/fail-safe path");
+  ok(classify([]).founder_verifiable === false, "empty change -> founder_verifiable=false (nothing founder-facing touched)");
+
   if (fails.length) {
     console.error("change-classify --self-test FAIL:");
     for (const f of fails) console.error(`  - ${f}`);
@@ -365,6 +416,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === sameFile(process.argv[
   }
   const { config, configError, source } = loadConfig(cwd);
   const result = classify(changedFiles, diffBody, config, { configError });
+
+  // Machine seam for the Founder-Review (VALIDATION) gate: print ONLY the boolean to
+  // stdout so a CI step can capture it directly (orthogonal to the A/B/C class letter).
+  if (argv.includes("--founder-verifiable")) {
+    console.error(`change-classify (${source}) founder_verifiable=${result.founder_verifiable}: ${result.founder_verifiable_why}`);
+    console.log(result.founder_verifiable ? "true" : "false");
+    process.exit(0);
+  }
+
   if (asJson) console.log(JSON.stringify({ ...result, configSource: source }, null, 2));
   else {
     console.error(`change-classify (${source})`);

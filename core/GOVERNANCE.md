@@ -144,7 +144,18 @@ remains running awaiting input.** Reaching a boundary is **not "unfinished"**; t
 brand-new `/goal` after the founder acts. Per §13 this is a **mechanism+policy pair**: the `goal-stop.mjs` exit-gate is
 **kernel mechanism** (thin, fires without consent, fails closed — a goal clears only on `objective_complete` or a
 valid, evidence-backed FAP); the boundary taxonomy + FAP content are **governance policy**. The SDLC's HUMAN-GATED
-tier (C6 greenlight · merge-to-main · prod-auth · rollback) **are** the boundaries — zero SDLC redesign. Canonical
+tier (C6 greenlight · merge-to-main · prod-auth · rollback) **are** the boundaries — zero SDLC redesign.
+
+**Two distinct founder boundaries (founder directive 2026-06-25 — `DECISIONS.md` D6).** Separate the *validation* boundary
+from the *safety* boundary. (1) The **Founder-Review (validation) boundary** fires **ONLY on founder-verifiable changes** —
+things the founder can CLICK, SEE, or VALIDATE (UI/UX, customer-facing copy/emails, public surfaces, user-facing workflows,
+business behavior; classifier `founder_verifiable=true`) — and it is **satisfied by the auto-generated zero-tech Founder
+Review Package** (implementation details hidden). **Non-founder-verifiable work** (backend, infra, CI, refactors, dependency
+updates, internal scripts, docs, non-customer-facing migrations) **creates no founder boundary** — it auto-continues after
+automated verification (§3 author≠verifier / QA / CI). (2) The **Class C / irreversible human-gate is unchanged** (§6, §11):
+money/payments/pricing/auth/contracts/e-signatures/PII/migrations/prompts/secrets/control-plane and prod-deploy/merge-to-main
+stay human-gated regardless of founder-verifiability — `founder_verifiable` is **orthogonal to Class C**. The validation
+boundary narrows *interruptions for review*; it never relaxes the safety gate. Canonical
 home + the H1–H8 hardening: `capabilities/GOAL-EXECUTION-CONTRACT.md`. *(Earned 2026-06-25: a goal phrased as "merged
 to main" looped its Stop-hook dozens of times because merge-to-main is a C6 human gate, never autonomously satisfiable
 — the infinite-idle incident this rule kills.)*

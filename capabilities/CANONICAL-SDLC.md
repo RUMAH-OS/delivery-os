@@ -29,7 +29,7 @@ Three actors, by construction (never blurred):
 | PR to DEV | open PR base=`dev` | **NEW-thin** | `open-pr` default `--base dev` |
 | CI | monitor→diagnose(F1–F5)→safe-fix→merge-gate | ⭐REUSE | `ci-release-orchestrator` (tool+skill+capability) |
 | Auto Deploy DEV | preview/dev deploy | **NEW** + founder-gated | `dev-first-deploy` (Vercel preview-per-PR + `dev` alias) |
-| Founder Review | review package on the live DEV deploy | **NEW** | `founder-review-package` generator |
+| Founder Review | review package on the live DEV deploy — **founder-verifiable changes only** (§2a) | **NEW** | `change-classify.mjs` (`founder_verifiable`) gates `founder-review-package` generator |
 | Scorecard | experience scorecard required check | REUSE | `experience-gate.mjs`, `founder-experience-scorecard` |
 | Greenlight → Merge | `founder-approved` label = C6 gate; then merge | REUSE | `approvals-route.ts` (C6) + `merge-pr.mjs` (no override) |
 | Production Deploy | audited, forward-only lane | REUSE | `deploy-lane.mjs` + `.deploy-lane.json` + `deployment-operator` |
@@ -39,6 +39,8 @@ Three actors, by construction (never blurred):
 | Repository Governance | audit branch/PR health, no accumulation | **NEW** | `repo-governance-auditor.mjs` (G1–G10) |
 | Verification | verification is a system behavior | REUSE | `verify-gate` + `qa-test` agent |
 | Learning Capture | persist lessons + agent outcomes | REUSE+**NEW-thin** | `file-lesson.mjs`, `agent-health.mjs`, `learning-review` (+ S2 persist) |
+
+**§2a — when Founder Review fires (the trigger, stated explicitly).** Founder Review is required **ONLY** when the change is **founder-verifiable** (classifier `founder_verifiable=true`): something the founder can CLICK, SEE, or VALIDATE — UI/UX, customer-facing copy/emails, public surfaces, user-facing workflows, business behavior. **Non-founder-verifiable changes** (backend, infra, CI, refactors, dependency updates, internal scripts, docs, non-customer-facing migrations) **skip it and auto-continue** after automated verification (author≠verifier / QA / CI), with **no founder interruption**. Every required Founder Review **auto-generates the zero-tech Founder Review Package** — business summary · exact URLs · the simplest path (local-or-DEV) chosen for the founder · click-by-click · expected results · pass/fail checklist · rollback only if relevant — with **all implementation details hidden** (GitHub/Vercel/tokens/env/`VITE_API_URL`/APIs/config/code), surfaced only when a one-time founder action requires it. `founder_verifiable` is **orthogonal to Class C**: a Class C consequential/irreversible action (§ governance) stays human-gated whether or not it is founder-verifiable.
 
 **Net new build:** `repo-governance-auditor.mjs` · `founder-review-package.mjs` · `dev-first-deploy` (+ workflow templates, founder-gated env) · `release-notes.mjs` · `branch-sweep`/smoke · ~4 ownership-policy rows · 3 thin composition-skills + the canonical workflow definition. Everything else is reuse.
 

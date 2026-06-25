@@ -74,6 +74,7 @@ Consequential decision → run `principle-11-review` (Governance §11). The rout
 | Owns/consumes, no-two-owner rule, glossary | ../ecosystem-architecture/06-source-of-truth-registry.md · 10-shared-business-entities.md |
 | Cross-project decisions | ../ecosystem-architecture/decisions/ECR-*.md |
 | How we build (loop, DoD, governance, packs) | delivery-os/ |
+| Founder review (founder-verifiable-gated; non-founder-verifiable work auto-continues; auto-generated zero-tech package, impl hidden) | delivery-os/capabilities/CANONICAL-SDLC.md §2a · core/GOVERNANCE.md §16 · DECISIONS.md D6 |
 | <project-specific concerns> | <doc paths> |
 
 ## 9. Active Now  — *what is currently active?*
