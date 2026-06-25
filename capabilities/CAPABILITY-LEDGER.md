@@ -11,6 +11,13 @@
 `in-OS` (canonical in delivery-os) → `propagated` (every project inherits via the upgrade path).
 **Class:** `OS-foundational` = inherited by every project · `project-earned` = stays local (earned per project).
 
+> **2026-06-25 — Canonical SDLC merged to `main` (#5 + #8), founder-approved → status `in-OS`.** The
+> SDLC lifecycle capabilities advanced `candidate → verified → in-OS`: ci-release-orchestrator,
+> repo-governance-auditor, founder-review-package, release-notes, smoke (+ the os-inherit `workflows`
+> class). All independently verified (author≠verifier); post-merge smoke = 5/5 tool self-tests PASS.
+> Registered in `os-foundation.manifest.json` (25 tools, 7 skills, 3 workflows). Next stage `propagated`
+> = `os-inherit sync` into PLOS/Admin (runs in the consumer repos). Release notes: `docs/RELEASE-NOTES-canonical-sdlc.md`.
+
 ## THE single canonical path (founder-ratified 2026-06-14 — no parallel mechanisms)
 **delivery-os is the source of truth. PLOS consumes. Future projects inherit automatically.** One path:
 ```
