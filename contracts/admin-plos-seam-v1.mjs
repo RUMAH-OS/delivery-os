@@ -73,6 +73,24 @@ const PDF_KIND = {
   },
 };
 
+// A packageRef.url must be the AUTHENTICATED Admin COMPLETE-delivery-package endpoint
+// (ADR-0005 keystone): GET /admin/invoices/<id>/delivery-package, scope `delivery:read`
+// (rumah-admin/src/admin.ts L3273). It returns the COMPLETE package as JSON
+// (subject + bodyText + bodyHtml + pdf + meta) so PLOS fetches ONE Admin-authored
+// payload rather than reconstructing it. Same rules family as pdfRef: id-anchored
+// relative path OR a full https URL ending in that same path (with an optional
+// signed-URL query string); never a raw file, never a public link. content-encoding
+// is PART of the contract (FV-4 generalised): the package is application/json, the
+// safe filename carries refs only (the invoice number), never PII. PLOS fetches it
+// with the same PLOS->Admin token the read seam uses.
+const PACKAGE_REF = {
+  url: /^(?:https:\/\/[^\s?#]+)?\/admin\/invoices\/[^\s/?#]+\/delivery-package(?:\?[^\s#]*)?$/,
+  urlDesc: "a /admin/invoices/<id>/delivery-package path or an https URL ending in it",
+  mimeType: "application/json",
+  filename: /^Levering-[A-Za-z0-9-]+\.json$/,
+  filenameDesc: 'the safe form "Levering-<number>.json"',
+};
+
 const isUuid = (v) => typeof v === "string" && UUID_RE.test(v);
 const isIso = (v) => typeof v === "string" && ISO_RE.test(v);
 const isInt = (v) => typeof v === "number" && Number.isInteger(v);
@@ -205,11 +223,19 @@ const REGISTRY = {
   // BILLED MONTH so PLOS renders the SAME period wording the Admin notice already contains. `period` is the
   // raw stored 'YYYY-MM'; `periodLabel` is the display form ("July 2026", from the shared formatPeriod).
   // DISPLAY ONLY — refs+display, PII-free (no name/email). Absent on a one-off (deposit, period=null) emit.
+  // packageRef (OPTIONAL, additive — version-safe; pre-packageRef consumers ignore it) is a PII-FREE POINTER to
+  // Admin's COMPLETE delivery package (ADR-0005 keystone GET /admin/invoices/:id/delivery-package, scope
+  // `delivery:read`; admin.ts L3273). Shape A (URL) only — { url, mimeType?, filename? } — id-anchored,
+  // content-encoding application/json, inline bytes/content forbidden, PII-strict (url/filename scanned).
+  // It lets PLOS FETCH the one Admin-authored package (subject/bodyText/bodyHtml/pdf/meta) instead of
+  // reconstructing it. v1: `notice` (+pdfRef) STILL stand — this is alongside them, NOT a replacement (the
+  // notice-drop is the later v2 cutover). See packageRef enforcement block in validateSeamEvent below.
   "invoice.send_requested": {
     required: ["invoiceId", "number", "tenantId", "contractId", "totalCents", "dueDate", "billerName", "notice"],
-    optional: ["pdfRef", "period", "periodLabel"],
+    optional: ["pdfRef", "packageRef", "period", "periodLabel"],
     notice: { required: ["subject", "body"], optional: ["bodyHtml"], text: ["body"] },
     pdfRef: { required: ["url", "mimeType", "filename"], optional: ["expiresAt"] },
+    packageRef: { required: ["url"], optional: ["mimeType", "filename"] },
   },
   // L1488 (reminders/run). The "reminder warranted" SIGNAL (PLOS owns cadence).
   "invoice.reminder_due": {
@@ -399,6 +425,44 @@ export function validateSeamEvent(envelope) {
       }
       if ("expiresAt" in ref && ref.expiresAt !== undefined && !isIso(ref.expiresAt)) {
         violations.push(`payload.pdfRef.expiresAt: must be an ISO-8601 instant when present`);
+      }
+    }
+  }
+
+  // 3b. packageRef (optional) — shape A (URL) only, validated EXACTLY like pdfRef.
+  //     A PII-free POINTER to Admin's COMPLETE delivery package (ADR-0005 keystone
+  //     GET /admin/invoices/:id/delivery-package, scope `delivery:read`). The
+  //     content-encoding is PART of the contract (FV-4 generalised): mimeType, when
+  //     present, must be application/json; url must be the AUTHENTICATED, id-anchored
+  //     delivery-package endpoint; filename, when present, the safe Levering-<n>.json
+  //     form. Inline bytes/content (shape B) are rejected. PII (email/name) must not
+  //     appear in url/filename. v1-additive: this stands ALONGSIDE notice + pdfRef.
+  if (spec.packageRef && "packageRef" in payload && payload.packageRef !== undefined) {
+    const ref = payload.packageRef;
+    if (!isPlainObject(ref)) {
+      violations.push(`payload.packageRef: must be an object { url, mimeType?, filename? } (shape A, URL)`);
+    } else {
+      validateFields(ref, spec.packageRef, "payload.packageRef", violations);
+      // Shape B (inline package bytes/content) is explicitly refused — keep the event a lean POINTER.
+      if ("data" in ref || "base64" in ref || "bytes" in ref || "content" in ref) {
+        violations.push(`payload.packageRef: inline package bytes/content (data/base64/bytes/content) are forbidden — send a URL ref (shape A), not the package inline`);
+      }
+      if (!isStr(ref.url)) {
+        violations.push(`payload.packageRef.url: must be a string (the authenticated delivery-package endpoint)`);
+      } else if (!PACKAGE_REF.url.test(ref.url)) {
+        violations.push(`payload.packageRef.url: must be the authenticated delivery-package endpoint (${PACKAGE_REF.urlDesc}), not a public/arbitrary link`);
+      } else if (PII_URL_RE.test(ref.url)) {
+        violations.push(`PII: payload.packageRef.url contains tenant PII (an email/name) — the url must carry only refs (the invoice id), PLOS resolves the human`);
+      }
+      if ("mimeType" in ref && ref.mimeType !== undefined && (!isStr(ref.mimeType) || ref.mimeType !== PACKAGE_REF.mimeType)) {
+        violations.push(`payload.packageRef.mimeType: must be exactly "${PACKAGE_REF.mimeType}" when present (the package is JSON)`);
+      }
+      if ("filename" in ref && ref.filename !== undefined) {
+        if (!isStr(ref.filename)) {
+          violations.push(`payload.packageRef.filename: must be a string when present`);
+        } else if (!PACKAGE_REF.filename.test(ref.filename)) {
+          violations.push(`payload.packageRef.filename: must be ${PACKAGE_REF.filenameDesc} (refs only — never a tenant name/email)`);
+        }
       }
     }
   }
