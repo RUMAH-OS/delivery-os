@@ -25,6 +25,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const MODE = process.argv[2] || "stop";
 const ROOT = process.cwd();
@@ -101,7 +102,13 @@ function frontmatter(file) {
   const fm = {};
   if (m) for (const line of m[1].split(/\r?\n/)) {
     const kv = line.match(/^([a-z_]+):\s*(.+?)\s*$/i);
-    if (kv) fm[kv[1].toLowerCase()] = kv[2].replace(/^["']|["']$/g, "");
+    if (!kv) continue;
+    let v = kv[2];
+    // PARSER FIX: an inline `#` comment must be stripped from an UNQUOTED scalar (e.g.
+    // `verify_status: verified  # note` → "verified"); a quoted value keeps its `#` verbatim.
+    if (/^(["']).*\1$/.test(v)) v = v.replace(/^["']|["']$/g, "");   // quoted → unwrap, do not touch inner #
+    else v = v.replace(/\s+#.*$/, "");                               // unquoted → drop trailing comment
+    fm[kv[1].toLowerCase()] = v;
   }
   return fm;
 }
@@ -118,6 +125,25 @@ function probeHolds(fm, path) {
   }
 }
 
+// SEMANTIC FRESHNESS HELPER (Governance §12). The vendored fingerprint helper lives at
+// .claude/os/tools/verify-fingerprint.mjs in a consumer. It is OPTIONAL: imported DEFENSIVELY here
+// (a couple of resolved locations) and, if ABSENT or unloadable, the gate FALLS BACK to the legacy
+// mtime staleness check and NEVER crashes. `verifyCoversImpl(fm, changedImplRel, rootDir)` returns
+// { covered } — true IFF every changed impl file's current normalized fingerprint matches the VERIFY's
+// recorded impl_fingerprint (fail-closed: missing field / parse error → covered=false).
+let verifyCoversImpl = null;
+for (const cand of [
+  join(ROOT, ".claude", "os", "tools", "verify-fingerprint.mjs"),   // consumer (vendored)
+  join(ROOT, "templates", "tools", "verify-fingerprint.mjs"),       // self-host / framework dogfood
+  join(ROOT, ".claude", "tools", "verify-fingerprint.mjs"),         // alt vendor layout
+]) {
+  if (!existsSync(cand)) continue;
+  try {
+    const mod = await import(pathToFileURL(cand).href);
+    if (typeof mod.verifyCoversImpl === "function") { verifyCoversImpl = mod.verifyCoversImpl; break; }
+  } catch { /* unloadable → try next, else fall back to mtime */ }
+}
+
 function freshPassArtifact(impl, tests = []) {
   const newest = Math.max(0, ...impl.map((f) => mtime(join(ROOT, f))));
   for (const d of VERIFY_DIRS) {
@@ -125,16 +151,29 @@ function freshPassArtifact(impl, tests = []) {
     for (const n of names) {
       if (!/^VERIFY-.*\.md$/i.test(n)) continue;
       const p = join(ROOT, d, n);
-      if (mtime(p) < newest) continue;                       // stale → does not count
       const fm = frontmatter(p);
       const passing = String(fm.verify_status).toLowerCase() === "verified";
       const independent = fm.verifier && fm.author && fm.verifier !== fm.author; // best-effort
+      if (!(passing && independent)) continue;               // not a verified, independent artifact
+      // FRESHNESS — now BEHAVIOR-based, not time-based:
+      //  • VERIFY carries impl_fingerprint AND the helper is present → it counts IFF the recorded
+      //    fingerprint still matches every changed impl file (a real behavior change → mismatch →
+      //    rejected → gate blocks; a reformat/comment/rebase leaves the fingerprint intact → passes).
+      //  • Legacy VERIFY (no impl_fingerprint) OR helper absent → FALL BACK to the mtime staleness check.
+      let fresh;
+      if (verifyCoversImpl && fm.impl_fingerprint) {
+        let cov; try { cov = verifyCoversImpl(fm, impl, ROOT); } catch { cov = null; }
+        fresh = !!(cov && cov.covered === true);
+      } else {
+        fresh = mtime(p) >= newest;                          // legacy VERIFY / helper absent → mtime
+      }
+      if (!fresh) continue;                                  // stale (behavior changed / older) → does not count
       // v4 write-scoping (B2): impl + test-tree changes together need the QA-signed acknowledgment.
       if (tests.length && !fm.test_pins_amended_by) {
-        if (passing && independent) process.stderr.write(`[verify-gate] ${d}/${n} ignored: tests/ changed alongside implementation but the artifact carries no test_pins_amended_by (QA-signed) line — authors may not quietly amend QA pins (Governance §12 write-scoping).\n`);
+        process.stderr.write(`[verify-gate] ${d}/${n} ignored: tests/ changed alongside implementation but the artifact carries no test_pins_amended_by (QA-signed) line — authors may not quietly amend QA pins (Governance §12 write-scoping).\n`);
         continue;
       }
-      if (passing && independent && probeHolds(fm, `${d}/${n}`)) return { path: `${d}/${n}`, fm };
+      if (probeHolds(fm, `${d}/${n}`)) return { path: `${d}/${n}`, fm };
     }
   }
   return null;
@@ -158,7 +197,7 @@ function blocked(impl) {
   const list = impl.slice(0, 6).join(", ") + (impl.length > 6 ? ` …(+${impl.length - 6})` : "");
   return `BLOCKED by Delivery OS verify-gate (Governance §12).\n` +
     `Implementation files changed (${list}) but no fresh, passing, INDEPENDENT ` +
-    `docs/verify/VERIFY-<slice>.md exists (verify_status: verified, author ≠ verifier, newer than the code).\n` +
+    `docs/verify/VERIFY-<slice>.md exists (verify_status: verified, author ≠ verifier, and its impl_fingerprint still matches the current code — re-verify only when the verified behavior changes).\n` +
     `This is "ready for QA" — not "done". Run an INDEPENDENT verifier on the running thing ` +
     `(template: delivery-os/templates/VERIFY.md.template), capture real execution evidence, then proceed.`;
 }

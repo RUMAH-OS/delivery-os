@@ -33,12 +33,32 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   SIGNAL_NAMES, TARGETS, REQUIREMENTS, CANONICAL_ORDER,
   validate, requirementsAreMonotonic,
 } from "../../contracts/deployment-auth-v1.mjs";
 import { classify, loadConfig } from "./change-classify.mjs";
+
+// =============================================================================
+// SEMANTIC-FRESHNESS HELPER (shared with the verify-gate). The verify-gate no
+// longer invalidates a VERIFY by timestamp; it invalidates SEMANTICALLY — a
+// VERIFY that records an `impl_fingerprint` of the code it covered stays valid
+// until that code's NORMALIZED runtime fingerprint changes. `verifyCoversImpl`
+// is owned by `verify-fingerprint.mjs` (a parallel build). Loaded BEST-EFFORT:
+// it resolves co-located in delivery-os (`./verify-fingerprint.mjs`) AND in a
+// consumer (`.claude/os/tools/verify-fingerprint.mjs`). If it is absent (helper
+// not yet landed, or an older consumer), readVerify falls back to the legacy
+// mtime check — it NEVER crashes.
+// =============================================================================
+let verifyCoversImpl = null;
+for (const cand of ["./verify-fingerprint.mjs", `${process.cwd().replace(/\\/g, "/")}/.claude/os/tools/verify-fingerprint.mjs`]) {
+  try {
+    const spec = cand.startsWith(".") ? cand : pathToFileURL(cand).href;
+    const mod = await import(spec);
+    if (mod && typeof mod.verifyCoversImpl === "function") { verifyCoversImpl = mod.verifyCoversImpl; break; }
+  } catch { /* try the next candidate; absent ⇒ fall back to legacy mtime */ }
+}
 
 // =============================================================================
 // FRONTMATTER — mirrors verify-gate.mjs `frontmatter`, PLUS the inline-`#`-comment
@@ -83,7 +103,14 @@ const REVIEW_DIR = "docs/review";
 // invoked the tool. ctx = { io, opts, classification }.
 // =============================================================================
 
-// 1) verify — a fresh, passing, INDEPENDENT VERIFY artifact, newer than the impl.
+// 1) verify — a passing, INDEPENDENT VERIFY artifact that still COVERS the impl.
+//    SEMANTIC freshness (founder directive 2026-06-25): a VERIFY counts IFF
+//    verify_status === "verified" AND author ≠ verifier AND — if it records an
+//    `impl_fingerprint` — every changed impl file's CURRENT normalized fingerprint
+//    still matches it (`verifyCoversImpl(...).covered === true`). A VERIFY without
+//    an `impl_fingerprint` falls back to the LEGACY mtime staleness check, as does
+//    the case where the fingerprint helper is unavailable. FAIL-CLOSED throughout:
+//    unreadable/missing/mismatch ⇒ this artifact does not count.
 export function readVerify(ctx) {
   const { io, opts } = ctx;
   try {
@@ -99,22 +126,38 @@ export function readVerify(ctx) {
       for (const n of names) {
         if (!/^VERIFY-.*\.md$/i.test(n)) continue;
         const rel = `${d}/${n}`;
-        if (io.mtime(rel) < newest) continue; // stale relative to the code ⇒ does not count
         const fm = parseFrontmatter(io.read(rel));
         const passing = String(fm.verify_status).toLowerCase() === "verified";
         const independent = !!(fm.author && fm.verifier && fm.author !== fm.verifier);
-        if (passing && independent) {
-          return {
-            passed: true,
-            reason: `verify: fresh INDEPENDENT verified artifact ${rel} (author "${fm.author}" ≠ verifier "${fm.verifier}").`,
-            evidence: { path: rel, author: fm.author, verifier: fm.verifier, date: fm.date || null, newerThanImplMs: newest },
-          };
+        if (!(passing && independent)) continue;
+
+        // SEMANTIC freshness: behavior change ⇒ fingerprint mismatch ⇒ re-verify;
+        // comments/formatting/rebases keep the fingerprint ⇒ the VERIFY stays valid.
+        const hasFingerprint = typeof fm.impl_fingerprint === "string" && fm.impl_fingerprint.trim() !== "";
+        let fresh, freshnessBasis;
+        if (hasFingerprint && verifyCoversImpl) {
+          let cov;
+          try { cov = verifyCoversImpl(fm, impl, io.cwd); }
+          catch (e) { cov = { covered: false, reason: `verify-fingerprint helper threw (${e.message})` }; }
+          fresh = !!(cov && cov.covered === true); // fail-closed: any uncovered/parse error ⇒ does not count
+          freshnessBasis = `impl_fingerprint (${fresh ? "covers current impl" : `stale — ${cov && cov.reason ? cov.reason : "behavior changed"}`})`;
+        } else {
+          // LEGACY: no impl_fingerprint field (or the helper is unavailable) ⇒ mtime staleness.
+          fresh = io.mtime(rel) >= newest;
+          freshnessBasis = hasFingerprint ? "mtime (impl_fingerprint present but fingerprint helper unavailable)" : "mtime (legacy — no impl_fingerprint)";
         }
+        if (!fresh) continue; // stale relative to the code's behavior ⇒ does not count
+
+        return {
+          passed: true,
+          reason: `verify: passing INDEPENDENT verified artifact ${rel} still covers the impl via ${freshnessBasis} (author "${fm.author}" ≠ verifier "${fm.verifier}").`,
+          evidence: { path: rel, author: fm.author, verifier: fm.verifier, date: fm.date || null, freshnessBasis, newestImplMs: newest },
+        };
       }
     }
     return {
       passed: false,
-      reason: `verify: no fresh, passing, INDEPENDENT docs/verify/VERIFY-*.md (verify_status: verified, author ≠ verifier, newer than ${impl.length} changed impl file(s)) — fail-closed.`,
+      reason: `verify: no passing, INDEPENDENT docs/verify/VERIFY-*.md still covering the ${impl.length} changed impl file(s) (verify_status: verified, author ≠ verifier, impl_fingerprint matches current code — or, legacy, newer than the impl) — fail-closed.`,
       evidence: { changedImpl: impl.length, newestImplMs: newest },
     };
   } catch (e) {

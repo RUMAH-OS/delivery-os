@@ -24,7 +24,7 @@ Three actors, by construction (never blurred):
 |---|---|---|---|
 | Goal Execution | engine run + dispatch plan | REUSE | `workflow-engine/goals-route.ts`, `capability-selector.ts`, `dispatch-route.mjs` |
 | Parallel Implementation | route the specialist (not general-purpose) | REUSE+**NEW-thin** | `dispatch-route.mjs`+`agent-route.mjs` (S1) + the routing-default rule (§5) |
-| Local Verify / Commit | author≠verifier gate | REUSE | `.claude/hooks/verify-gate.mjs`, `skills/verify-gate` |
+| Local Verify / Commit | author≠verifier gate; a VERIFY's freshness is now **SEMANTIC (impl-fingerprint), not timestamp** — valid until the verified impl's runtime behavior changes (`DECISIONS.md` D8) | REUSE | `.claude/hooks/verify-gate.mjs`, `skills/verify-gate`, `templates/tools/verify-fingerprint.mjs` |
 | Push / Branch | auto-push, no local accumulation | ⭐REUSE | `templates/githooks/post-commit` (ff-only, feature-only, never main) |
 | PR to DEV | open PR base=`dev` | **NEW-thin** | `open-pr` default `--base dev` |
 | CI | monitor→diagnose(F1–F5)→safe-fix→merge-gate | ⭐REUSE | `ci-release-orchestrator` (tool+skill+capability) |
@@ -38,7 +38,7 @@ Three actors, by construction (never blurred):
 | Release Notes | gh+git log → CHANGELOG | **NEW-thin** | `release-notes.mjs` |
 | Branch/PR Cleanup | delete merged branch; sweep stale | ⭐REUSE+**NEW** | `merge-pr.mjs` + `repo-governance-auditor.mjs` |
 | Repository Governance | audit branch/PR health, no accumulation | **NEW** | `repo-governance-auditor.mjs` (G1–G10) |
-| Verification | verification is a system behavior | REUSE | `verify-gate` + `qa-test` agent |
+| Verification | verification is a system behavior; "fresh VERIFY" = **semantically fresh** (impl-fingerprint match), not newer-than-mtime — a behavior change still demands a fresh independent VERIFY (D8) | REUSE | `verify-gate` + `qa-test` agent |
 | Learning Capture | persist lessons + agent outcomes | REUSE+**NEW-thin** | `file-lesson.mjs`, `agent-health.mjs`, `learning-review` (+ S2 persist) |
 
 **§2a — when Founder Review fires (the trigger, stated explicitly).** Founder Review is required **ONLY** when the change is **founder-verifiable** (classifier `founder_verifiable=true`): something the founder can CLICK, SEE, or VALIDATE — UI/UX, customer-facing copy/emails, public surfaces, user-facing workflows, business behavior. **Non-founder-verifiable changes** (backend, infra, CI, refactors, dependency updates, internal scripts, docs, non-customer-facing migrations) **skip it and auto-continue** after automated verification (author≠verifier / QA / CI), with **no founder interruption**. Every required Founder Review **auto-generates the zero-tech Founder Review Package** — business summary · exact URLs · the simplest path (local-or-DEV) chosen for the founder · click-by-click · expected results · pass/fail checklist · rollback only if relevant — with **all implementation details hidden** (GitHub/Vercel/tokens/env/`VITE_API_URL`/APIs/config/code), surfaced only when a one-time founder action requires it. `founder_verifiable` is **orthogonal to Class C**: a Class C consequential/irreversible action (§ governance) stays human-gated whether or not it is founder-verifiable.

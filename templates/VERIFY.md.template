@@ -1,12 +1,15 @@
 ---
 slice: "<id> — <title>"
-verify_status: executed        # planned | generated | executed | verified  (verifier sets 'verified' only when ALL below pass)
+verify_status: executed
+# ^ one of: planned | generated | executed | verified. The verifier sets 'verified' only when ALL gates below pass.
+#   NB: keep the verify_status VALUE line itself free of a trailing inline `# comment` (see the body note).
 author: "<who/what AUTHORED the code under test — agent id / session / human>"
 verifier: "<who/what RAN this verification — MUST differ from author (Governance §3/§12)>"
 date: "<YYYY-MM-DD>"
 independence_basis: "codeowners-PR | recorded-distinct-invocation"   # how author≠verifier is proven here
 machine_probe: "<ONE command the verify-gate re-executes at gate time; exit 0 = still passing. Pick the most load-bearing check (a test, a scan, a smoke). Required for `verified` unless genuinely impossible — then `machine_probe: none — <why>`.>"
 test_pins_amended_by: "<verifier id, ONLY if this slice changed files under tests/ e2e/ evals/ — the QA-signed acknowledgment the write-scoping gate checks; omit otherwise>"
+impl_fingerprint: '<single-line JSON: {"<impl-file>":"<hash>",...} — produced by `node <tools>/verify-fingerprint.mjs compute --changed`. Records the NORMALIZED fingerprint of the impl files this VERIFY covers. SEMANTIC freshness: the gate revalidates by comparing it to the CURRENT code — a behavior change ⇒ mismatch ⇒ this VERIFY is stale (re-verify); comments/formatting/rebases/merge-commits ⇒ match ⇒ STILL VALID. OMIT this field to fall back to the legacy mtime (timestamp) check.>'
 ---
 
 # VERIFY — Slice <id> <title>
@@ -16,6 +19,17 @@ test_pins_amended_by: "<verifier id, ONLY if this slice changed files under test
 > A verdict of `verified` is permitted ONLY if: every acceptance criterion PASSes on its OWN surface,
 > every load-bearing claim is Confirmed/Evidence-backed, all required gates are closed, and the
 > verifier was a REAL distinct lens from the author. Otherwise the slice caps at `executed`.
+
+### How to fill `impl_fingerprint` (semantic freshness, not timestamp)
+Run `node <tools>/verify-fingerprint.mjs compute --changed` and paste its single-line JSON into the
+`impl_fingerprint:` frontmatter value. It records the **normalized** fingerprint of the impl files this
+VERIFY covers, so the gate can revalidate by **behavior**, not by mtime: a real behavior change makes the
+current fingerprint diverge → this VERIFY goes stale → re-verify; non-functional edits (comments,
+formatting, rebases, merge commits) keep the fingerprint → the VERIFY stays valid. **Omit the field** to
+fall back to the legacy mtime (timestamp) check.
+> Parser note: a trailing inline `# comment` on a frontmatter VALUE (e.g. `verify_status: verified # note`)
+> is now **tolerated** by the fixed parser (it strips it), but is **still best avoided** — keep the
+> `verify_status:` value line clean and put any legend on its own `#` line.
 
 ## Independence header  (Governance §3/§12 — proves author ≠ verifier)
 - Verifier identity / invocation: <distinct agent id · session · timestamp — NOT the build session>
