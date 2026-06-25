@@ -3,7 +3,9 @@
   "name": "Learning Review",
   "description": "Registers Learning Review as a first-class Delivery OS lifecycle hook (peer to VERIFY and Founder Review). A 3-level trigger policy decides whether experience is captured continuously (L0), checkpointed lightly (L1), or run through a full multi-specialist retro (L2) — fired by the classifier learning-trigger.mjs on the heavy triggers (incident · ADR/board · new-capability · founder-epic · milestone · census-candidate · N-merge backstop>30), default no-review. Every approved learning is auto-classified by learning-classify.mjs into the right asset of the 10-way taxonomy and inherited via the manifest; an L2 review emits a Founder Learning Package. Eval is FAIL-OPEN (an L0/L1 trigger never blocks); the review decision is CLOSE-DEFAULT (no review unless a trigger fires). This feeds the existing §14 promotion machinery — it does not relax the promotion bar (observed failure OR second consumer) or the §11 panel economics.",
   "ownerSystem": "delivery-os",
-  "status": "candidate",
+  "status": "active",
+  "rollout": "shadow",
+  "ratified": "2026-06-25 (founder-ratified; runs in SHADOW classify+log — turning on gating is a separate founder decision after calibration)",
   "version": "v1",
 
   "home": {

@@ -612,3 +612,11 @@
 {"pattern":"A shallow checkout broke a range-computing gate","project":"rumah-admin","source":"rumah-admin:retro:SLICE-dev-signin-restore","capability":"candidate: `ci-config-lint` — assert `fetch-depth: 0`","date":"2026-06-25"}
 {"pattern":"CI test-DB schema drifted from the app's expected schema","project":"rumah-admin","source":"rumah-admin:retro:SLICE-dev-signin-restore","capability":"candidate: `test-db-schema-parity` — a fast","date":"2026-06-25"}
 {"pattern":"Learning-review went 175 commits overdue","project":"rumah-admin","source":"rumah-admin:retro:SLICE-dev-signin-restore","capability":"candidate: continuous `learning-review` cadence wired to the","date":"2026-06-25"}
+{"pattern":"safety control must cover EVERY entrypoint of its class (guard-coverage lint)","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"env config from explicit file+flag never ambient/presence; born-correct dev-env scaffolding","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"migrations precede the code deploy; authorize in-scope forward migration in the deploy-lane","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"CI gate must run only where its computation is valid (trigger-scope lint)","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"real-DB e2e driver catches cross-slice reader-consistency defects unit tests miss","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"build the structure, gate the policy (mechanism autonomous, consequential policy founder-gated)","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"in-session decision-fork checkpoint is a distinct founder-boundary kind from the terminating FAP","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
+{"pattern":"agent-parallelism telemetry missing — OS cannot tune the fan-out it cannot measure","project":"delivery-os","source":"delivery-os:learning-review-2026-06-25-session","date":"2026-06-25"}
