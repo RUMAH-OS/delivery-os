@@ -1,0 +1,227 @@
+# =============================================================================
+# Delivery OS — PROMOTE TO PROD workflow (TEMPLATE — NOT installed live in delivery-os).
+#
+# WHAT THIS IS
+#   The founder-gated back half of the canonical SDLC (capabilities/CANONICAL-SDLC.md
+#   §3 + §4). It promotes the reviewed-in-DEV work `dev → main`, then lets the EXISTING
+#   production deploy.yml ship it, then watches/smokes/verifies/notes/cleans up.
+#
+# THE C6 HUMAN GATE (read this — it is the whole point)
+#   This workflow fires on `pull_request_target: [labeled]` and does NOTHING unless the
+#   label is `founder-approved` AND the person who applied it is a CODEOWNER. That label,
+#   applied by a verified human, IS the founder's authorization to merge + ship. This is
+#   NOT a parsed-green auto-merge: a green CI is necessary but NEVER sufficient. The
+#   Action only EXECUTES the merge the human already authorized, and it is FAIL-CLOSED on
+#   every floor condition (non-CODEOWNER label · red dev CI · unverified VERIFY). Merge
+#   and prod-deploy are the founder-authorized gate, never machine-inferred.
+#   (ASPIRATIONAL / FORBIDDEN: the engine autonomously self-merging on a green signal —
+#   that violates G9 + C6. Do not "improve" this into lights-out auto-merge.)
+#
+# pull_request_target (why, and the safety constraint)
+#   `labeled` only exists on `pull_request_target`, which runs in the BASE repo context
+#   with secrets + write token. That is required to merge. Because it runs trusted, this
+#   workflow NEVER checks out or runs untrusted PR-head code in a privileged step — it
+#   only runs the vendored OS tools + `gh` against the API. Do not add a step that
+#   executes the PR branch's package scripts here.
+#
+# SCAFFOLDER-COPIED + FOUNDER-FILLED
+#   Vendored into a consumer's `.github/workflows/` by `os-inherit sync` (manifest
+#   `workflows[]`), byte-identical + drift-checked. Production deploy itself is NOT here:
+#   it is the existing deploy.yml (push:main). This file does not duplicate deploy logic.
+# =============================================================================
+
+name: Promote to Prod (founder-approved → dev to main)
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+# The label gate. Everything below only runs for the founder-approval label; any other
+# label is a structural no-op (the job `if` is false), so the workflow can never act on
+# an unrelated label.
+permissions:
+  contents: write          # squash-merge dev→main + delete the merged feature branch
+  pull-requests: write     # comment the go/stop decision on the PR
+
+concurrency:
+  group: promote-to-prod-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Re-assert the merge floor, then promote (fail-closed)
+    runs-on: ubuntu-latest
+    # GATE 1 — the label must be exactly `founder-approved`. Any other labeled event
+    # evaluates false here and the job is skipped entirely.
+    if: github.event.label.name == 'founder-approved'
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+      ACTOR: ${{ github.event.sender.login }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # ── GATE 2 — the labeler must be a CODEOWNER (verified human) ─────────────
+      # Parses .github/CODEOWNERS for @handles and confirms the person who applied the
+      # `founder-approved` label is one of them. NOT "has write access" — an explicit
+      # CODEOWNER, because the label IS the founder's signature. Fail-closed: a label
+      # from a non-CODEOWNER stops here and says why.
+      - name: Gate — labeler is a CODEOWNER
+        run: |
+          set -euo pipefail
+          if [ ! -f .github/CODEOWNERS ]; then
+            echo "::error::No .github/CODEOWNERS — cannot verify the approver is a CODEOWNER. Fail-closed."
+            gh pr comment "$PR" --repo "$REPO" --body \
+              "⛔ Promotion stopped: this repo has no \`.github/CODEOWNERS\`, so the \`founder-approved\` label cannot be verified as coming from a CODEOWNER. The C6 human gate requires it. (No machine override exists.)"
+            exit 1
+          fi
+          # Extract every @handle named anywhere in CODEOWNERS (drop the leading @).
+          OWNERS="$(grep -oE '@[A-Za-z0-9_./-]+' .github/CODEOWNERS | sed 's/^@//' | sort -u || true)"
+          echo "CODEOWNERS handles: $(echo "$OWNERS" | tr '\n' ' ')"
+          if ! printf '%s\n' "$OWNERS" | grep -qix "$ACTOR"; then
+            echo "::error::Labeler '$ACTOR' is not a CODEOWNER. The founder-approved label is only valid from a CODEOWNER."
+            gh pr comment "$PR" --repo "$REPO" --body \
+              "⛔ Promotion stopped: \`$ACTOR\` applied \`founder-approved\` but is **not a CODEOWNER**. The C6 human gate requires a CODEOWNER's approval. Re-label as a CODEOWNER. (No machine override.)"
+            exit 1
+          fi
+          echo "Labeler '$ACTOR' is a CODEOWNER — C6 human gate satisfied."
+
+      # ── GATE 3 — re-assert the full merge floor (fail-closed) ─────────────────
+      # The floor = (label by CODEOWNER ✓ above) + (dev CI green) + (the slice's VERIFY
+      # is verified). Any miss → stop + comment exactly which condition failed.
+      - name: Gate — dev CI is green
+        run: |
+          set -euo pipefail
+          # Machine-readable check state for the PR (never parse --watch output).
+          CHECKS="$(gh pr checks "$PR" --repo "$REPO" --json name,bucket 2>/dev/null || echo '[]')"
+          COUNT="$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).length)}catch{console.log(0)}})' <<<"$CHECKS")"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::PR $PR reports zero checks — dev CI has not registered. Fail-closed."
+            gh pr comment "$PR" --repo "$REPO" --body "⛔ Promotion stopped: dev CI has not produced any checks yet. Wait for CI, then re-apply the label."
+            exit 1
+          fi
+          NOTPASS="$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const c=JSON.parse(s);console.log(c.filter(x=>x.bucket!=="pass").map(x=>x.name+":"+x.bucket).join(", "))}catch{console.log("parse-error")}})' <<<"$CHECKS")"
+          if [ -n "$NOTPASS" ]; then
+            echo "::error::dev CI is not all-green: $NOTPASS"
+            gh pr comment "$PR" --repo "$REPO" --body "⛔ Promotion stopped: dev CI is **not all-green**. Failing/pending/skipped: $NOTPASS. Green CI is necessary (not sufficient) — fix, then re-label."
+            exit 1
+          fi
+          echo "dev CI is all-green."
+
+      - name: Gate — the slice's VERIFY is verified
+        run: |
+          set -euo pipefail
+          # The author≠verifier artifact (skills/verify-gate). A promotion requires a
+          # VERIFY doc with an explicit verified verdict. Honest + fail-closed: if none
+          # is found, stop and say so (we do not infer "verified" from a green build).
+          shopt -s nullglob
+          FOUND=""
+          for f in docs/verify/VERIFY-*.md; do
+            if grep -qiE '(verdict:\s*pass|status:\s*verified|^verified\b|\bVERIFIED\b)' "$f"; then
+              FOUND="$f"; break
+            fi
+          done
+          if [ -z "$FOUND" ]; then
+            echo "::error::No verified VERIFY artifact found under docs/verify/ (need 'Verdict: PASS' / 'verified')."
+            gh pr comment "$PR" --repo "$REPO" --body "⛔ Promotion stopped: no **verified** VERIFY artifact found under \`docs/verify/\` (author≠verifier, skills/verify-gate). Independent QA must verify the slice before it ships."
+            exit 1
+          fi
+          echo "Found verified VERIFY artifact: $FOUND"
+
+      # ── (b) MERGE dev → main (squash) via the mechanical gate ─────────────────
+      # The vendored merge-pr.mjs re-checks all-green via the checks API (no override
+      # flag, by design) and squash-merges. --no-delete-branch: NEVER delete `dev`
+      # (the standing integration branch). Feature-branch cleanup is step (h) below.
+      - name: Merge dev → main (squash, mechanical gate)
+        run: |
+          set -euo pipefail
+          TOOL=".claude/os/tools/merge-pr.mjs"
+          if [ -f "$TOOL" ]; then
+            node "$TOOL" "$PR" --no-delete-branch
+          else
+            echo "::warning::$TOOL not vendored — falling back to a guarded gh squash-merge."
+            gh pr merge "$PR" --repo "$REPO" --squash
+          fi
+          gh pr comment "$PR" --repo "$REPO" --body "✅ Floor re-asserted (CODEOWNER label · dev CI green · VERIFY verified). Merged \`$HEAD_REF\` → \`$BASE_REF\` (squash). Production deploy now runs via deploy.yml on push to \`main\`."
+
+      # ── (c) PROD DEPLOY — NOT here. deploy.yml fires on push:main (do not duplicate).
+      # ── (d) DEPLOY-WATCH — observe the production deploy that the merge triggered ──
+      - name: Deploy-watch (production deploy.yml)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          echo "Waiting for the production deploy (deploy.yml on push:main) to register…"
+          RUN_ID=""
+          for i in $(seq 1 30); do
+            RUN_ID="$(gh run list --repo "$REPO" --workflow deploy.yml --branch main \
+                        --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)"
+            [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ] && break
+            sleep 10
+          done
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::warning::No deploy.yml run found yet — check the Actions tab. (Observational; not blocking.)"
+            exit 0
+          fi
+          echo "Watching deploy run #$RUN_ID …"
+          gh run watch "$RUN_ID" --repo "$REPO" --exit-status || \
+            echo "::warning::Production deploy run #$RUN_ID did not finish green — escalate to a human."
+
+      # ── (e) SMOKE — post-deploy probe (Phase 3 tool; guarded) ─────────────────
+      - name: Smoke tests (prod)
+        continue-on-error: true
+        run: |
+          TOOL=".claude/os/tools/smoke.mjs"
+          if [ ! -f "$TOOL" ]; then
+            echo "::warning::$TOOL not vendored yet (CANONICAL-SDLC Phase 3) — skipping smoke."
+            exit 0
+          fi
+          node "$TOOL"
+
+      # ── (f) PROD-VERIFY — confirm the deployed prod surface (guarded) ──────────
+      - name: Prod verify
+        continue-on-error: true
+        run: |
+          TOOL=".claude/os/tools/prod-verify.mjs"
+          if [ ! -f "$TOOL" ]; then
+            echo "::warning::$TOOL not vendored yet (CANONICAL-SDLC Phase 3) — skipping prod-verify."
+            exit 0
+          fi
+          node "$TOOL"
+
+      # ── (g) RELEASE NOTES — gh+git log → CHANGELOG + a GitHub release (guarded) ─
+      - name: Release notes (--gh-release)
+        continue-on-error: true
+        run: |
+          TOOL=".claude/os/tools/release-notes.mjs"
+          if [ ! -f "$TOOL" ]; then
+            echo "::warning::$TOOL not vendored yet (CANONICAL-SDLC Phase 3) — skipping release notes."
+            exit 0
+          fi
+          node "$TOOL" --gh-release
+
+      # ── (h) CLEANUP — delete the merged FEATURE branch (never dev/main) ───────
+      # merge-pr.mjs already deletes feature branches at the feature→dev gate; this is
+      # the safety net for a feature branch promoted here. Structurally guarded: only a
+      # `feature/`-prefixed head is deletable, so `dev` and `main` can never be removed.
+      - name: Cleanup — delete merged feature branch
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          case "$HEAD_REF" in
+            feature/*)
+              echo "Deleting merged feature branch: $HEAD_REF"
+              gh api -X DELETE "repos/$REPO/git/refs/heads/$HEAD_REF" \
+                && echo "Deleted $HEAD_REF." \
+                || echo "::warning::Could not delete $HEAD_REF (may already be gone)."
+              ;;
+            *)
+              echo "Head '$HEAD_REF' is not a feature/* branch — leaving it intact (dev/main are never deleted)."
+              ;;
+          esac
