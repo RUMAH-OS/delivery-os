@@ -24,7 +24,9 @@
     "templates/tools/file-lesson.mjs",
     "templates/tools/milestone-report.mjs",
     "templates/tools/repo-governance-auditor.mjs",
-    "templates/tools/founder-review-package.mjs"
+    "templates/tools/founder-review-package.mjs",
+    "templates/tools/release-notes.mjs",
+    "templates/tools/smoke.mjs"
   ],
   "contracts": [
     "contracts/admin-plos-seam-v1.mjs",
