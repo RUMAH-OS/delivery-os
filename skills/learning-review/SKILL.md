@@ -1,6 +1,6 @@
 ---
 name: learning-review
-version: 2.0.0
+version: 2.1.0
 stability: stable
 description: >
   Phase-end retrospective that converts experience into ROUTED changes: artifact-reconstructed
@@ -13,9 +13,28 @@ decision_class: governance
 inputs:  [the phase's commits, VERIFY docs (incl. FAIL sections), decision/gate ledgers, friction log, permission-refusal moments]
 outputs: [docs/RETROSPECTIVE-<date>.md + same-series project-local changes + docs/feedback/OS-FEEDBACK-<event>.md for anything OS-level]
 earned_from: "Consumer A's rebuild retrospective 2026-06-12 (produced 7 earned skills + kernel update in one series) — AND the same retro's own bypass: it applied implement-in-same-series to OS-LEVEL lessons, self-minting a version label with no triage (ruling C1). The fork below is that incident, mechanized. Sources tagged [A]/[P]."
-mechanical_spine: "/learning-review command; §14 review-artifact detector hard-blocks pushing the retro without its triage; N-merges backstop catches the never-run retro"
+mechanical_spine: "/learning-review command; the first-class hook's classifier `templates/tools/learning-trigger.mjs` decides the LEVEL (L0/L1/L2 — D10/ADR-003); §14 review-artifact detector hard-blocks pushing the retro without its triage; N-merges backstop caps learning debt at 30 (the never-run retro); on L2, `templates/tools/learning-classify.mjs` routes every approved lesson into the 10-way taxonomy + `templates/tools/founder-learning-package.mjs` emits the Founder Learning Package"
 ---
-# Learning Review (v2.0 — with the blast-radius fork)
+# Learning Review (v2.1 — first-class hook · 3-level trigger policy · blast-radius fork)
+
+## The 3-level trigger policy (D10 / ADR-003 — registers this skill as a first-class lifecycle hook)
+Learning Review is a first-class Delivery OS lifecycle hook, **peer to VERIFY and Founder Review**. The classifier
+`templates/tools/learning-trigger.mjs` decides which level fires (eval is **FAIL-OPEN** — L0/L1 never block a push,
+commit, or goal; review is **CLOSE-DEFAULT** — no review unless a trigger fires):
+- **L0 — continuous capture** (every slice): append-only signal capture (`capabilities/signals.jsonl` via
+  `file-lesson.mjs` + the gates). No review, no block.
+- **L1 — lightweight checkpoint** (phase-end / routine boundary): a fast **bump-or-declare-no-learning** pass
+  (step 7 below) — non-blocking.
+- **L2 — full multi-specialist review** (HEAVY triggers only — **incident · ADR/board · new-capability ·
+  founder-epic · milestone · census-candidate · the §14 N-merge backstop >30**): runs the full procedure below,
+  **composing principle-11's multi-lens machinery into the retro** (a *scaled* panel — §11 economics intact, not
+  14 blind lens-runs), then **auto-classifies** every approved lesson and emits the **Founder Learning Package**.
+
+`learning_expected = (L1 ∨ L2)`; default no-review. The N-merge backstop (§14, default 30) is the completeness
+guarantee — the recorded **175-overdue** retro becomes structurally impossible; rejecting **review-every-slice**
+avoids the recorded **14×-fanout** over-fire. SHADOW rollout: classify + log before gating. This registration
+**feeds the §14 promotion machinery — it does not relax the promotion bar (observed failure OR second consumer)
+or the §11 panel economics.**
 
 ## Overview
 A retrospective that changes nothing was a meeting [A]. But a retrospective that changes the OS *in the same
@@ -48,6 +67,16 @@ learning immediately; route OS-level learning design-first.
      pipeline. **Never write the base, the ecosystem registries, or a version label from a retro series.**
      The earning incident: a retro shipped OS-level packaging *and minted an OS version label* in its own
      commit — exactly the bypass its own red-flag list warns about.
+   - **6c. AUTO-CLASSIFY every approved lesson into the right asset (L2; D10/ADR-003).** Run
+     `templates/tools/learning-classify.mjs` — each approved lesson routes into exactly one of the **10-way
+     taxonomy** (*hook · template · doctrine-line · skill · agent-change · lint · process-adjustment ·
+     capability-ledger-row · ADR/decision · no-framework-change*) and is inherited via
+     `os-foundation.manifest.json`. **A lesson is never assumed a skill** — storing it in the wrong artifact is
+     itself a defect (§14). The OS-base lessons from 6b carry their classified asset through the OS-FEEDBACK
+     triage; this step makes the routing mechanical, not a guess.
+   - **6d. Emit the Founder Learning Package (L2).** `templates/tools/founder-learning-package.mjs` produces the
+     zero-tech founder-facing artifact — what was learned · what changed · what (if anything) the founder must
+     decide — mirroring the Founder Review Package envelope (implementation detail hidden).
 7. **Bump-or-declare-no-learning** [P]: every skill USED during the phase either bumps its version (+ changelog
    line) or records an explicit "no learning". Earned: every skill in three repos sat at 1.0.0 after the
    heaviest procedure month on record, while one skill's real procedure shadow-forked far past its file.
@@ -72,6 +101,16 @@ learning immediately; route OS-level learning design-first.
 - Each used skill shows a version bump or an explicit "no learning" line.
 
 ## Changelog
+- 2.1.0 — **registered as a first-class lifecycle hook (peer to VERIFY + Founder Review), `DECISIONS.md` D10 /
+  `docs/adr/ADR-003`.** Adds the **3-level trigger policy** (L0 continuous capture / L1 lightweight checkpoint /
+  L2 full multi-specialist review on the heavy triggers), driven by the classifier
+  `templates/tools/learning-trigger.mjs` (fail-open on L0/L1; close-default). L2 **composes principle-11's lens
+  machinery into the retro** (scaled, §11 economics intact), **auto-classifies** every approved lesson via
+  `templates/tools/learning-classify.mjs` (the 10-way taxonomy, steps 6c) and **emits the Founder Learning
+  Package** via `templates/tools/founder-learning-package.mjs` (step 6d). Closes both recorded failures — the
+  175-overdue under-fire (N-merge backstop is the completeness floor) and the 14×-fanout over-fire (reject
+  review-every-slice). SHADOW rollout; the §14 promotion bar + close-default + no-backflow lint are UNCHANGED.
+  Keeps the v2.0 blast-radius fork + bump-or-declare-no-learning.
 - 2.0.0 — v4 union: consumer A's executable retro (artifact reconstruction, assumptions ledger, pattern
   census, implement-in-same-series, honesty bar) + the mandatory blast-radius fork (C1/N2, F8) +
   bump-or-declare-no-learning (B16) + the N1 unproven-until-fired doctrine.

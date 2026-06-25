@@ -1,0 +1,178 @@
+# =============================================================================
+# Delivery OS — LEARNING REVIEW workflow (board decision 2026-06-25 — D10 / ADR-003).
+#                (TEMPLATE — NOT installed live in delivery-os.)
+#
+# WHAT THIS IS
+#   The terminal lifecycle hook of the canonical SDLC (capabilities/CANONICAL-SDLC.md),
+#   registered as a FIRST-CLASS hook peer to verify-coverage.yml (VERIFY) and
+#   dev-preview.yml (Founder Review). It makes Delivery OS learn from real work
+#   WITHOUT depending on anyone remembering to run a retro — the §14 OS Feedback Loop,
+#   mechanized at the trigger and human at the judgment.
+#
+#   It runs the 3-LEVEL TRIGGER POLICY via templates/tools/learning-trigger.mjs:
+#     L0  continuous capture (every slice) — append-only, no review, never blocks.
+#     L1  lightweight checkpoint (phase-end) — bump-or-declare, never blocks.
+#     L2  full multi-specialist review (HEAVY triggers ONLY — incident · ADR/board ·
+#         new-capability · founder-epic · milestone · census-candidate · the §14
+#         N-merge backstop >30): the review + auto-classify + the Founder Learning Package.
+#
+#   EVAL IS FAIL-OPEN. An L0/L1 classification NEVER blocks a push, a merge, or a goal —
+#   only the heavy-trigger L2 path schedules the full review. The review CLOSE-DEFAULTS:
+#   no review unless a trigger fires. Completeness is guaranteed by the §14 N-merge
+#   backstop (debt capped at 30 — the recorded 175-overdue retro becomes impossible).
+#
+# WHAT THIS IS DELIBERATELY NOT
+#   It NEVER merges, deploys, or mints an OS version label (§14/F1 — a version cut is
+#   base-only). It FEEDS the §14 promotion machinery — it does NOT relax the promotion
+#   bar (observed failure OR second consumer) or the scaled §11 panel. SHADOW rollout:
+#   classify + log before gating (the D3/ADR-001 precedent).
+#
+# SCAFFOLDER-COPIED (manifest workflows[]) — vendored byte-identical into a consumer's
+#   .github/workflows/ by `os-inherit sync`; the learning tools it calls are vendored
+#   under .claude/os/tools/ (with templates/tools/ as the OS-repo fallback).
+# =============================================================================
+
+name: learning-review
+
+on:
+  # Merge to main = a milestone-class boundary; the trigger classifies the level.
+  push:
+    branches: [main]
+  # The N-merge backstop completeness check runs on a steady cadence even with no push.
+  schedule:
+    - cron: "0 7 * * *"   # daily 07:00 UTC — after the governance hygiene pass
+  # Manual fire for an incident / founder-epic / board decision retro.
+  workflow_dispatch:
+    inputs:
+      event:
+        description: "Heavy trigger (incident | adr | new-capability | founder-epic | milestone | census-candidate)"
+        required: false
+        default: ""
+
+# Read-only by default; the review JOB opts into the one write it needs (the package + classified assets).
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-review-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1) CLASSIFY — the 3-level trigger. FAIL-OPEN: L0/L1 never block; only L2 proceeds.
+  # ---------------------------------------------------------------------------
+  classify:
+    name: classify (3-level trigger — fail-open)
+    runs-on: ubuntu-latest
+    outputs:
+      level: ${{ steps.trigger.outputs.level }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history — the N-merge backstop counts commits since the last feedback artifact
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      # Resolve the vendored learning tools (consumer: .claude/os/tools; OS repo: templates/tools).
+      - name: Resolve learning tools
+        id: tools
+        run: |
+          set -euo pipefail
+          for d in ".claude/os/tools" "templates/tools"; do
+            if [ -f "$d/learning-trigger.mjs" ]; then
+              echo "dir=$d" >> "$GITHUB_OUTPUT"
+              echo "Using learning tools in: $d"
+              exit 0
+            fi
+          done
+          echo "::warning::learning-trigger.mjs not found (.claude/os/tools or templates/tools). Run \`os-inherit sync\`. Fail-OPEN: classifying as L0 (no review)."
+          echo "dir=" >> "$GITHUB_OUTPUT"
+
+      # The classifier decides L0 / L1 / L2 from the push + the event input + the backstop count.
+      # FAIL-OPEN by design: any error or a missing tool yields L0 (continuous capture, no review).
+      - name: Classify trigger level
+        id: trigger
+        env:
+          EVENT_INPUT: ${{ github.event.inputs.event }}
+        run: |
+          DIR="${{ steps.tools.outputs.dir }}"
+          if [ -z "$DIR" ]; then
+            echo "level=L0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if LEVEL="$(node "$DIR/learning-trigger.mjs" --event "$EVENT_INPUT" --base "${{ github.event.before }}" --level-only)"; then
+            case "$LEVEL" in
+              L2) echo "level=L2" >> "$GITHUB_OUTPUT"; echo "Heavy trigger — full multi-specialist Learning Review (L2)." ;;
+              L1) echo "level=L1" >> "$GITHUB_OUTPUT"; echo "Lightweight checkpoint (L1) — non-blocking, no full review." ;;
+              *)  echo "level=L0" >> "$GITHUB_OUTPUT"; echo "Continuous capture (L0) — no review." ;;
+            esac
+          else
+            echo "::warning::learning-trigger errored — FAIL-OPEN: classifying as L0 (no review, never blocks)."
+            echo "level=L0" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # 2) REVIEW — runs ONLY on the heavy-trigger L2 path. Classify + Founder Learning Package.
+  # ---------------------------------------------------------------------------
+  review:
+    name: L2 review + classify + Founder Learning Package
+    needs: classify
+    if: needs.classify.outputs.level == 'L2'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write          # surface the Founder Learning Package to a rolling issue
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      - name: Resolve learning tools
+        id: tools
+        run: |
+          set -euo pipefail
+          for d in ".claude/os/tools" "templates/tools"; do
+            if [ -f "$d/learning-classify.mjs" ] && [ -f "$d/founder-learning-package.mjs" ]; then
+              echo "dir=$d" >> "$GITHUB_OUTPUT"
+              echo "Using learning tools in: $d"
+              exit 0
+            fi
+          done
+          echo "::warning::learning-classify.mjs / founder-learning-package.mjs not found — run \`os-inherit sync\`. Skipping (SHADOW: classify + log before gating)."
+          echo "dir=" >> "$GITHUB_OUTPUT"
+
+      # AUTO-CLASSIFY every approved lesson into the 10-way taxonomy (never assumed a skill — §14).
+      - name: Auto-classify approved lessons (10-way taxonomy)
+        if: steps.tools.outputs.dir != ''
+        run: |
+          DIR="${{ steps.tools.outputs.dir }}"
+          node "$DIR/learning-classify.mjs" --json | tee learning-classify.json
+
+      # Emit the zero-tech Founder Learning Package (impl detail hidden — mirrors the Founder Review Package).
+      - name: Emit Founder Learning Package
+        if: steps.tools.outputs.dir != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_INPUT: ${{ github.event.inputs.event }}
+        run: |
+          DIR="${{ steps.tools.outputs.dir }}"
+          node "$DIR/founder-learning-package.mjs" --event "$EVENT_INPUT" --post || \
+            echo "::warning::founder-learning-package emit failed — SHADOW: logged, not gated."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Learning Review (L2 — first-class lifecycle hook)"
+            echo ""
+            echo "- Trigger level: \`${{ needs.classify.outputs.level }}\`"
+            echo "- Auto-classified the approved lessons into the 10-way taxonomy (learning-classify.mjs)."
+            echo "- Emitted the Founder Learning Package (founder-learning-package.mjs)."
+            echo "- SHADOW rollout: classify + log before gating. Feeds the §14 promotion machinery —"
+            echo "  the promotion bar (observed failure OR second consumer) + the scaled §11 panel are UNCHANGED."
+          } >> "$GITHUB_STEP_SUMMARY"

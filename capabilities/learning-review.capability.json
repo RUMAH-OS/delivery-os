@@ -1,0 +1,84 @@
+{
+  "id": "learning-review",
+  "name": "Learning Review",
+  "description": "Registers Learning Review as a first-class Delivery OS lifecycle hook (peer to VERIFY and Founder Review). A 3-level trigger policy decides whether experience is captured continuously (L0), checkpointed lightly (L1), or run through a full multi-specialist retro (L2) — fired by the classifier learning-trigger.mjs on the heavy triggers (incident · ADR/board · new-capability · founder-epic · milestone · census-candidate · N-merge backstop>30), default no-review. Every approved learning is auto-classified by learning-classify.mjs into the right asset of the 10-way taxonomy and inherited via the manifest; an L2 review emits a Founder Learning Package. Eval is FAIL-OPEN (an L0/L1 trigger never blocks); the review decision is CLOSE-DEFAULT (no review unless a trigger fires). This feeds the existing §14 promotion machinery — it does not relax the promotion bar (observed failure OR second consumer) or the §11 panel economics.",
+  "ownerSystem": "delivery-os",
+  "status": "candidate",
+  "version": "v1",
+
+  "home": {
+    "repo": "delivery-os",
+    "path": "templates/tools/learning-trigger.mjs"
+  },
+
+  "facets": {
+    "contract": null,
+    "events":   null,
+    "ui":       null,
+    "skill":    "skills/learning-review/SKILL.md",
+    "wiki":     null
+  },
+
+  "triggerPolicy": {
+    "model": "3-level (ratified board decision 2026-06-25 — DECISIONS.md D10, docs/adr/ADR-003-learning-review.md)",
+    "default": "no-review (close-default)",
+    "evalPosture": "fail-open — an L0/L1 classification NEVER blocks a push, a commit, or a goal; only the heavy-trigger L2 path schedules the full review",
+    "completenessGuarantee": "the N-merge backstop (§14, default 30) caps learning debt at 30 commits — the recorded 175-overdue retro becomes structurally impossible",
+    "classifier": "templates/tools/learning-trigger.mjs",
+    "levels": [
+      {
+        "id": "L0",
+        "name": "continuous capture",
+        "fires": "every slice — append-only signal capture (capabilities/signals.jsonl via file-lesson.mjs + the gates); no review, no block",
+        "learning_expected": false
+      },
+      {
+        "id": "L1",
+        "name": "lightweight checkpoint",
+        "fires": "phase-end / routine slice boundary — a fast bump-or-declare-no-learning checkpoint; non-blocking",
+        "learning_expected": true
+      },
+      {
+        "id": "L2",
+        "name": "full multi-specialist review",
+        "fires": "any HEAVY trigger — incident · ADR/board decision · new-capability · founder-epic · milestone · census-candidate · the §14 N-merge backstop (>30 commits since the last docs/feedback artifact)",
+        "learning_expected": true,
+        "runs": "the learning-review skill + a scaled §11 multi-lens panel (compose principle-11's lens machinery) + learning-classify.mjs + emits the Founder Learning Package"
+      }
+    ],
+    "autoDecisionRule": "learning_expected = (level == L1) OR (level == L2); default no review. Every APPROVED learning is auto-classified into exactly the right asset (the 10-way taxonomy) and inherited via os-foundation.manifest.json — never assumed a skill (§14)."
+  },
+
+  "invoke": {
+    "kind": "cli",
+    "ref":  "node templates/tools/learning-trigger.mjs <event>",
+    "input": {
+      "event":   { "type": "string", "required": false },
+      "base":    { "type": "string", "required": false },
+      "level":   { "type": "string", "required": false },
+      "json":    { "type": "boolean", "required": false }
+    },
+    "output": {
+      "level":     "the classified trigger level (L0 / L1 / L2) + learning_expected boolean",
+      "assets":    "for an approved learning, the learning-classify.mjs taxonomy bucket(s) (the 10-way asset map) the lesson routes into",
+      "package":   "on L2 — docs/learning/LEARNING-<event>.md (the Founder Learning Package) emitted by founder-learning-package.mjs"
+    },
+    "sideEffect": "write (L2 only — emits the Founder Learning Package + appends classified assets; L0/L1 are read-or-append-only and never block)",
+    "idempotent": true,
+    "observability": { "outcome": "the classified level + learning_expected + the chosen asset bucket(s); on L2, the emitted package path; structured --json report" },
+    "errors": null
+  },
+
+  "assets": {
+    "classifier": "templates/tools/learning-classify.mjs",
+    "taxonomy": "the 10-way learning taxonomy — each approved lesson routes to exactly one asset (storing it in the wrong artifact is itself a defect, §14): hook · template · doctrine-line · skill · agent-change · lint · process-adjustment · capability-ledger-row · ADR/decision · no-framework-change",
+    "inheritance": "an approved framework-level asset propagates via os-foundation.manifest.json (tools[]/skills[]/workflows[]) so every future repo inherits it — the inheritance half of §14 is already mechanical"
+  },
+
+  "rollout": {
+    "mode": "SHADOW — classify + log before gating (the D3/ADR-003 SHADOW precedent). learning-trigger.mjs classifies and records the level + would-fire decision without scheduling a blocking review, until the trigger calibration is observed on real work.",
+    "promotionBarUnchanged": "Learning Review FEEDS the §14 promotion machinery; the promotion bar (observed failure OR second consumer pulling), close-default, the §11 scaled panel, and the no-backflow lint are all UNCHANGED. This registers a hook; it does not relax the bar."
+  },
+
+  "health": null
+}
