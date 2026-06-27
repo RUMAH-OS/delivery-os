@@ -1,6 +1,6 @@
 ---
 name: founder-action-package
-version: 1.0.0
+version: 1.0.1
 stability: experimental
 description: >
   Detect that a /goal has reached a genuine founder BOUNDARY (a non-automatable next action), gather
@@ -33,9 +33,11 @@ A `/goal` is the **maximum autonomous execution segment** toward a business obje
 the **first non-automatable next action**. The moment the next *required* step can only be done by a
 human, the autonomous phase has ended **SUCCESSFULLY**: the goal emits a **Founder Action Package (FAP)**
 and terminates immediately — it never waits, polls, idles, or stays running awaiting input. This skill is
-the single procedure for that emit-and-terminate. Its spine is `boundary-classify.mjs` (is this really a
-boundary?) + the `FOUNDER-ACTION-PACKAGE.md.template` (the envelope) + `goal-stop.mjs` (the Stop-hook that
-re-checks the FAP and clears the goal).
+the single procedure for that emit-and-terminate. Its spine is `templates/tools/boundary-classify.mjs`
+(is this really a boundary?) + the `templates/FOUNDER-ACTION-PACKAGE.md.template` (the envelope) +
+`templates/tools/goal-stop.mjs` (the Stop-hook that re-checks the FAP and clears the goal). **Every path
+here is repo-root-relative** — resolved from the delivery-os root (`$CLAUDE_PROJECT_DIR`, the cwd of every
+hook/tool invocation), NEVER from this skill's own directory.
 
 Three load-bearing rules (the reason this is a capability, not a prompt):
 - **A boundary is PROVEN, never asserted (H3).** Run `boundary-classify` on the failed action. Only a
@@ -80,7 +82,7 @@ Three load-bearing rules (the reason this is a capability, not a prompt):
    fill the frontmatter from the classify output and the body sections 1–7 in the zero-tech FOUNDER-RUNBOOK
    voice. **Reuse, don't re-author:** an `approval`/`merge-to-main` FAP **embeds the `founder-review-package`
    output** as its §5; a `credentials`/provisioning FAP reuses the `FOUNDER-RUNBOOK-DEV-PROVISIONING` voice.
-5. **Terminate.** Stop. The `goal-stop.mjs` Stop-hook re-reads the FAP, validates it (fresh · disposition ·
+5. **Terminate.** Stop. The `templates/tools/goal-stop.mjs` Stop-hook re-reads the FAP, validates it (fresh · disposition ·
    taxonomy class · hard evidence kind · resume_goal · verify_clean), and CLEARS the goal so the turn ends
    and the process exits. A malformed or evidence-less FAP does NOT clear — fix it, don't force the stop.
 
@@ -102,11 +104,14 @@ Three load-bearing rules (the reason this is a capability, not a prompt):
 - A `no_tool`-alone FAP → REJECTED by goal-stop (H4); `no_tool` + a hard kind → accepted.
 - A cap-trip → a `disposition: failure`, `boundary_evidence_kind: cap_tripped` FAP (H1).
 - A duplicate-boundary resume → escalation, not a silent re-FAP (H7).
-- `boundary-classify.mjs --self-test` and `goal-stop.mjs --self-test` pass (exit 0) and `node --check`-clean.
+- `templates/tools/boundary-classify.mjs --self-test` and `templates/tools/goal-stop.mjs --self-test` pass (exit 0) and `node --check`-clean.
 
 ## Changelog
-- 1.0.0 — new (experimental); the emit side of the /goal Execution Contract. Spine: `boundary-classify.mjs`
-  + `goal-stop.mjs` + `FOUNDER-ACTION-PACKAGE.md.template`. Composes with founder-review-package (embedded
+- 1.0.1 — 2026-06-27 hook-path integrity: every spine reference made an explicit repo-root path
+  (`templates/tools/…`), removing the skill-relative ambiguity that MODULE_NOT_FOUNDed when a bare
+  filename resolved against the skill's own dir. No behavior change; guarded forever by `check-hook-paths.mjs`.
+- 1.0.0 — new (experimental); the emit side of the /goal Execution Contract. Spine: `templates/tools/boundary-classify.mjs`
+  + `templates/tools/goal-stop.mjs` + `templates/FOUNDER-ACTION-PACKAGE.md.template`. Composes with founder-review-package (embedded
   as the §5 of an approval/merge FAP), the FOUNDER-RUNBOOK-DEV-PROVISIONING voice, the verify-gate (H2
   blocked-at-boundary), and founder-burden-gate (each FAP counts one founder action). Capabilities:
   classify-boundary, generate-fap, terminate-goal.

@@ -1,0 +1,70 @@
+# =============================================================================
+# Delivery OS — HOOK-PATH INTEGRITY workflow.
+#
+# WHAT THIS IS
+#   The SERVER-SIDE backstop for the pre-push "check-hook-paths" gate (Gate 5).
+#   On every PR to `dev` or `main` it proves, on a clean runner, that EVERY
+#   governance/review hook + skill tool reference (settings.json hooks, the
+#   committed pre-push, and every SKILL.md `node …mjs` / `templates/tools/…`
+#   reference) RESOLVES to a real .mjs and `node --check`-loads. Fail-closed.
+#
+# EARNED FROM
+#   The founder-action-package MODULE_NOT_FOUND incident (2026-06-27): a skill
+#   referenced its spine tools by a path that, resolved against the skill's own
+#   base dir, did not exist. The tools were never missing — they were MISREFERENCED.
+#   The local pre-push hook can be skipped on a non-canonical client; this CI check
+#   makes "a misreferenced/missing hook can never reach production" a server invariant.
+#
+# REQUIRED CHECK
+#   A workflow file alone does NOT block merge — branch protection makes it binding:
+#       node .claude/os/tools/setup-branch-protection.mjs --repo <owner/name> --branch main --apply
+#       node .claude/os/tools/setup-branch-protection.mjs --repo <owner/name> --branch dev  --apply
+#
+# SCAFFOLDER-COPIED (manifest workflows[]) — vendored into a consumer's
+#   .github/workflows/. The tool it runs is vendored under .claude/tools/
+#   (with templates/tools/ as the OS-repo dogfood fallback).
+# =============================================================================
+
+name: hook-path-integrity
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hook-path-integrity-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  hook-path-integrity:
+    name: hook-path-integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      # Resolve the tool: consumer (.claude/tools) or OS-repo dogfood (templates/tools).
+      - name: Resolve check-hook-paths tool
+        id: tool
+        run: |
+          set -euo pipefail
+          for p in ".claude/tools/check-hook-paths.mjs" "templates/tools/check-hook-paths.mjs"; do
+            if [ -f "$p" ]; then echo "path=$p" >> "$GITHUB_OUTPUT"; echo "Using: $p"; exit 0; fi
+          done
+          echo "::error::check-hook-paths.mjs not found (.claude/tools or templates/tools). Run \`os-inherit sync\`. Fail-closed."
+          exit 1
+
+      # Prove the tool itself is honest before trusting its verdict.
+      - name: Self-test the checker
+        run: node "${{ steps.tool.outputs.path }}" --self-test
+
+      # Fail-closed: any missing or non-loading hook/tool reference blocks merge.
+      - name: Check every hook/tool reference resolves + node --check loads
+        run: node "${{ steps.tool.outputs.path }}"

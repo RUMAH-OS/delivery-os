@@ -147,6 +147,7 @@ cp "$DOS/templates/tools/os-sync.mjs"        .claude/tools/os-sync.mjs
 cp "$DOS/templates/tools/check-os-drift.mjs" .claude/tools/check-os-drift.mjs
 cp "$DOS/templates/tools/render-kernel.mjs"  .claude/tools/render-kernel.mjs
 cp "$DOS/templates/tools/validate-skills.mjs" .claude/tools/validate-skills.mjs   # v4/B37: fail-closed format lint (pre-push Gate 3)
+cp "$DOS/templates/tools/check-hook-paths.mjs" .claude/tools/check-hook-paths.mjs # hook/tool reference integrity (pre-push Gate 5)
 cp "$DOS/templates/tools/merge-pr.mjs"       scripts/merge-pr.mjs                 # v4/B4: the only sanctioned merge path (DoD row 9)
 printf '{"baseline_ts":0}' > .claude/.verify-state.json
 # record the OS VERSION CONSUMED (the version boundary; v4/F1: consumers adopt by PIN, never mint versions)
@@ -175,7 +176,7 @@ git rev-parse --verify dev >/dev/null 2>&1 || git branch dev 2>/dev/null || true
 for f in .claude/settings.json .claude/hooks/verify-gate.mjs .claude/hooks/sibling-probe.mjs .githooks/pre-push \
          docs/verify/_TEMPLATE.md docs/manifest.schema.json \
          .claude/tools/os-sync.mjs .claude/tools/check-os-drift.mjs .claude/tools/render-kernel.mjs \
-         .claude/tools/validate-skills.mjs scripts/merge-pr.mjs \
+         .claude/tools/validate-skills.mjs .claude/tools/check-hook-paths.mjs scripts/merge-pr.mjs \
          docs/DECISIONS.md docs/INVARIANTS.md docs/gates.md docs/friction-log.md \
          memory/doctrine/doctrine-seed.md tests/helpers/assert-test-database.mjs \
          .gitattributes .env.example .claude/.verify-config.json; do
@@ -185,6 +186,7 @@ done
 [ -f delivery-os/core/GOVERNANCE.md ]   || { echo "FATAL: doctrine not vendored (delivery-os/core/GOVERNANCE.md missing) — router pointers would dangle. Aborting."; exit 1; }
 grep -q '"os_version"' .claude/.verify-config.json || { echo "FATAL: OS version boundary not recorded. Aborting."; exit 1; }
 node .claude/tools/validate-skills.mjs || { echo "FATAL: installed skill pack fails the format lint. Aborting."; exit 1; }
+node .claude/tools/check-hook-paths.mjs || { echo "FATAL: a hook/tool reference is missing or fails node --check. Aborting (Governance §12)."; exit 1; }
 
 echo "✓ Scaffolded '$PROJECT' (packs: ${PACKS:-none})"
 echo "  git: initialized · branches main+dev · verify-gate + drift-lint + skill-lint enforced (.claude/settings.json + .githooks/pre-push)"
