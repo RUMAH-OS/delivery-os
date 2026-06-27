@@ -196,6 +196,23 @@ try {
       if (!named) { process.stderr.write(releaseBlocked(t.name) + "\n"); process.exit(1); }
     }
     const all = [...changed];
+
+    // ── REVIEW-CLASS TRIGGER (capability/architecture-aware; ADR-003 L2 made binding, Governance §14) ──
+    // A new capability · architectural decision · platform capability · workflow · cross-system integration ·
+    // or significant-production change must AUTO-trigger the three reviews (Foundation · Founder · Learning).
+    // Delegated to the fail-closed detector (review-trigger.mjs), which REUSES learning-trigger's L2
+    // classification: bug-fixes / small UI tweaks / trivial maintenance classify BELOW L2 and pass untouched.
+    {
+      const rt = [".claude/tools/review-trigger.mjs", "templates/tools/review-trigger.mjs"]
+        .map((p) => join(ROOT, p)).find((p) => existsSync(p));
+      if (rt && all.length) {
+        try {
+          execSync(`node "${rt}" gate --tip ${tip} --files-stdin`,
+            { cwd: ROOT, input: all.join("\n"), stdio: ["pipe", "ignore", "inherit"] });
+        } catch { process.exit(1); } // the detector printed the block reason + exited non-zero
+      }
+    }
+
     const impl = all.filter((f) => isImpl(f) && !NONIMPL.test(f));
     if (!impl.length) process.exit(0);
     // a verified, independent VERIFY artifact must be part of the pushed tree (read at the tip commit)

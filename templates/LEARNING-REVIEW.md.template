@@ -1,0 +1,34 @@
+---
+event: "<new-capability | architecture-review | integration | significant-production | milestone | incident>"
+date: "<YYYY-MM-DD>"
+change: "<the capability/architecture change this review closes>"
+triaged_by: "<who ran the learning review — reconstructed from artifacts, not memory>"
+milestone: "<the phase/slice this closes, or '-'>"
+---
+
+# Learning Review — <change>
+
+> Auto-triggered by the Review-Class Trigger (Governance §14 · ADR-003 L2). Converts experience into ROUTED
+> CAPABILITY — never a feelings document. Run the `learning-review` skill (3-level hook; this is its L2
+> artifact). An L2 also emits the Founder Learning Package + auto-classifies each lesson (10-way taxonomy).
+> **An OS-FEEDBACK triage (`docs/feedback/OS-FEEDBACK-<event>.md`) or a `docs/RETROSPECTIVE-<date>.md` ALSO
+> satisfies this review.** "No framework lessons discovered." is a VALID answer — but the review must exist.
+
+## 1. Reconstruct from artifacts (commits · VERIFY docs · decision/gate ledgers · friction log)
+<what actually happened this change — cited to artifacts, never recollection.>
+
+## 2. Were any framework-level lessons discovered?
+<one line or a short list. If none: "None.">
+
+## 3. Capability impact (the §14 routing)
+| Lesson | Layer (project / ecosystem / Delivery OS) | Asset (hook · template · doctrine · skill · agent · lint · process · ledger-row · ADR · none) | Destination |
+|--------|------------------------------------------|----------------------------------------------------------------------------------------------|-------------|
+| <…> | <…> | <…> | <project memory / ECR / framework change + case study + version bump> |
+
+## 4. Did any EXISTING capability fail to catch this?
+<every capability that should have fired and didn't → a strengthened capability candidate (this is how the
+trigger that produced THIS review's own existence was earned). Or "None.">
+
+## 5. Blast-radius fork
+- **Project-local lessons** → implemented in the same series: <…>
+- **OS-base / cross-system lessons** → DESIGN-FIRST via `docs/feedback/OS-FEEDBACK-<event>.md` (never write the base from a retro): <…>

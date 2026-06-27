@@ -1,0 +1,30 @@
+---
+review: foundation
+date: "<YYYY-MM-DD>"
+change: "<the capability/architecture change this review gates — slice id / ADR / contract>"
+verdict: "<STABLE — build on it | STABLE-WITH-FIXES | NOT-STABLE — redesign first>"
+lenses: "<the two BLIND, independent lenses — e.g. reviewer-critic (consistency) + lead-architect (forward gaps)>"
+---
+
+# Foundation Review — <change>
+
+> Auto-triggered by the Review-Class Trigger (Governance §14 · ADR-003 L2) for a capability /
+> architectural / integration / significant-production change. Question: **are the foundations this change
+> builds on still internally consistent + still valid?** Two INDEPENDENT lenses work BLIND + in parallel
+> (reviewer-critic = contradictions/consistency · lead-architect = forward gaps), then consolidate. No
+> single agent — orchestrator included — concludes alone (§11). Constraint: do not redesign unless necessary.
+
+## Foundation set reviewed
+<the load-bearing docs/contracts/manifests the change rests on — cross-checked against the just-built reality.>
+
+## VERDICT: <STABLE | STABLE-WITH-FIXES | NOT-STABLE>
+- **Consistency (reviewer-critic):** <coherent? contradictions found? each fixed by additive prose or a real redesign?>
+- **Forward gaps (lead-architect):** <does the model still support the vision? structural gap or additive-only?>
+
+## Findings + fixes
+| # | Sev | Finding | Fix applied / required |
+|---|-----|---------|------------------------|
+| F1 | Blocker/Should/Nice | <…> | <…> |
+
+## Conclusion
+<one line: are the foundations stable to build this change on? what (if anything) must change first?>

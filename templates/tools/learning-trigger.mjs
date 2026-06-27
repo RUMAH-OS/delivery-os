@@ -59,6 +59,38 @@ export const MARKERS = {
   capability: ["skills/*/SKILL.md", "**/skills/*/SKILL.md", "agents/*", "**/agents/*", "**/CAPABILITY-LEDGER.md"],
   // a roadmap milestone / release cut (VERSION or a CHANGELOG-v* file)
   release: ["VERSION", "**/VERSION", "CHANGELOG-v*", "**/CHANGELOG-v*"],
+  // a CROSS-SYSTEM INTEGRATION surface — a producer/consumer seam contract, a seam fixture, or a
+  // cross-repo contract. The recorded miss (Admin→PLOS invoice-delivery rework: a NEW immutable-package
+  // contract across two repos) earned no learning level because it touched none of the markers above —
+  // this marker closes that hole directly.
+  integration: ["contracts/**", "**/contracts/**", "**/seam/**", "**/seam-*", "**/*.seam.*",
+                "**/*-contract.*", "**/*.contract.*", "**/CONSUMER-*.md", "**/consumer-*.md"],
+  // a NEW/changed WORKFLOW or LIFECYCLE pack (the os-inherit workflow templates / lifecycle defs).
+  // Deliberately NOT `.github/workflows/**` (routine CI plumbing — change-classify class A); a delivery
+  // workflow pack is a platform capability, a CI yaml tweak is maintenance.
+  workflow: ["templates/workflows/**", "**/workflow-packs/**", "**/lifecycles/**", "**/*.lifecycle.*"],
+  // THE FRAMEWORK'S OWN ARCHITECTURE — the SECOND recorded miss (founder, 2026-06-27): "Foundation/
+  // Founder/Learning Review are no longer consistently triggered on significant architectural work."
+  // Root cause: every marker above is keyed to a CONSUMER-APP surface (billing / migrations / contracts /
+  // SKILL / agent / VERSION). The framework's OWN architectural surfaces matched NONE of them, so —
+  //   · the governance spine (`core/GOVERNANCE.md`, `core/OPERATING-LOOP.md`, `core/DEFINITION-OF-DONE.md`)
+  //     and the design-decision WAL (`proposals/`) classified change-classify class B → only L1, and
+  //   · the CONTROL-PLANE tooling itself — the classifiers / triggers / gates / hooks that ENFORCE every
+  //     other gate — classified class A when installed under `.claude/` (auto-safe!) → L0.
+  // Editing the constitution, rewriting the risk classifier, or changing THIS trigger's own logic — the
+  // most architecturally consequential work there is — owed NO review. A change to the control plane can
+  // silently disable every gate; it is architecturally significant BY DEFINITION. This marker closes that
+  // direction. (App bug-fix/UI/trivial maintenance touch none of these paths → stay class A/B → below L2.)
+  controlplane: [
+    // the governance spine + the design-decision WAL (repo-anchored, so a consumer app's own src/core/
+    // is NOT swept in — only the framework's top-level core/ + proposals/ qualify)
+    "core/**", "proposals/**",
+    // the control-plane TOOLING itself — the gates, classifiers, triggers, hooks (canonical + installed)
+    "**/verify-gate.mjs", "**/change-classify.mjs", "**/learning-trigger.mjs",
+    "**/review-trigger.mjs", "**/census-detector.mjs", "**/check-hook-paths.mjs", "**/check-os-drift.mjs",
+    "templates/tools/**", "templates/hooks/**", "templates/githooks/**",
+    "**/.claude/hooks/**", "**/.claude/tools/**",
+  ],
 };
 // a prod rollback / revert / hotfix marker, scanned over commit subjects + the diff body.
 const ROLLBACK_RE = /\b(rollback|roll-back|revert|hotfix|hot-fix)\b/i;
@@ -146,6 +178,30 @@ function classifyLevel(input) {
       : `decision/ADR recorded (${paths.filter((p) => matchAny(p, MARKERS.decision)).join(", ") || "panel"})`);
   if (anyPathHits(paths, MARKERS.capability))
     l2.push(`NEW capability surface (${paths.filter((p) => matchAny(p, MARKERS.capability)).join(", ")})`);
+
+  // CONSEQUENTIAL / ARCHITECTURE / SIGNIFICANT-PRODUCTION (composed from change-classify, never forked).
+  // A class-C change — money / identity / contracts / data-shape / migrations / prompts / secrets, OR the
+  // control-plane itself — IS architecturally significant by definition and ALWAYS earns a full review.
+  // THIS is the marker that closes the recorded miss: a cross-system migration+contract rework classified
+  // class C, but — lacking an ADR or new-capability path — earned NO learning level (it fell to L0 and
+  // fired nothing). A class-C change is precisely "a significant production change", never a bug-fix/UI/
+  // trivial-maintenance one (those are class A/B and do NOT reach here).
+  if (paths.length && cc.class === "C")
+    l2.push(`CONSEQUENTIAL change — change-classify class C (${cc.reason})`);
+
+  if (anyPathHits(paths, MARKERS.integration))
+    l2.push(`cross-system integration / seam contract (${paths.filter((p) => matchAny(p, MARKERS.integration)).join(", ")})`);
+
+  const wfHits = paths.filter((p) => matchAny(p, MARKERS.workflow) &&
+    !/(^|\/)\.github\/workflows\//.test(String(p).replace(/\\/g, "/")));
+  if (wfHits.length)
+    l2.push(`new/changed workflow or lifecycle pack (${wfHits.join(", ")})`);
+
+  // FRAMEWORK ARCHITECTURE / CONTROL-PLANE — the governance spine, the design-decision WAL, or the gate/
+  // classifier/trigger/hook tooling itself. Closes the 2026-06-27 regression: significant architectural
+  // work ON THE FRAMEWORK fell to L1/L0 and fired no review.
+  if (anyPathHits(paths, MARKERS.controlplane))
+    l2.push(`framework architecture / control-plane change (${paths.filter((p) => matchAny(p, MARKERS.controlplane)).join(", ")})`);
 
   const epicScale = !!input.epicScale ||
     paths.length >= EPIC_FILES ||
@@ -292,6 +348,48 @@ function selfTest() {
   ok(level({ changedFiles: ["src/x.ts"], milestoneReport: true }).level === "L2", "milestone-report fired -> L2");
   ok(level({ changedFiles: ["src/x.ts"], censusExit: 1 }).level === "L2", "census candidate (non-zero exit) -> L2");
   ok(level({ changedFiles: ["src/x.ts"], commitSubjects: ["revert: undo the bad deploy"] }).level === "L2", "revert marker -> L2");
+
+  // --- NEW (the founder's gap): CONSEQUENTIAL/ARCHITECTURE/INTEGRATION/WORKFLOW -> L2 ---
+  // a migration touching the financial SoR (class C) -> L2 (the recorded miss).
+  ok(level({ changedFiles: ["db/migrations/0042_invoice_lifecycle.sql"] }).level === "L2", "migration (financial SoR, class C) -> L2");
+  ok(level({ changedFiles: ["src/server/billing/invoice.ts"] }).level === "L2", "billing path (class C) -> L2");
+  ok(/CONSEQUENTIAL change/.test(level({ changedFiles: ["db/migrations/0042.sql"] }).reasons.join(" ")), "class-C reason surfaced");
+  // a cross-repo SEAM / immutable-package CONTRACT (the Admin→PLOS rework shape) -> L2.
+  ok(level({ changedFiles: ["contracts/invoice-delivery-v1.mjs"] }).level === "L2", "cross-repo contract -> L2 (integration)");
+  ok(level({ changedFiles: ["packages/seam/consumer-fixtures.json"] }).level === "L2", "seam fixture -> L2 (integration)");
+  ok(/integration|CONSEQUENTIAL/.test(level({ changedFiles: ["apps/web/CONSUMER-invoice.md"] }).reasons.join(" ")), "CONSUMER-import contract -> L2");
+  // a new workflow / lifecycle PACK -> L2; routine CI yaml is NOT a workflow-pack marker.
+  ok(level({ changedFiles: ["templates/workflows/promote.yml"] }).level === "L2", "new workflow pack -> L2");
+  ok(level({ changedFiles: [".github/workflows/ci.yml"] }).level === "L0", "routine .github/workflows CI yaml -> L0 (NOT a workflow-pack marker; class A maintenance)");
+
+  // --- REGRESSION GUARD (founder requirement 2026-06-27): the framework's OWN architectural surfaces ---
+  // This block is the named guard that the "significant architectural work fires no review" regression
+  // cannot silently reappear. Each assertion is a path that MUST classify L2 (pure level — the exact shape
+  // the review-trigger gate calls), and the exemption assertions below prove the marker did NOT over-fire.
+  ok(level({ changedFiles: ["core/GOVERNANCE.md"] }).level === "L2", "GUARD: core/GOVERNANCE.md (constitution) -> L2");
+  ok(level({ changedFiles: ["core/OPERATING-LOOP.md"] }).level === "L2", "GUARD: core/OPERATING-LOOP.md -> L2");
+  ok(level({ changedFiles: ["core/DEFINITION-OF-DONE.md"] }).level === "L2", "GUARD: core/DEFINITION-OF-DONE.md -> L2");
+  ok(level({ changedFiles: ["proposals/NEW-DESIGN.md"] }).level === "L2", "GUARD: proposals/* (design WAL) -> L2");
+  ok(level({ changedFiles: ["templates/tools/change-classify.mjs"] }).level === "L2", "GUARD: the risk classifier itself -> L2");
+  ok(level({ changedFiles: ["templates/tools/learning-trigger.mjs"] }).level === "L2", "GUARD: the L2 trigger's own logic -> L2");
+  ok(level({ changedFiles: ["templates/tools/review-trigger.mjs"] }).level === "L2", "GUARD: the review-trigger detector -> L2");
+  ok(level({ changedFiles: [".claude/tools/learning-trigger.mjs"] }).level === "L2", "GUARD: the INSTALLED gate logic (was class A -> L0!) -> L2");
+  ok(level({ changedFiles: [".claude/hooks/verify-gate.mjs"] }).level === "L2", "GUARD: the installed verify-gate hook -> L2");
+  ok(/control-plane|CONSEQUENTIAL/.test(level({ changedFiles: ["core/GOVERNANCE.md"] }).reasons.join(" ")), "GUARD: control-plane reason surfaced");
+  // and the marker does NOT sweep in a CONSUMER APP's own src/core/ (repo-anchored core/**, not **/core/**):
+  ok(level({ changedFiles: ["apps/web/src/core/util.ts"] }).level !== "L2" ||
+     /class C|integration|workflow/.test(level({ changedFiles: ["apps/web/src/core/util.ts"] }).reasons.join(" ")),
+     "GUARD: a consumer app's own src/core/ is NOT swept into control-plane L2");
+
+  // --- EXEMPTIONS (must NOT reach L2): bug-fix · small UI tweak · trivial maintenance ---
+  ok(level({ changedFiles: ["src/lib/parser.ts"], commitSubjects: ["fix: a regression in the parser"] }).level === "L1",
+     "isolated bug-fix (regression) -> L1, NOT L2 (no full review owed)");
+  ok(level({ changedFiles: ["src/pages/Dashboard.tsx"], diffBody: "+<span>tweak</span>" }).level === "L1",
+     "small UI tweak (founder_verifiable, not epic) -> L1, NOT L2");
+  ok(level({ changedFiles: ["src/lib/util.ts"], diffBody: "+const x = 1;" }).level === "L0",
+     "trivial maintenance (class A refactor) -> L0, NOT L2");
+  ok(level({ changedFiles: ["docs/notes.md", "tests/unit/x.test.ts"] }).level === "L0",
+     "docs + tests only -> L0, NOT L2");
 
   // --- a founder-review EPIC (founder_verifiable AND epic-scale) -> L2 ---
   const epicFiles = Array.from({ length: 9 }, (_, i) => `apps/web/components/C${i}.tsx`);
