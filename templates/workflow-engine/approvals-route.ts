@@ -46,6 +46,22 @@ export function createApprovalsRoute(ctx: ApprovalsRouteContext): Hono<{ Variabl
   // S1/S2: the human-principal gate is the ONLY auth on this completer.
   approvalsApi.use("/approvals", ctx.humanPrincipal.requireHuman(requiredScope));
 
+  // G5 — PENDING-APPROVALS LISTING (the founder approvals inbox). A step BLOCKED awaiting 'human-response' IS
+  // a pending approval; before this there was no way to enumerate them (only workflow.gate.resolved on exit).
+  // PII-free: returns ID/coded refs only (runId, seq, awaitingEventId, stepType, owner, updatedAt) — the caller
+  // resolves detail via GET /workflow/runs/:id (which now carries the verdict, G4). Gated by the same human
+  // principal as POST /approvals (the inbox is a management view).
+  approvalsApi.get("/approvals", async (c) => {
+    const pending = await db
+      .select({
+        runId: workflowStep.runId, seq: workflowStep.seq, awaitingEventId: workflowStep.awaitingEventId,
+        stepType: workflowStep.stepType, owner: workflowStep.owner, updatedAt: workflowStep.updatedAt,
+      })
+      .from(workflowStep)
+      .where(and(eq(workflowStep.state, "blocked"), eq(workflowStep.awaitSource, "human-response")));
+    return c.json({ data: { pending, count: pending.length } });
+  });
+
   approvalsApi.post("/approvals", async (c) => {
     const parsed = ApprovalCallbackV1.safeParse(await c.req.json().catch(() => undefined));
     if (!parsed.success) {
