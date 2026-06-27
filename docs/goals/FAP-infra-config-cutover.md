@@ -52,7 +52,16 @@ RESULT: FAIL — 4 required key(s) MISSING/INVALID.   (DATABASE_URL, AUTH_JWT_SE
 
 ## 3. Do this — grouped by platform (each item appears exactly ONCE)
 
-### A. Vercel — project `property-lead-os` → Settings → Environment Variables → **Production**
+> **⚠ CANONICAL VERCEL SCOPE — read first.** Both projects live under the **TEAM** scope
+> **`team_1CSTFxqvnOe9lvHtCsPHSeax`** ("Ruma Housing") — NOT your personal `bkasanwiredjos-projects`
+> scope. This is proven on disk: PLOS `deploy.yml` sets `VERCEL_ORG_ID=team_1CSTFxqvnOe9lvHtCsPHSeax`
+> and rumah-admin `.vercel/repo.json` has `orgId: team_1CSTFxqvnOe9lvHtCsPHSeax` (infra inventory finding
+> **D2**). Open the Vercel **team** workspace switcher → "Ruma Housing" BEFORE editing either project. If you
+> set the variables on the personal-scope project, the deploy reads from the team project and the secrets
+> **silently never take effect** — this is the single highest-risk step. (Supersedes the stale
+> `FAP-platform-hardening-v6.md` line that named the personal scope.)
+
+### A. Vercel — team **`team_1CSTFxqvnOe9lvHtCsPHSeax`** → project `property-lead-os` → Settings → Environment Variables → **Production**
 Set each of these (the doctor prints the exact source for every one):
 
 | Variable | Value / source | Why |
@@ -68,9 +77,9 @@ Set each of these (the doctor prints the exact source for every one):
 | *(optional)* **DISCOVERY_ENABLED**, **DISCOVERY_SWEEP_ENABLED**, **SERPAPI_KEY** | set `=1` + the key only when you want the autonomous Discovery sweep to run/spend | Stays inert until set. |
 
 ### B. Vercel — plan
-- **Upgrade the property-lead-os project's team to a paid (Pro) plan.** Hobby caps crons (2, once/day) — too few/slow for the heartbeat + delivery drain + Discovery sweep on a `*/5`-style schedule. This is the structural switch that makes "runs without manual intervention" true.
+- **Upgrade the `team_1CSTFxqvnOe9lvHtCsPHSeax` ("Ruma Housing") team to a paid (Pro) plan** (the team the `property-lead-os` project lives in). Hobby caps crons (2, once/day) — too few/slow for the heartbeat + delivery drain + Discovery sweep on a `*/5`-style schedule. This is the structural switch that makes "runs without manual intervention" true.
 
-### C. Vercel — project `rumah-admin` → Settings → Environment Variables → **Production**
+### C. Vercel — team **`team_1CSTFxqvnOe9lvHtCsPHSeax`** → project `rumah-admin` → Settings → Environment Variables → **Production**
 | Variable | Value / source | Why |
 |---|---|---|
 | **DATABASE_URL** | Supabase → Settings → Database → **Transaction pooler (6543)** URI (prod ref `clfocpodfbtgzivnivck`) | Build + 503 cure; use a non-service-role principal so RLS applies. |
