@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rumah-os/delivery-os/platform-health.schema.json",
+  "title": "Delivery OS — Unified Platform Health report",
+  "description": "The ONE response shape every app's GET /api/health/platform (or equivalent) emits, so the Infrastructure Platform can poll every app identically. Each app aggregates its own subsystem probes (DB reachability, the drain/heartbeat liveness, discovery, event cursor, …) into this shape. The verdict is the worst-wins fold of the per-subsystem statuses (computeVerdict in platform-health.mjs); a CRITICAL subsystem that is down or unknown takes the whole platform down (fail-closed). Validate any instance with `node infra/platform-health.mjs validate`.",
+  "type": "object",
+  "required": ["service", "verdict", "ok", "checkedAt", "subsystems", "summary"],
+  "additionalProperties": true,
+  "properties": {
+    "service": { "type": "string", "description": "Stable service id (matches the config-registry service)." },
+    "verdict": {
+      "type": "string",
+      "enum": ["ok", "degraded", "down"],
+      "description": "The overall verdict the platform polls on. ok = serve · degraded = serve + alarm · down = fail-closed (the route answers HTTP 503)."
+    },
+    "ok": { "type": "boolean", "description": "Convenience: verdict === 'ok'." },
+    "checkedAt": { "type": "string", "format": "date-time", "description": "ISO-8601 instant the aggregate was computed." },
+    "subsystems": {
+      "type": "array",
+      "description": "One entry per probed subsystem. A failed/timed-out probe MUST appear here as status=down with an actionable cause — never be silently omitted.",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "critical", "detail"],
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string", "description": "Subsystem id, e.g. database | heartbeat | event-cursor | discovery | admin-handoff." },
+          "status": {
+            "type": "string",
+            "enum": ["ok", "degraded", "down", "unknown"],
+            "description": "ok = healthy · degraded = impaired · down = failed/unreachable · unknown = could not determine (never silently treated as ok)."
+          },
+          "critical": { "type": "boolean", "description": "Does a failure here take the whole platform down? (default true)." },
+          "detail": { "type": "string", "description": "One-line human reason." },
+          "latencyMs": { "type": "number", "description": "Probe latency in ms (optional)." },
+          "actionable": { "type": "string", "description": "The next action when not ok (optional). Config-class causes delegate to config-doctor." }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "ok", "degraded", "down", "unknown"],
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "integer" },
+        "ok": { "type": "integer" },
+        "degraded": { "type": "integer" },
+        "down": { "type": "integer" },
+        "unknown": { "type": "integer" }
+      }
+    }
+  }
+}

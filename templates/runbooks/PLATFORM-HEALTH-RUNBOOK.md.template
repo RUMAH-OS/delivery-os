@@ -1,0 +1,104 @@
+# Platform Health & Recovery Runbook — &lt;service&gt;
+
+> Vendored from `delivery-os/templates/runbooks/PLATFORM-HEALTH-RUNBOOK.md.template`.
+> The operator's single page for: reading platform health, diagnosing a stuck/failing
+> workflow, rolling back a bad deploy, and confirming the self-heal actually recovered.
+> Pairs with the Infrastructure Platform tools vendored in `infra/`:
+> `config-doctor.mjs` (pre-deploy config), `platform-health.mjs` (runtime health +
+> diagnostics), `rollback-helper.mjs` (rollback), `post-deploy-verify.mjs` (self-healing
+> verification). READ-ONLY tools — none mutate prod; promotion/rollback is a human action.
+
+---
+
+## 0. The one health story (how the pieces compose)
+
+```
+BEFORE deploy        config-doctor      → every required prod config key PRESENT + valid (gate; blocks build)
+DURING runtime       /api/health/platform → one canonical report: per-subsystem status + overall verdict
+WHEN something stops platform-health diagnose → the ACTIONABLE cause (never a silent stop)
+AFTER deploy         post-deploy-verify → config PASS + health not-down + a synthetic path responds (alarms if not)
+WHEN a deploy is bad rollback-helper    → the last-known-good deploy + the exact promote command
+```
+
+config is config-doctor's concern; health delegates config-class faults BACK to it (one
+source of truth per concern).
+
+---
+
+## 1. Read platform health
+
+- **Endpoint:** `GET <base>/api/health/platform` — returns the canonical shape
+  (`infra/platform-health.schema.json`). `verdict`: `ok` (200) · `degraded` (200 + alarm)
+  · `down` (503, fail-closed). Each subsystem carries `status` + a one-line `detail` +
+  (when not ok) an `actionable`.
+- **Subsystems aggregated:** &lt;list the app's probes — e.g. database (config-resolved pooled
+  connection), heartbeat/drain liveness, event cursor, discovery pipeline&gt;.
+- A failed probe is NEVER omitted — it appears as `status: down` with a classified cause.
+
+## 2. Diagnose a stuck or failing workflow
+
+Do NOT guess. Feed the symptom to the diagnostics engine:
+
+```
+echo '{"subsystem":"<db|event-cursor|heartbeat|external-api>","error":"<the error text>","code":"<errno/pg-code>"}' \
+  | node infra/platform-health.mjs diagnose
+```
+
+It returns ONE named cause + the next action:
+
+| Cause | Means | First action |
+|-------|-------|--------------|
+| `DB_UNREACHABLE` | the pooled connection cannot reach Postgres | Supabase up? host/port resolve? confirm pooler with config-doctor |
+| `POOL_EXHAUSTION` | connections exhausted under serverless fan-out | DATABASE_URL must be the **:6543 transaction pooler**; check for a connection leak |
+| `CONFIG_KEY_MISSING` | a required env key is missing/invalid | **delegate:** `node infra/config-doctor.mjs --env production` |
+| `STUCK_CONSUMER_CURSOR` | the event drain fell behind / wedged | trigger the heartbeat/drain once; check the head-of-line event for a poison-pill |
+| `HEARTBEAT_STALE` | the engine heartbeat stopped beating | confirm the Vercel cron heartbeat is firing + its secret is set |
+| `EXTERNAL_API_ERROR` | an upstream returned non-2xx | check provider status + the credential/quota; retry with backoff |
+| `UNKNOWN` | unrecognized — but captured, NOT silent | record it + add a taxonomy rule so it is named next time |
+
+## 3. Roll back a bad deploy
+
+1. **Find the last-known-good:**
+   ```
+   node infra/rollback-helper.mjs --json   # needs VERCEL_TOKEN + VERCEL_PROJECT_ID (read-only)
+   ```
+   It prints the current production deploy, the **last-known-good** deploy, and the exact
+   `vercel promote <url>` command. It NEVER promotes for you.
+2. **Promote (human action):** run the printed `vercel promote …` command. This re-points
+   the production alias at the previous good deployment — the fastest forward-safe recovery.
+3. **Migrations (the `down/` strategy):** a code rollback does NOT undo a schema migration.
+   - Forward migrations are **forward-only in production** (`migrations/*.sql`).
+   - Each reversible migration ships a paired `migrations/*.down.sql`; `npm run db:rollback`
+     applies the down files in reverse for **dev/CI** recovery.
+   - In **prod**, prefer a forward "fix" migration over a destructive down. NEVER run a
+     `down` that drops a column/table holding real data without a founder decision.
+   - &lt;app-specific: name any gated/founder-only migrations here&gt;.
+4. **Confirm recovery:** `node infra/post-deploy-verify.mjs --base <prod-url> --service <id>`.
+
+## 4. Self-healing — and verifying it actually healed
+
+The platform already self-heals interrupted/stuck runs; this section documents HOW, and
+how to CONFIRM the recovery happened (recovery you cannot observe is not recovery).
+
+- **Heartbeat re-drives interrupted runs.** The engine tick is **stateless + SKIP-LOCKED**:
+  every beat picks up any run left mid-flight (a serverless freeze, a redeploy) and advances
+  it one transition. A run interrupted between states is resumed on the next beat, not lost.
+- **The drain quarantines poison-pills.** A bad event does not silently stop the cursor — it
+  is parked/quarantined and the drain continues, so one bad event cannot wedge the pipeline.
+- **The standing cron is the self-heal clock.** Vercel cron hits the heartbeat/drain route on
+  a fixed schedule; as long as it fires (and its secret is set — config-doctor verifies), the
+  self-heal loop runs continuously.
+
+**Verify the self-heal works (not just that it exists):**
+- `post-deploy-verify` re-polls `/api/health/platform` across a retry window — this IS the
+  recovery window. If the heartbeat was stale or the cursor behind right after deploy, a
+  healthy re-poll proves the self-heal caught up; a still-failing re-poll ALARMS.
+- The health report's `heartbeat`/`event-cursor` subsystems show liveness + lag directly:
+  after an incident, watch them return to `ok` — that is the recorded proof of recovery.
+
+## 5. Escalation
+
+- `down` verdict that does not clear within the self-heal window → page the on-call / founder.
+- A `CONFIG_KEY_MISSING` cause → this is a config boundary; resolve via config-doctor + the
+  Founder Action Package, not a code change.
+- Anything classified `UNKNOWN` recurring → open a capability candidate to add a taxonomy rule.
