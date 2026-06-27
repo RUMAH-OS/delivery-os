@@ -44,6 +44,40 @@ Register **Learning Review** as a first-class lifecycle hook, peer to VERIFY (D8
 ## Rollout (SHADOW-mode, the D3/ADR-001 precedent)
 `learning-trigger.mjs` **classifies + logs** the level + the would-fire decision **without scheduling a blocking review**, until trigger calibration is observed on real work. Promotion out of SHADOW is a founder decision once the false-fire/missed-fire rates are seen — exactly the SHADOW discipline ADR-001/D3 established for the auto-merge classifier.
 
+## Addendum — 2026-06-26 (founder ruling): the L2 class promoted SHADOW → ENFORCE
+The recorded miss the SHADOW posture allowed: a class-C cross-system change (the Admin→PLOS invoice-delivery
+rework — a new immutable-package contract, a cross-repo seam, prod migrations to the financial SoR) shipped and
+**neither a Founder Review nor a Learning Review fired**, because the only *enforced* triggers were count-based
+(N-merges) + release-tag, and L2 classification was advisory-only. Two changes close it, reuse-first:
+1. **Classifier gap fixed** (`templates/tools/learning-trigger.mjs`): L2 now also fires on a **class-C / consequential**
+   change (composed from `change-classify`), a **cross-system integration / seam contract**, and a **workflow/lifecycle
+   pack** — the markers the rework would have tripped. (Bug-fix/UI/trivial stay class A/B → below L2.)
+2. **L2 made BINDING for this class** (`templates/tools/review-trigger.mjs`, wired into the verify-gate pre-push next
+   to the §14 review-artifact detector, fail-closed): an L2 push must carry its **three reviews (Foundation · Founder ·
+   Learning)**, fresh + well-formed, or it is blocked. Posture `.claude/.verify-config.json → review_trigger`
+   (`enforce` default · `shadow` = the original ADR-003 classify-and-log · `off`). The rest of the SHADOW rollout (the
+   L0/L1 levels, the calibration of thresholds) is **unchanged** — only the heavy L2 class is now enforced, which is the
+   "turning on gating is a separate founder decision" this ADR reserved, now made. **Honest limit (unchanged from §12):**
+   the gate proves an artifact EXISTS, is non-empty, and carries an author-distinct attestation — it cannot prove the
+   review was truthful rather than rubber-stamped; that remains human/governance, surfaced not claimed.
+
+## Addendum — 2026-06-27 (second recorded miss, founder): the framework's OWN architecture
+The 2026-06-26 markers were keyed entirely to *consumer-app* surfaces (billing / migrations / contracts / SKILL /
+agent / VERSION). The framework's own architectural surfaces matched none of them, so significant architectural work ON
+THE FRAMEWORK fired no review: the governance spine (`core/`) and the design-decision WAL (`proposals/`) classified
+change-classify class B → only **L1**, and the CONTROL-PLANE tooling itself — the gates / classifiers / triggers / hooks
+that enforce every other gate — classified class A when installed under `.claude/` → **L0** (editing the live gate logic
+was treated as auto-safe maintenance). This is the founder's reported regression: "Foundation/Founder/Learning Review are
+no longer consistently triggered on significant architectural work." The fix, reuse-first:
+1. **A new `controlplane` L2 marker** in `templates/tools/learning-trigger.mjs`: `core/**` · `proposals/**` · the
+   `verify-gate`/`change-classify`/`learning-trigger`/`review-trigger`/`census-detector` tooling · `templates/{tools,hooks,githooks}/**`
+   · installed `**/.claude/{tools,hooks}/**`. Repo-anchored so a consumer app's own `src/core/` is NOT swept in.
+2. **A named regression guard** (the founder's explicit requirement) in both the `learning-trigger.mjs` and
+   `review-trigger.mjs` self-tests asserts every framework surface fires L2 — and that the exemptions still hold
+   (a class-A refactor stays L0, a small UI tweak stays L1) — so the regression cannot silently reappear. The
+   review-trigger embedded-fallback classifier was extended in lock-step (fail TOWARD review on these paths when the
+   canonical classifier is unavailable).
+
 ## References
 - `DECISIONS.md` D10 · `core/GOVERNANCE.md` §14 (OS Feedback Loop), §11 (panel economics), §13 (mechanism/policy line), §16 (boundary)
 - `capabilities/learning-review.capability.json` · `capabilities/CANONICAL-SDLC.md` (Learning Review row)

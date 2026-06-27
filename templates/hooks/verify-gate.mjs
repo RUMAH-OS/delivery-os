@@ -411,6 +411,24 @@ try {
     }
     const all = [...changed];
 
+    // ── REVIEW-CLASS TRIGGER (capability/architecture-aware; ADR-003 L2 made binding, Governance §14) ──
+    // The COMPLEMENT of the review-artifact detector below: that one fires when you WRITE a review (→ triage);
+    // THIS one fires when you make a capability / architectural decision / platform capability / workflow /
+    // cross-system integration / significant-production CHANGE (→ the three reviews must exist). It closes the
+    // recorded miss (a class-C cross-system migration+contract rework that earned no review). Delegated to the
+    // fail-closed detector, which REUSES learning-trigger's L2 classification; bug-fix/UI/trivial changes
+    // classify BELOW L2 and pass untouched. Posture: .claude/.verify-config.json → review_trigger.
+    {
+      const rt = [".claude/tools/review-trigger.mjs", "templates/tools/review-trigger.mjs"]
+        .map((p) => join(ROOT, p)).find((p) => existsSync(p));
+      if (rt && all.length) {
+        try {
+          execSync(`node "${rt}" gate --tip ${tip} --files-stdin`,
+            { cwd: ROOT, input: all.join("\n"), stdio: ["pipe", "ignore", "inherit"] });
+        } catch { process.exit(1); } // the detector printed the block reason + exited non-zero
+      }
+    }
+
     // §14 v4 — REVIEW-ARTIFACT DETECTOR (HARD-BLOCK, F7). Release tags never fired in the field;
     // continuous projects mint their release-class moments as review artifacts instead. A push that
     // adds/changes one must also carry an OS-feedback triage. ("No framework lessons" remains valid.)

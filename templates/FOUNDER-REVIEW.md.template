@@ -1,0 +1,34 @@
+---
+review: founder
+date: "<YYYY-MM-DD>"
+change: "<the capability/architecture change — slice id / PR>"
+reviewer: "<the FOUNDER (or the founder's named delegate) who ran this review — NOT the author>"
+review_path: "<LOCAL (one-command harness) | DEV preview | PROD — chosen for least founder effort>"
+pass_fail: "<PASS | FAIL | PENDING>"
+---
+
+# Founder Review — <change>
+
+> Auto-triggered by the Review-Class Trigger (Governance §14 · ADR-003 L2). The zero-technical-knowledge
+> package the FOUNDER can act on alone. Prefer generating it with `founder-review-package` (it writes
+> `docs/review/REVIEW-<pr>-<slice>.md`, which ALSO satisfies this review) — this template is the manual
+> fallback. Implementation detail (diffs, env, CI) stays OUT of this doc; REAL urls only, never placeholders.
+
+## What changed (in plain language)
+<one short paragraph a non-technical founder understands — no jargon, no diff.>
+
+## The links to open
+<REAL urls (the chosen LOCAL/DEV base + each path). Never a placeholder. If none: "no reviewable surface".>
+
+## Click-by-click
+1. <step> → <what you should see>
+
+## ✅ Pass / ❌ Fail checklist
+- [ ] <the founder-verifiable acceptance the founder ticks>
+
+## What still needs YOU
+<the ONE real one-time founder action + a direct link, or "nothing further". Links ONLY for a real action.>
+
+## Reviewer attestation (anti-rubber-stamp)
+- [ ] I am the founder (or named delegate) and I am NOT the author of this change.
+- [ ] I actually opened the links / ran the checklist above — this is not a sign-off from memory.

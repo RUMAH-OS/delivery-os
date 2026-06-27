@@ -1,1 +1,1 @@
-{"impl_extra":["scripts/","templates/hooks/","templates/githooks/","templates/tools/"]}
+{"impl_extra":["scripts/","templates/hooks/","templates/githooks/","templates/tools/"],"review_trigger":"enforce"}
