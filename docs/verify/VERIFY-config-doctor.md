@@ -2,17 +2,62 @@
 slice: "config-doctor — Infrastructure Registry & Configuration layer"
 verify_status: verified
 # ^ one of: planned | generated | executed | verified. The verifier sets 'verified' only when ALL gates below pass.
-author: "build agent (Opus 4.8 build session)"
-verifier: "qa-test agent (independent invocation, 2026-06-27)"
+# RE-VERIFIED 2026-06-27 (sensitive-env fix): an INDEPENDENT qa-test invocation (distinct from the build agent that
+# authored the fix) re-ran the gates against the new sensitive-aware classifyVercelEnv() + github-secret process.env
+# fallback + 4 new self-test cases. Self-test 20/20 (exit 0); classification rule independently probed 6/6 incl.
+# the security edge (a sensitive var carrying a value is still PRESENT, never blank, and its value is never printed);
+# github-secret env-fallback forced-tested (gh-unavailable + injected VERCEL_* ⇒ lane github-secret(env), no value
+# leak); no regression in the MISSING/INVALID/read-only/no-secret-leak guarantees against both real consumer
+# registries; and the template change is byte-identical (LF-normalized) to the merged PLOS PR #205 corrections —
+# the only residual template↔PLOS deltas are pre-existing path-resolution (HERE/fileURLToPath) + a lint pragma,
+# untouched by this fix. Author != verifier (§3/§12) is satisfied: the verifier did NOT author the code under test.
+author: "build agent (Opus 4.8 — sensitive-env fix session)"
+verifier: "qa-test agent (Opus 4.8 — independent re-verification invocation, 2026-06-27; distinct from the build agent)"
 date: "2026-06-27"
-independence_basis: "recorded-distinct-invocation"
+independence_basis: "real-independent — a true second qa-test invocation re-ran the gates against the new code; the verifier did not author the production change under test"
 machine_probe: "node templates/tools/config-doctor.mjs --self-test"
-impl_fingerprint: '{"templates/tools/config-doctor.mjs":"b60406e6df62b44257f0e277bf1a98b69bf6df8c5491a3670e8d2dedcd3b44b7","templates/tools/config-registry.schema.json":"0a4d7e7ae557c07ae5885a0fd7c9a7a230693b8fe39eb37e21f27e027d7a6255"}'
+impl_fingerprint: '{"templates/tools/config-doctor.mjs":"c1802847c0e2fcd3be5fb97157bbed3a07dc9c53cb288f0d36f25711a100f68a","templates/tools/config-registry.schema.json":"24e23ed9bf3fa581bd85deaa96eadeabda05e82716fb8fff11dc55c11a9689e3"}'
+# NOTE (fingerprint correction): the schema hash was stale in the prior header (0a4d7e7a…). The committed schema
+# (unchanged since the original infra commit de1f695, verified via git) hashes to 24e23ed9… (sha256, LF). This fix
+# touches ONLY config-doctor.mjs (c1802847…, unchanged this verification); the schema entry is corrected to its true value.
 ---
 
 # VERIFY — Slice config-doctor — Infrastructure Registry & Configuration layer
 
 ## Verdict
+**verify_status:** `verified` (independent re-verification of the sensitive-env fix; PASS)  ·  one line: the
+sensitive-env false-negative fix is APPLIED and an INDEPENDENT qa-test lens (≠ the build agent) re-ran the gates
+against the new `classifyVercelEnv()` + github-secret `process.env` fallback — self-test **20/20** (exit 0, incl.
+the 4 new sensitive/blank classification cases), the classification rule independently re-probed **6/6** (incl. the
+security edge), the env-fallback forced-tested (gh-unavailable + injected `VERCEL_*` ⇒ PRESENT, no value leak), no
+regression in the MISSING/INVALID/read-only/no-secret-leak guarantees against both real consumer registries, and the
+template change is byte-identical (LF-normalized) to the merged PLOS PR #205 corrections (no extra behavior).
+
+## Independent re-verification evidence (sensitive-env fix — qa-test, 2026-06-27)
+| # | Command / probe | Exit | Result |
+|---|------------------|------|--------|
+| R1 | `node templates/tools/config-doctor.mjs --self-test` (cwd delivery-os) | 0 | **20/20 passed** — incl. `✓ sensitive var (value omitted as '') is PRESENT, not blank`, `✓ encrypted var with ciphertext value is PRESENT, not blank`, `✓ non-sensitive var with empty value IS blank`, `✓ sensitive flag is carried through` |
+| R2 | independent extraction + isolated eval of `classifyVercelEnv` over 6 cases (sensitive `value:""`⇒not-blank/sensitive · encrypted ciphertext⇒not-blank · non-sensitive empty⇒blank · non-sensitive whitespace⇒blank · plain value⇒not-blank · **sensitive carrying a value⇒still not-blank/sensitive**) | 0 | **6/6 PASS** — the rule is correct beyond the 4 pinned cases; the security edge (a sensitive var is NEVER reported blank) holds |
+| R3 | github-secret env-fallback: forced `gh` unavailable (empty PATH) + injected `VERCEL_TOKEN/ORG_ID/PROJECT_ID` into the job env, ran PLOS prod | — | all three resolve `✓ PRESENT … lane=github-secret(env)`; the injected token VALUE is **NOT printed anywhere** in the output (no secret leak) |
+| R4 | no-regression: `node infra/config-doctor.mjs --env production` against the real PLOS and rumah-admin registries (read-only) | 1 each | required keys reported `✗ MISSING` with actionable FIX + honest `lane=…(unverified)`; structural validation passed (full reports produced); `--json` valid JSON (`pass=false`); post-run `git status --porcelain infra/` empty in BOTH consumers (no writes) |
+| R5 | template↔PLOS parity: LF-normalized diff of `templates/tools/config-doctor.mjs` vs the merged `../property-lead-os/infra/config-doctor.mjs` (#205) | — | the sensitive-env logic (classifyVercelEnv, the vercel-prod sensitive detail branch, the github-secret env fallback, the 4 self-test cases) is **byte-identical**; the only residual deltas are pre-existing `HERE`/`fileURLToPath` path-resolution + a `/* global fetch */` lint pragma — unrelated to this fix and untouched by the staged diff |
+> Re-verification was read-only against the real consumer repos (production lane does not consult local `.env`;
+> R4 shows no files written). The verifier did not author the code under test (§3/§12).
+
+## What changed since the prior `verified` verdict (the sensitive-env fix — re-verification scope)
+- `fetchVercelKeys()` now classifies each Vercel env entry via the new pure `classifyVercelEnv(e)`:
+  `type:"sensitive"` with `value:""` ⇒ PRESENT-but-unreadable (NOT blank); only a non-sensitive var with an
+  explicitly empty value is blank. (Ports the merged PLOS PR #205 fix.)
+- `evaluate()` (vercel-prod lane) PRESENT detail now distinguishes a SENSITIVE variable from an encrypted one.
+- `evaluate()` (github-secret lane) now checks `process.env[key.name]` before reporting MISSING(unverified) —
+  the VERCEL_* secrets a Vercel runner cannot `gh secret list` but which the workflow injects into the job env.
+- `selfTest()` adds 4 cases pinning the classification (sensitive value:"" ⇒ not blank · encrypted ciphertext
+  ⇒ not blank · non-sensitive empty ⇒ blank · sensitive flag carried) → **20/20** (was 16/16).
+- Independent re-verification owed (qa-test): re-run `--self-test` (expect 20/20), and re-run the live-plane
+  behavior checks (#2/#3/#4 below) against the real consumer registries to confirm no regression in the
+  MISSING/INVALID/read-only/no-secret-leak guarantees with the new classification path.
+
+## Original verdict (PRE-FIX — retained as history, no longer the active verdict)
 **verify_status:** `verified`  ·  one line: all 5 acceptance criteria PASS on their own surface — self-test 16/16 exit 0, both consumer prod runs report the known-missing keys with actionable fixes and exit 1, `--json` is valid JSON, the tool is provably read-only and prints no real secret value, and both consumer registries load through the doctor's structural validation without error.
 > A verdict of `verified` is permitted ONLY if: every acceptance criterion PASSes on its OWN surface,
 > every load-bearing claim is Confirmed/Evidence-backed, all required gates are closed, and the
@@ -67,7 +112,7 @@ impl_fingerprint: '{"templates/tools/config-doctor.mjs":"b60406e6df62b44257f0e27
 ## Gate ledger  (DoD core rows + active pack rows — each ✅ needs an evidence pointer; ⬜/🔴 are honest)
 | Gate | Status | Evidence |
 |------|--------|----------|
-| Build/validate green (self-test) | ✅ | →cmd #1 (16/16, exit 0) |
+| Build/validate green (self-test) | ✅ | →R1 (20/20, exit 0) — supersedes the pre-fix cmd #1 (16/16) |
 | Dedicated commit + slice id (or NO-GIT flagged) | ⬜ | Verifier does not commit; impl files are working-tree changes (`templates/tools/*`), commit is the author's gate |
 | **CI green — machine-read at merge** | ⬜ | Not at merge time; this is a pre-merge independent verification |
 | Migration reversible + applies-clean-on-fresh-DB | n/a | No DB migration in this slice (config-validation tool only) |

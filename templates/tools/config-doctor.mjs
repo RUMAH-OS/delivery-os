@@ -241,20 +241,35 @@ async function fetchVercelKeys(reg, env) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return { available: false, reason: `Vercel API HTTP ${res.status}` };
     const body = await res.json();
-    const present = new Map(); // key -> { blank }
+    const present = new Map(); // key -> { blank, sensitive }
     for (const e of body.envs || []) {
       if (Array.isArray(e.target) ? e.target.includes(target) : e.target === target) {
-        // The list endpoint returns encrypted values redacted; a blank var shows
-        // up with an empty `value`. We can only assert blank when the value field
-        // is explicitly an empty string; otherwise treat presence as set.
-        const blank = typeof e.value === "string" && e.value.trim() === "";
-        present.set(e.key, { blank });
+        // CRITICAL: a Vercel "Sensitive" env var (type:"sensitive") NEVER returns
+        // its value through the API — the list endpoint always reports value:"" for
+        // it, BY DESIGN. An empty `value` is therefore NOT evidence that a sensitive
+        // var is unset; the key's PRESENCE in the response is. Only a NON-sensitive
+        // var (type:"plain"/"encrypted") with an explicitly empty value is genuinely
+        // blank. (type:"encrypted" returns a non-empty ciphertext blob here, never
+        // the plaintext.) Treating sensitive-as-blank was a false-negative that
+        // failed the gate for DATABASE_URL/SUPABASE_URL/TICK_TOKEN even though they
+        // were correctly set in Vercel as Sensitive variables.
+        present.set(e.key, classifyVercelEnv(e));
       }
     }
     return { available: true, present };
   } catch (e) {
     return { available: false, reason: `Vercel API error: ${e.message}` };
   }
+}
+
+// Classify ONE Vercel env-var list entry → { blank, sensitive }. Pure (no I/O), so
+// the self-test can lock in the rule. A type:"sensitive" var's value is never
+// returned by the API (always ""), so it is PRESENT-but-unreadable, NOT blank. Only a
+// non-sensitive var with an explicitly empty value is genuinely blank.
+function classifyVercelEnv(e) {
+  const sensitive = e.type === "sensitive";
+  const blank = !sensitive && typeof e.value === "string" && e.value.trim() === "";
+  return { blank, sensitive };
 }
 
 // GitHub Actions secrets: presence-only via `gh secret list` (no values exposed).
@@ -379,6 +394,16 @@ function evaluate(key, env, planes) {
         if (present) return { state: "PRESENT", lane: "github-secret", detail: "set in GitHub Actions secrets (presence verified; value not inspected)." };
         return absent(required, "github-secret");
       }
+      // gh CLI is not available in this runner (the Vercel deploy job authenticates
+      // to Vercel, not GitHub, so `gh secret list` cannot run). But the deploy
+      // workflow INJECTS these secrets into the job env (VERCEL_TOKEN/ORG_ID/PROJECT_ID
+      // are mapped into process.env). Their PRESENCE there is a real, direct check —
+      // not a guess — so verify from process.env before reporting unverified. This
+      // removes the false "MISSING (unverified)" failure for secrets that are in fact
+      // present (and were already proven by the workflow's pre-flight Guard step).
+      const envVal = process.env[key.name];
+      if (envVal !== undefined && String(envVal).trim() !== "")
+        return { state: "PRESENT", lane: "github-secret(env)", detail: "present in the workflow environment (injected from GitHub Actions secrets; value not inspected)." };
       // Optionally fall back to local for --include-local runs.
       if (planes.local) return evalFromValue(key, env, planes.local[key.name], "local(.env)", required);
       return absent(required, "github-secret(unverified)");
@@ -387,7 +412,13 @@ function evaluate(key, env, planes) {
     if (planes.vercel.available) {
       const hit = planes.vercel.present.get(key.name);
       if (hit && !hit.blank)
-        return { state: "PRESENT", lane: "vercel-prod", detail: "set in Vercel production env (presence verified; encrypted value not inspected)." };
+        return {
+          state: "PRESENT",
+          lane: "vercel-prod",
+          detail: hit.sensitive
+            ? "set in Vercel production env as a SENSITIVE variable (presence verified; value is unreadable via the API by design)."
+            : "set in Vercel production env (presence verified; encrypted value not inspected).",
+        };
       if (hit && hit.blank)
         return { state: "MISSING", lane: "vercel-prod", detail: "present in Vercel but BLANK (empty value) — same as unset for the build." };
       // Not in Vercel prod. --include-local may still find it locally (advisory).
@@ -496,6 +527,24 @@ function selfTest() {
   // flag.
   assert("present flag is VALID", validate("flag", "1").ok === true);
   assert("absent flag is MISSING", validate("flag", "").missing === true);
+
+  // Vercel env classification — the SENSITIVE false-negative regression.
+  assert(
+    "sensitive var (value omitted as '') is PRESENT, not blank",
+    classifyVercelEnv({ key: "DATABASE_URL", type: "sensitive", value: "" }).blank === false,
+  );
+  assert(
+    "encrypted var with ciphertext value is PRESENT, not blank",
+    classifyVercelEnv({ key: "CRON_SECRET", type: "encrypted", value: "abc123ciphertext" }).blank === false,
+  );
+  assert(
+    "non-sensitive var with empty value IS blank",
+    classifyVercelEnv({ key: "FOO", type: "encrypted", value: "" }).blank === true,
+  );
+  assert(
+    "sensitive flag is carried through",
+    classifyVercelEnv({ key: "DATABASE_URL", type: "sensitive", value: "" }).sensitive === true,
+  );
 
   // requiredness resolution.
   assert("per-env required resolves", isRequired({ required: { production: true, development: false } }, "production") === true);
