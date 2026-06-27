@@ -127,6 +127,29 @@ const RULES = {
   // A boolean feature flag — any present value is structurally valid (truthiness
   // is the app's concern). Declared so an unset flag is reported, not guessed.
   flag: () => ({ ok: true }),
+  // A POSITIVE-INTEGER tuning knob — pool size, a timeout in ms/s, a cap. This rule is the
+  // ENV-ROBUSTNESS STANDARD enforced at the config layer: a present-but-EMPTY or non-numeric
+  // value is INVALID, and 0 / negative are rejected because for every such knob 0 means
+  // "disabled / unlimited" (pool=0, statement_timeout=0 → NO bound, connect_timeout=0 → none).
+  // That is the BUG-209-1 trap: an empty-string env makes `Number("")===0`, silently disabling
+  // the very bound that keeps a serverless DB client from hanging past the gateway (HTTP 000).
+  // Declaring DB_POOL_MAX / DB_STATEMENT_TIMEOUT_MS / DB_CONNECT_TIMEOUT with this rule means an
+  // empty value FAILS the gate up front instead of degrading silently at runtime. The CODE-side
+  // companion is `Number(env)||default` (never `Number(env ?? default)`), asserted by the
+  // platform-health DB-client preflight (`platform-health.mjs preflight-db-client`).
+  "int-positive": (v) => {
+    const n = Number(v);
+    return Number.isInteger(n) && n > 0
+      ? { ok: true }
+      : {
+          ok: false,
+          // NB: an EMPTY/whitespace value is short-circuited to MISSING by validate() before this rule
+          // runs, so it surfaces as MISSING (not INVALID) — either way it FAILS the gate. This rule's job
+          // is to reject a PRESENT-but-bad value: 0/negative (= disables the bound, the BUG-209-1 effect)
+          // or non-numeric.
+          message: `must be a positive integer (got "${v}"). 0/negative/non-numeric would DISABLE the bound (the BUG-209-1 effect) — set the documented default value.`,
+        };
+  },
 };
 
 // secret-min:N and enum:a|b|c are parameterized rules resolved here.
@@ -496,6 +519,13 @@ function selfTest() {
   // flag.
   assert("present flag is VALID", validate("flag", "1").ok === true);
   assert("absent flag is MISSING", validate("flag", "").missing === true);
+
+  // int-positive — the env-robustness standard (the BUG-209-1 trap caught at the config layer).
+  assert("int-positive accepts a positive integer", validate("int-positive", "8").ok === true);
+  assert("int-positive REJECTS 0 (= disables the bound)", validate("int-positive", "0").ok === false);
+  assert("int-positive REJECTS a negative", validate("int-positive", "-1").ok === false);
+  assert("int-positive REJECTS non-numeric", validate("int-positive", "abc").ok === false);
+  assert("int-positive treats EMPTY as MISSING (the empty-env trap surfaces, not coerced to 0)", validate("int-positive", "").missing === true);
 
   // requiredness resolution.
   assert("per-env required resolves", isRequired({ required: { production: true, development: false } }, "production") === true);
