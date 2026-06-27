@@ -39,4 +39,14 @@ if [ -f .claude/tools/agents-check.mjs ]; then
     exit 1
   fi
 fi
+
+# Gate 5 — hook-path integrity (fail-closed): every governance/review hook + skill tool reference
+# must RESOLVE to a real .mjs and `node --check`-load. A misreferenced/missing hook (the
+# founder-action-package MODULE_NOT_FOUND class) can never push. Tool: .claude/tools/check-hook-paths.mjs.
+if [ -f .claude/tools/check-hook-paths.mjs ]; then
+  if ! node .claude/tools/check-hook-paths.mjs >&2; then
+    echo "✗ push blocked by Delivery OS check-hook-paths: a hook/tool reference is missing or fails node --check." >&2
+    exit 1
+  fi
+fi
 exit 0
