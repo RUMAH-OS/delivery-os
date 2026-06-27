@@ -158,3 +158,50 @@ still below L2) and in `review-trigger.mjs --self-test` (embedded fallback fails
 control-plane tools). `node templates/tools/learning-trigger.mjs --self-test`, `node templates/tools/review-trigger.mjs
 --self-test`, `node .claude/tools/review-trigger.mjs --self-test`, `node templates/tools/change-classify.mjs --self-test`
 → all **PASS, exit 0**. The two `review-trigger.mjs` copies remain **byte-identical** (`diff` = IDENTICAL).
+
+---
+
+## Independent QA re-verification — 2026-06-27 (PR #14, `governance/review-trigger-restore`)
+
+```
+author:   review-trigger engineer (controlplane marker + regression guard increment)
+verifier: qa-test (independent; did NOT author — Governance §12, author≠verifier)
+```
+
+I independently verified the engineer increment above (the `controlplane` L2 marker family + the named
+REGRESSION GUARD). I did **not** author it. Evidence below was **executed** on a clean checkout of PR #14
+(`gh pr checkout 14`, working tree clean), not read.
+
+**Self-tests (exit codes captured):**
+- `node templates/tools/learning-trigger.mjs --self-test` → **PASS, exit 0** (REGRESSION GUARD block passes).
+- `node templates/tools/review-trigger.mjs --self-test` → **PASS, exit 0**.
+- `node .claude/tools/review-trigger.mjs --self-test` → **PASS, exit 0**.
+- `node templates/tools/change-classify.mjs --self-test` → **PASS, exit 0**.
+
+**Independent `level()` probe** (driven from a throwaway script importing the canonical `level()` directly —
+not the embedded asserts — exercising the exact shape the gate calls):
+
+| Change-set | Want | Got | Reason[0] |
+|---|---|---|---|
+| `core/GOVERNANCE.md` | L2 | **L2** | framework architecture / control-plane change |
+| `templates/tools/verify-gate.mjs` | L2 | **L2** | CONSEQUENTIAL — change-classify class C |
+| `templates/hooks/verify-gate.mjs` | L2 | **L2** | CONSEQUENTIAL — change-classify class C |
+| `.claude/tools/review-trigger.mjs` | L2 | **L2** | framework architecture / control-plane change |
+| `proposals/X.md` | L2 | **L2** | framework architecture / control-plane change |
+| `apps/web/src/core/util.ts` (consumer app core/) | **NOT L2** | **L1** | class B — NOT swept in (repo-anchored `core/**`) |
+| `src/lib/parser.ts` + `fix: a regression…` | L1 | **L1** | a defect/regression was filed this slice |
+| `src/pages/Dashboard.tsx` (UI tweak) | L1 | **L1** | founder_verifiable=true |
+| `docs/notes.md` + `tests/unit/x.test.ts` | L0 | **L0** | capture-only |
+
+All nine independent checks PASS. The control-plane markers fire L2 for framework surfaces (constitution,
+proposals WAL, gate/classifier/trigger tooling in `templates/{tools,hooks}` and installed `.claude/{tools,hooks}`);
+the marker is **repo-anchored** (`core/**`, not `**/core/**`) so a consumer app's own `src/core/**` is NOT
+swept into control-plane L2; and the exclusions hold (isolated bug-fix → L1, trivial UI → L1, docs/tests-only → L0).
+
+**Byte-identity:** `md5sum` of `templates/tools/review-trigger.mjs` and `.claude/tools/review-trigger.mjs`
+both `50421a6607570cf437d8a82091677ad1`; `diff` exit 0 (IDENTICAL).
+
+**VERDICT: PASS (independent).** Every acceptance criterion for the increment is met with executed evidence.
+The governance regression (framework's own architectural changes firing no review) is closed and protected by
+a named regression guard that fails the self-test if it reappears. Promoting the engineer addendum above from
+PENDING to independently re-verified. No defects filed. PR #14 is clear to merge.
