@@ -1,0 +1,8 @@
+# Real GitHub identities used as CODEOWNERS owners (humans/bots — NOT agent roles, so they
+# do NOT require a .claude/agents/<handle>.md). Declared per-project; the framework stays
+# project-agnostic (check-os-drift.mjs reads this list). One handle per line; # = comment.
+# The three Runtime identities (Builder · Verifier · Project Owner) + the founder.
+bkasanwiredjo
+rumah-os-builder
+rumah-os-verifier
+rumah-os-po
