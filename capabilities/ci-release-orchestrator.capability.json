@@ -33,5 +33,31 @@
     "errors": null
   },
 
+  "requires_config": [
+    {
+      "key": "PUBLIC_BASE_URL",
+      "data_class": "INTERNAL",
+      "env_scope": ["staging", "prod"],
+      "rule": "url",
+      "reason": "post-deploy watch probes the deployed base; absent ⇒ the go/no-go cannot confirm the release surface answered."
+    }
+  ],
+  "requires_secret": [
+    {
+      "key": "VERCEL_TOKEN",
+      "data_class": "SECRET",
+      "env_scope": ["prod"],
+      "rule": "non-empty",
+      "reason": "watches the Vercel deploy on the prod plane; without it the deploy-watch step is blind (read-only presence check, value never inspected)."
+    },
+    {
+      "key": "DATABASE_URL",
+      "data_class": "SECRET",
+      "env_scope": ["prod"],
+      "rule": "postgres-pooler-6543",
+      "reason": "the release go/no-go is unreachable if the prod DB URL is the direct :5432 string — the connection-exhaustion 503 class. Must be the transaction-pooler (6543)."
+    }
+  ],
+
   "health": null
 }

@@ -38,5 +38,24 @@
     "errors": null
   },
 
+  "requires_config": [
+    {
+      "key": "PUBLIC_BASE_URL",
+      "data_class": "INTERNAL",
+      "env_scope": ["staging", "prod"],
+      "rule": "url",
+      "reason": "the authorization verdict stamps the target deploy base into its report; a missing base makes a prod authorization unreproducible."
+    }
+  ],
+  "requires_secret": [
+    {
+      "key": "VERCEL_TOKEN",
+      "data_class": "SECRET",
+      "env_scope": ["prod"],
+      "rule": "non-empty",
+      "reason": "read-only Vercel token used to verify live prod env state before authorizing a deploy; without it the gate cannot confirm the target plane (§57.5 D7 precondition)."
+    }
+  ],
+
   "health": null
 }

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rumah-os/delivery-os/capability-requirements.schema.json",
+  "title": "Delivery OS — Capability config/secret requirements (RS-DOS §57.3, additive to §31 *.capability.json)",
+  "description": "ADDITIVE extension to the capability descriptor (`*.capability.json`, §31 / CAPABILITY-MANIFEST-STANDARD). It declares — as a first-class, queryable Runtime fact (not tribal knowledge rediscovered per incident) — WHICH config and WHICH secrets a capability requires, for WHICH environments. Per §57.3: `capability += { requires_config:[..], requires_secret:[..] }`, each entry `{key, data_class, env_scope, rule}`. This schema validates ONLY those two additive arrays; it does NOT re-state the rest of the capability descriptor (the §3 standard owns that, and unknown fields are forward-compatible there). The resolver (capability-config-resolver.mjs) reads these arrays and produces a WorkPackage's `config_req` set; the readiness-shadow binding (readiness-shadow.mjs) feeds that set to the I-Config oracle (i-config.mjs, §57.4) and LOGS the readiness verdict at the C9/D7/C13 gates. SHADOW in Sprint 1.3 — the verdict is reported, never blocking (the enforce-flip is gated to Sprint 2.2). The `key`/`data_class`/`env_scope`/`rule` vocabulary is the SAME as the canonical config-secret-registry (config-secret-registry.schema.json) so a capability's requirement resolves 1:1 onto a registry key.",
+  "type": "object",
+  "properties": {
+    "requires_config": {
+      "type": "array",
+      "description": "Non-secret config keys this capability needs (data_class ∈ {PUBLIC, INTERNAL, CONFIDENTIAL}). Each entry names a key that MUST resolve to a registry key. Absent/empty ⇒ the capability needs no config.",
+      "items": { "$ref": "#/definitions/requirement" },
+      "uniqueItems": true
+    },
+    "requires_secret": {
+      "type": "array",
+      "description": "Secret keys this capability needs (data_class ∈ {PII, SECRET}); these bind to the §54.2 trust boundary (trusted-domain only; NEVER tree-resident — §30). Separated from requires_config so 'which SECRETS does this capability require' (the founder's Q2) is answerable without re-classifying. Absent/empty ⇒ the capability needs no secret.",
+      "items": { "$ref": "#/definitions/requirement" },
+      "uniqueItems": true
+    }
+  },
+  "definitions": {
+    "requirement": {
+      "type": "object",
+      "required": ["key", "data_class", "env_scope", "rule"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The env var name, exactly as the capability's code reads it. MUST match a `key` in the service's config-secret-registry (the resolver flags an unresolved requirement as a registry gap)."
+        },
+        "data_class": {
+          "type": "string",
+          "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "PII", "SECRET"],
+          "description": "The §54.1 classification. A requirement listed under requires_secret MUST be PII or SECRET; one under requires_config MUST NOT be. The resolver asserts this so the secret/config split stays honest."
+        },
+        "env_scope": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["local", "dev", "QA", "staging", "prod"] },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The environments in which THIS CAPABILITY needs the key. The resolver intersects this with the target env to decide whether the requirement applies to a given work package run."
+        },
+        "rule": {
+          "type": "string",
+          "description": "The expected validation_rule id (postgres-pooler-6543 | url | secret-min:N | non-empty | flag | enum:a|b | number | int-nonneg). Advisory at the capability layer: the registry's validation_rule is authoritative; the resolver warns if a capability's stated rule disagrees with the registry (a drift signal)."
+        },
+        "reason": {
+          "type": "string",
+          "description": "OPTIONAL one-line why — what breaks if this key is MISSING/INVALID (surfaced in the readiness-shadow log for the founder audit)."
+        }
+      }
+    }
+  }
+}
