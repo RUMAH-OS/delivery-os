@@ -1,0 +1,40 @@
+# =============================================================================
+# CODEOWNERS — TEMPLATE for the consumer repos
+#   (rumah-admin · property-lead-os · jarvis-slack-control-surface · rumah-housing-website)
+# -----------------------------------------------------------------------------
+# Install at each repo's root. Purpose: make `require_code_owner_reviews` enforceable
+# by guaranteeing every path has a REAL, distinct CODEOWNERS approver — the founder as
+# reviewer-of-last-resort (DRB §6b). The merge gate then requires an approving review
+# from an identity ≠ the PR author.
+#
+# CODEOWNERS rule: the LAST matching pattern wins. The catch-all is the floor; the
+# per-area lines below would override it once distinct specialist identities exist.
+# =============================================================================
+
+# Reviewer-of-last-resort — every path, no exceptions, until refined.
+*   @bkasanwiredjo
+
+# --- Per-area refinement (build-on-pull; uncomment per repo when identities exist) ---
+# The intent: the approver of a change is never the lens that authored it. Tune per repo:
+#
+#   rumah-admin (durable financial engine — the risk carrier):
+#     /src/db/migrations/   @bkasanwiredjo   # schema changes touch the live :6543 pooler
+#     /.claude/os/          @bkasanwiredjo   # VENDORED Delivery OS engine — drift-gated, not hand-edited
+#     /infra/               @bkasanwiredjo   # config registry / config-doctor (I-Config)
+#     /tests/  /e2e/        @bkasanwiredjo   # verifier-owned disjoint scope (§C5)
+#
+#   property-lead-os (discovery / revenue pipeline):
+#     /packages/config/     @bkasanwiredjo   # @plos/config Zod schema (I-Config source)
+#     /apps/*/migrations/   @bkasanwiredjo
+#     /tests/  /e2e/        @bkasanwiredjo
+#
+#   jarvis-slack-control-surface (undeployed; control surface — Class-C when live):
+#     *                     @bkasanwiredjo   # catch-all suffices until P5.3
+#
+#   rumah-housing-website (near-static):
+#     /content/             @bkasanwiredjo   # SEO-bearing copy
+#     *                     @bkasanwiredjo
+#
+# NOTE: replace @bkasanwiredjo with a distinct NON-AUTHOR specialist identity per area
+# only AFTER identity model Option A lands a second real GitHub account; never route an
+# area to the identity that builds it (that re-collapses author≠verifier).

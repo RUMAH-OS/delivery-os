@@ -1,0 +1,7 @@
+# CODEOWNERS — Sprint 1.0 (Delivery OS migration). Makes require_code_owner_reviews
+# enforceable: every path needs an approving review from a REAL CODEOWNERS identity
+# that is NOT the PR author. Reviewer-of-last-resort = the founder (a real, distinct
+# GitHub identity, DRB section 6b) — never a role token. Per-area specialist owners are
+# build-on-pull (identity Option A; the three-identity model) — see
+# delivery-os/docs/execution/sprint-1.0/IDENTITY-AND-VERIFICATION-MODEL.md.
+*   @bkasanwiredjo

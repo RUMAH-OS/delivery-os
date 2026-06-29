@@ -30,6 +30,7 @@
     "templates/tools/smoke.mjs",
     "templates/tools/goal-init.mjs",
     "templates/tools/goal-stop.mjs",
+    "templates/tools/goal-progress.mjs",
     "templates/tools/boundary-classify.mjs",
     "templates/tools/change-classify.mjs",
     "templates/tools/verified-tree.mjs",

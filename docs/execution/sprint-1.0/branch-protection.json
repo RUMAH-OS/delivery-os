@@ -1,0 +1,90 @@
+{
+  "_meta": {
+    "id": "BP-sprint-1.0",
+    "date": "2026-06-28",
+    "purpose": "Per-repo main-branch protection for the Delivery OS ecosystem. Source of truth for apply-branch-protection.sh. INCREMENTAL: required_status_checks lists EVERY check with active=true|false + activates_at; only active=true checks are sent now (a not-yet-built required check would block ALL PRs).",
+    "owner_org": "RUMAH-OS",
+    "founder_identity": "bkasanwiredjo",
+    "do_not_run_note": "This config is applied by the FOUNDER via apply-branch-protection.sh (founder-gated, outward-facing). The worker agent does NOT apply it.",
+    "check_name_rule": "Each check 'name' MUST equal the GitHub status-check CONTEXT exactly — that is the job's display name (the job's `name:` if set, else the job id). A mismatch makes protection silently pass (DRB Risk: required-check names that don't match jobs).",
+    "deferred_sprints": {
+      "verify-coverage": "1.x (the D9 machine_probe on neutral CI — name reserved; job lands with the first slice that ships a class probe)",
+      "secret-scan": "1.1 (gitleaks/trufflehog, CRLF-normalized)",
+      "config-gate": "1.2 (uniform I-Config oracle / config-doctor across the ecosystem)",
+      "migration-runner": "1.4 (advisory-lock-serialized CI migration apply)"
+    }
+  },
+
+  "defaults": {
+    "enforce_admins": true,
+    "required_linear_history": true,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "block_creations": false,
+    "required_conversation_resolution": true,
+    "restrictions": null,
+    "required_pull_request_reviews": {
+      "dismiss_stale_reviews": true,
+      "require_code_owner_reviews": true,
+      "required_approving_review_count": 1,
+      "require_last_push_approval": true
+    },
+    "required_status_checks_strict": true
+  },
+
+  "repos": [
+    {
+      "slug": "RUMAH-OS/delivery-os",
+      "branch": "main",
+      "note": "DOS dogfoods templates and has NO .github/workflows today, so its required-status-check set is EMPTY now. The floor here is CODEOWNERS review + linear history + no direct push + no admin bypass + required PR. Checks below activate as DOS grows its own CI.",
+      "required_checks": [
+        { "name": "verify-coverage", "active": false, "activates_at": "1.x" },
+        { "name": "secret-scan",     "active": false, "activates_at": "1.1" },
+        { "name": "config-gate",     "active": false, "activates_at": "1.2" },
+        { "name": "migration-runner","active": false, "activates_at": "1.4" }
+      ]
+    },
+    {
+      "slug": "RUMAH-OS/rumah-admin",
+      "branch": "main",
+      "note": "ADM has ci.yml (engine-ownership drift gate + build-and-migrate) and config-gate.yml. The two ci.yml jobs are ACTIVE required checks now. config-gate.yml EXISTS but is held to 1.2 (the uniform I-Config oracle) to avoid blocking PRs on un-provisioned Vercel read secrets before the oracle is canonical.",
+      "required_checks": [
+        { "name": "engine-ownership",   "active": true,  "activates_at": "1.0", "note": "the drift gate; skips loudly until DELIVERY_OS_REPO/TOKEN secrets are provisioned, then hard-fails on drift — safe to require now. Pin its checkout ref to a DOS tag (drift-gate-pin.md)." },
+        { "name": "build-and-migrate",  "active": true,  "activates_at": "1.0", "note": "build/tsc + unit + migrate-applies-clean + rollback + the vendored v6 gates — exists now." },
+        { "name": "validate prod config (fail-closed)", "active": false, "activates_at": "1.2", "note": "config-gate.yml job display-name. Exists, but promotion to REQUIRED waits for 1.2 + provisioned VERCEL_* read secrets (else risks blocking all PRs)." },
+        { "name": "verify-coverage",    "active": false, "activates_at": "1.x" },
+        { "name": "secret-scan",        "active": false, "activates_at": "1.1" },
+        { "name": "migration-runner",   "active": false, "activates_at": "1.4" }
+      ]
+    },
+    {
+      "slug": "RUMAH-OS/property-lead-os",
+      "branch": "main",
+      "note": "PLOS ci.yml exposes an aggregator job `verify` (green iff ci-db-test + ci-static[incl. the OS drift-lint step] + ci-build all pass) already documented as the required check (DO NOT RENAME). Requiring `verify` transitively binds the drift gate. PLOS has no standalone engine-ownership job.",
+      "required_checks": [
+        { "name": "verify",             "active": true,  "activates_at": "1.0", "note": "aggregator: ci-db-test + ci-static (contains the OS-drift drift-lint) + ci-build. The existing documented required check." },
+        { "name": "secret-scan",        "active": false, "activates_at": "1.1" },
+        { "name": "config-gate",        "active": false, "activates_at": "1.2", "note": "PLOS runs its config gate inside `vercel build` today; the uniform required check lands at 1.2." },
+        { "name": "verify-coverage",    "active": false, "activates_at": "1.x" }
+      ]
+    },
+    {
+      "slug": "RUMAH-OS/jarvis-slack-control-surface",
+      "branch": "master",
+      "note": "JAR is undeployed and has NO .github/workflows. Required-status-check set is EMPTY now; the floor is CODEOWNERS + linear + no direct push + no admin bypass + required PR. Heavy LLM-spend gates are deferred to P5.3.",
+      "required_checks": [
+        { "name": "ci",          "active": false, "activates_at": "P5.3" },
+        { "name": "secret-scan", "active": false, "activates_at": "1.1" }
+      ]
+    },
+    {
+      "slug": "RUMAH-OS/rumah-housing-website",
+      "branch": "main",
+      "note": "WEB GitHub slug is rumah-housing-website (local dir is rumah-website). ci.yml exposes job `verify` (typecheck/lint/build + strict SEO). Per DRB: website = ci + light verify only. `verify` is ACTIVE now.",
+      "required_checks": [
+        { "name": "verify",      "active": true,  "activates_at": "1.0", "note": "typecheck + lint + build + strict SEO checks — exists now." },
+        { "name": "secret-scan", "active": false, "activates_at": "1.1", "note": "light." }
+      ]
+    }
+  ]
+}

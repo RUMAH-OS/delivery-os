@@ -151,9 +151,11 @@ before it, up to the cap, is free.
 - **Governance §16** (new): *"Autonomous execution terminates at the founder boundary — the boundary is success."*
   Per §13: the **`goal-stop.mjs` exit-gate is KERNEL MECHANISM** (thin, non-swappable, fires without consent, fails
   closed); the **boundary taxonomy + FAP content are GOVERNANCE POLICY** (swappable, invoked on demand).
-- **Inheritance:** add to `os-foundation.manifest.json` — tools `goal-stop.mjs`, `boundary-classify.mjs`, `goal-init.mjs`;
-  skill `founder-action-package`; the Stop-hook wiring in `templates/settings.json`; template `FOUNDER-ACTION-PACKAGE.md.template`.
-  `scripts/new-project.sh` drops the goal-stop Stop entry so every new repo is born terminate-at-boundary.
+- **Inheritance:** add to `os-foundation.manifest.json` — tools `goal-stop.mjs`, `boundary-classify.mjs`, `goal-init.mjs`,
+  `goal-progress.mjs` (the M1 ledger, H9); skill `founder-action-package`; the Stop-hook wiring in `templates/settings.json`;
+  templates `FOUNDER-ACTION-PACKAGE.md.template` + the `goal_metric_reachable`/`metric_value`/`metric_target` VERIFY fields
+  (H9). `scripts/new-project.sh` drops the goal-stop Stop entry so every new repo is born terminate-at-boundary; the
+  `verify-gate` Stop hook it already installs carries the H9 verifier-driven goal-delta escalation.
 - **SDLC integration (zero redesign):** the SDLC's HUMAN-GATED tier (C6 greenlight · merge-to-main · prod-auth ·
   NEEDS-APPROVAL fixes · rollback) **IS** the §3 taxonomy. A goal running `delivery-lifecycle` autonomously executes
   impl→verify→commit→push→PR-to-dev→CI→deploy-DEV→founder-review-package → hits the **C6 boundary** → FAP (embedding
@@ -208,6 +210,37 @@ The first design reproduced the very bug it fixes and pressured §12. These fixe
 - **H8 — `/goal` is a MAIN-LOOP execution segment (G9).** "Unlimited parallel agents" is G9-clean only because Claude's
   main loop is the spawner (the harness ceiling), never an out-of-loop background runner. The contract states this
   explicitly; a `/goal` is not the ASPIRATIONAL engine-autonomous runner (that needs G2+S4).
+- **H9 (postmortem 2026-06-28 §E2/§F) — VERIFIER-DRIVEN goal-delta escalation (NOT an auto-panel rung).** The H1 cap
+  catches *time/turn* runaway; it is blind to a goal whose **objective metric never moves** while every cycle is a
+  "successful" per-slice fix-verify-merge. The Discovery incident burned ~10 PRs / ~9 hours with `floor`=8 pinned and
+  **nothing watching the metric**, even though #217's 02:06 independent VERIFY wrote — in prose — that ≥20 was
+  unreachable from those leads. The gap was **a goal-level finding with no teeth.** The fix amplifies the signal that
+  WORKED (author≠verifier), in two parts:
+  - **(a) Acceptance-delta gate (the teeth).** A VERIFY artifact MAY carry a goal-level field
+    `goal_metric_reachable: true|false` (+ optional `metric_value` / `metric_target`). When an **independent** verifier
+    marks it `false`, **`verify-gate` (Stop) ESCALATES** — it directs a **Founder Action Package / strategy-review**
+    (reuse `skills/founder-action-package` + `boundary-classify.mjs`), the verifier's finding as the re-checkable
+    evidence: a strategy/business-decision **boundary** (the founder decides redirect-vs-accept) or a `failure` if the
+    target is genuinely unreachable from current inputs. This halts the engineering loop the way the framework already
+    halts — a boundary = STOP = SUCCESS — instead of baiting "one more fix."
+  - **(b) M1 metric ledger (machine visibility).** `goal-init --metric/--op/--target` records an OPTIONAL
+    `acceptance:{metric,op,target}` block; the new main-loop tool **`goal-progress.mjs`** appends
+    `progress[]{turn,value,predicted,fix_ref}` each cycle, making the flat line machine-visible (it *would have stamped*
+    `value:8, predicted:20` every cycle). **CRITICAL INVARIANT: the metric STEERS, it NEVER gates exit** — `clears_on`
+    stays the structural pair `[objective_complete, valid_fap_at_boundary]`. The metric is NEVER a clear condition
+    (that reintroduces the §5 human-gated-terminal bug). `goal-progress.mjs` only appends + reports; it never touches
+    `clears_on` or `status`.
+  - **REJECTED / DEFERRED — the auto-redirect panel (M2/M3/M4 of the governance lens, §E).** An auto-invoked in-loop
+    `principle-11` panel on a Stop-hook rung is **NOT built.** A Stop hook (`goal-stop.mjs evaluate() → {block,reason}`)
+    cannot spawn fresh independent context — it only steers the same frame-captured agent, **re-instantiating the very
+    frame-lock it diagnoses** (the 08:42 mercury panel itself inherited the false "5→≥20" frame). It is deferred until
+    frame-inheritance is solved: any future panel must RE-DERIVE "is the target reachable from current inputs?" from
+    scratch, independent of the stated target. The independence source that actually breaks frames here is a
+    human/independent verifier, not an in-loop rung.
+  - **KERNEL POSTURE PRESERVED.** No new rung is added to `goal-stop.mjs`; its zero-I/O fail-closed posture is intact
+    (NO `probe` network I/O in the kernel hook). The H9 detection lives in `verify-gate` (the Stop path that already
+    parses VERIFY frontmatter); the halt is the existing FAP path. No new founder gate, no autonomy reduction — the
+    only added behavior surfaces a verifier's goal-level finding so it can no longer be ignored.
 
 **Revised honest limit:** the boundary direction *under-claims* (quit early → a rejectable FAP the founder sees) — the
 same safe posture as §12. The retry-forever direction is made safe by **H1's cap** (forced FAP on cap-trip), not by

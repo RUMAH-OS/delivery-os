@@ -26,14 +26,24 @@ for (const s of skillRows) {
     fails.push(`router §5 advertises skill "${s}" but .claude/skills/${s}/SKILL.md does not exist (phantom dispatch)`);
 }
 
-// --- CODEOWNERS handles → each must have a backing .claude/agents/<handle>.md ---
+// --- CODEOWNERS handles → an AGENT handle must have a backing .claude/agents/<handle>.md;
+//     a REAL GitHub identity (human/bot owner) does NOT. Real identities are project-declared
+//     in .claude/codeowners-humans.txt (one handle per line; # comments ok) so the framework
+//     stays project-agnostic. The legacy role tokens owner/founder are exempt by default.
+//     (The phantom-agent guard holds: a handle that is neither an agent file nor a declared
+//     identity still fails — a typo'd agent role is still caught.) ---
 const co = read(join(ROOT, "CODEOWNERS"));
 if (co) {
+  const humans = new Set(["owner", "founder"]);
+  for (const line of read(join(ROOT, ".claude", "codeowners-humans.txt")).split(/\r?\n/)) {
+    const t = line.trim().replace(/^@/, "").toLowerCase();
+    if (t && !t.startsWith("#")) humans.add(t);
+  }
   const handles = [...co.matchAll(/@([a-z0-9][a-z0-9-]+)/gi)].map((m) => m[1]);
   for (const h of [...new Set(handles)]) {
-    if (h === "owner" || h === "founder") continue; // human handles, not agent files
+    if (humans.has(h.toLowerCase())) continue; // real GitHub identity (human/bot), not an agent role
     if (!existsSync(join(ROOT, ".claude", "agents", `${h}.md`)))
-      fails.push(`CODEOWNERS binds @${h} but .claude/agents/${h}.md does not exist (void author≠verifier binding)`);
+      fails.push(`CODEOWNERS binds @${h} but .claude/agents/${h}.md does not exist and @${h} is not a declared identity in .claude/codeowners-humans.txt (void author≠verifier binding)`);
   }
 }
 

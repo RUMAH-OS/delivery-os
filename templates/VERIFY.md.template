@@ -9,6 +9,9 @@ date: "<YYYY-MM-DD>"
 independence_basis: "codeowners-PR | recorded-distinct-invocation"   # how author≠verifier is proven here
 machine_probe: "<ONE command the verify-gate re-executes at gate time; exit 0 = still passing. Pick the most load-bearing check (a test, a scan, a smoke). Required for `verified` unless genuinely impossible — then `machine_probe: none — <why>`.>"
 test_pins_amended_by: "<verifier id, ONLY if this slice changed files under tests/ e2e/ evals/ — the QA-signed acknowledgment the write-scoping gate checks; omit otherwise>"
+goal_metric_reachable: "<OPTIONAL goal-level finding (H9). true|false. Set FALSE when, as the INDEPENDENT verifier, you judge the active /goal's acceptance METRIC is NOT reachable from the current inputs (e.g. ≥20 contacts is unreachable from these 5 leads — the per-slice fix raises quality, not volume). A `false` here makes verify-gate (Stop) ESCALATE a Founder Action Package / strategy-review — the teeth a goal-level finding otherwise lacks. Omit (or `true`) when the metric is on track. This NEVER gates exit by itself; it escalates to the founder. Pair with metric_value/metric_target below.>"
+metric_value: "<OPTIONAL — the goal metric's CURRENT measured value (e.g. 8), evidence for goal_metric_reachable>"
+metric_target: "<OPTIONAL — the goal metric's TARGET (e.g. 20)>"
 impl_fingerprint: '<single-line JSON: {"<impl-file>":"<hash>",...} — produced by `node <tools>/verify-fingerprint.mjs compute --changed`. Records the NORMALIZED fingerprint of the impl files this VERIFY covers. SEMANTIC freshness: the gate revalidates by comparing it to the CURRENT code — a behavior change ⇒ mismatch ⇒ this VERIFY is stale (re-verify); comments/formatting/rebases/merge-commits ⇒ match ⇒ STILL VALID. OMIT this field to fall back to the legacy mtime (timestamp) check.>'
 ---
 
