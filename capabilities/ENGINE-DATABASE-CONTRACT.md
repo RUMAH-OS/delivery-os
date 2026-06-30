@@ -57,7 +57,35 @@ stream consumers *pull* from, ECR-0006), while each consumer keeps its own **con
 - **Rejected alternatives:** SQLite (no SKIP LOCKED/RLS); node-local Postgres (state dies with the node —
   breaks ADR-005); reuse a consumer DB (re-couples platform state to a consumer — the inversion ADR-005 fixes).
 
+## Platform Secret Contract (I-Config-validated)
+The platform now has its **own** Config & Secret Registry (`delivery-os/infra/config-secret-registry.json`)
+— the first one (previously only consumers had registries, which is why the oracle could not discover a
+platform secret). The **Secret Validation Capability (`i-config.mjs`) validates it exactly as it does a
+consumer registry** — verified output:
+
+```
+I-Config readiness — delivery-os [prod]
+XX MISSING  ENGINE_DATABASE_URL  (required, SECRET, supabase)
+RESULT: NOT READY — 1 required key MISSING   (report-only)
+```
+
+**Complete current platform runtime-secret set (1 required):**
+| Key | data_class | rule | required | source | notes |
+|---|---|---|---|---|---|
+| `ENGINE_DATABASE_URL` | SECRET | postgres-url | prod ✓ (local optional) | supabase (dedicated platform project) | the engine's managed off-node store; **not** the `:6543` pooler (always-on node → persistent pool → direct URL); never a consumer DB |
+
+**Anticipated future platform secrets (NOT declared yet — Waterline: added with the capability that needs them):**
+- a goal-API auth/signing secret — when the platform exposes `/v1/goals` to control surfaces (ADR-004) + Sprint 5.3.
+- agent-execution credentials — if/when the platform engine runs real agent-result steps.
+
+These are deliberately **not** pre-declared (no speculative secrets). The registry grows as runtime capabilities land.
+
+**Oracle limitation (honest):** the engine secret lives on the Execution **node** plane (a 0600 env file),
+not vercel/github; the oracle confirms the *declaration* (shape/class/required) but cannot remotely read the
+node plane — node-plane presence is `verify-node.sh`'s job at deploy.
+
 ## Verdict
 The Engine DB contains **only Delivery OS platform execution state**, PII-free and consumer-FK-free. It is
 safe and correct as a dedicated platform plane, and conceptually pre-existing (the engine schema, relocated).
-The sole new decision is outbox ownership (above), recommended for M3.
+The platform secret contract is now declared and I-Config-validated; the sole open design item is outbox
+ownership (above), recommended for M3.
