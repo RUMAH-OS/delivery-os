@@ -30,7 +30,6 @@
     "templates/tools/smoke.mjs",
     "templates/tools/goal-init.mjs",
     "templates/tools/goal-stop.mjs",
-    "templates/tools/goal-progress.mjs",
     "templates/tools/boundary-classify.mjs",
     "templates/tools/change-classify.mjs",
     "templates/tools/verified-tree.mjs",
@@ -78,6 +77,18 @@
         "ignoreColumns": [],
         "appMigrationsNote": "The app's APPLIED engine-migration FILE PATHS are PER-APP / PROJECT-LOCAL — they are NOT declared here (that would be single-tenant). Each installer declares its own applied paths in its project-local .claude/os/engine.config.json: {\"workflow-engine\":{\"appMigrations\":[\"migrations/…\"]}}. `os-inherit engine-check` reads THAT per-app declaration for the DDL-parity inputs (falling back to a shared-manifest ddlParity.appMigrations only if no project-local config exists — backward compat). The shared manifest still owns the CANONICAL set (canonicalDir) — the source of truth for the SHAPE. Admin declares its 0034/0037/0038/0039/0041; the demo-app declares its verbatim 0001-0004; PLOS will declare its own renumbered set on install.",
         "note": "Structural equivalence is asserted between the canonical engine migration set (canonicalDir) and the app's APPLIED instance (declared per-app in engine.config.json). Reference mappings: Canonical 0001_engine_core.sql == Admin 0034 + 0038 (0034 creates workflow_step with a 3-value effect CHECK; 0038 widens it via DROP+ADD CONSTRAINT to the canonical 4-value set incl. await-callback — final state equivalent). Canonical 0002_engine_await_loop.sql == Admin 0037. Canonical 0003_engine_agent_runner.sql == Admin 0039. Canonical 0004_engine_agent_id.sql == Admin 0041. The demo-app applies all four canonical files VERBATIM (byte-identical) into its own sequence. The app's outbox COMMENT ON COLUMN / outbox table is installer-owned infra, NOT engine DDL — canonical 0001 deliberately omits the outbox; the structural check ignores non-engine objects."
+      }
+    },
+    {
+      "key": "governance-engine",
+      "source": "templates/governance-engine",
+      "into": ".claude/os/governance-engine",
+      "record": "INHERITED-governance-engine.json",
+      "ddlParity": {
+        "canonicalDir": "templates/governance-engine/migrations",
+        "ignoreColumns": [],
+        "appMigrationsNote": "Per-app, project-local (same multi-tenant rule as workflow-engine): each installer declares its APPLIED governance-engine migration FILE PATHS in its own .claude/os/engine.config.json under the \"governance-engine\" key ({\"governance-engine\":{\"appMigrations\":[\"migrations/…\"]}}). `os-inherit engine-check` reads THAT for the DDL-parity inputs (falling back to a shared-manifest ddlParity.appMigrations only if no project-local config exists). The shared manifest owns only the CANONICAL set (canonicalDir) — the source of truth for the goal-governance SHAPE. The finance-os-demo applies the two canonical files VERBATIM into its vendored sequence; a production consumer will renumber/split into its own.",
+        "note": "Structural equivalence is asserted between the canonical governance-engine migration set (canonicalDir: 0001_goal_contract.sql — the goal_contract + goal-supervisor durable contract; 0002_runtime_durable_stores.sql — the runtime durable stores / cages) and the app's APPLIED instance (declared per-app in engine.config.json). The finance-os-demo applies both canonical files BYTE-IDENTICAL into its own sequence (the strongest form of structural equivalence). The reference Postgres adapter under templates/governance-engine/adapters/ is installer-copied reference DDL/runtime, not part of the canonical migration set; only migrations/ defines the engine-owned SHAPE."
       }
     }
   ],
