@@ -1,0 +1,14 @@
+{
+  "name": "deliveryos-engine-host",
+  "private": true,
+  "type": "module",
+  "description": "Runtime dependency manifest for the platform Engine Host (M2/M4, ADR-005). delivery-os itself stays dependency-free (no-runtime invariant); the EXECUTION NODE installs these to run the host. Versions match the engine's reference installer. Pinned to the vendored engine's drizzle-orm major.",
+  "engines": { "node": "22.x" },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

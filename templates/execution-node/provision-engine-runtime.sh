@@ -54,6 +54,16 @@ done
 echo "OK: platform engine schema migrated."
 [ "$MIGRATE_ONLY" = 1 ] && { echo "migrate-only: done."; exit 0; }
 
+# Install the host's runtime deps (delivery-os stays dependency-free; the NODE installs them — no-runtime
+# invariant). node_modules lands in engine-host/ (gitignored). Then resolve ABSOLUTE node + tsx for launchd.
+command -v node >/dev/null || { echo "FATAL: node (22.x) required on the node"; exit 1; }
+case "$(node -v)" in v22.*) :;; *) echo "WARN: node $(node -v) — the engine stack pins 22.x";; esac
+echo "==> installing engine-host runtime deps (drizzle-orm/postgres/tsx)"
+( cd "$HERE/engine-host" && npm install --no-audit --no-fund --silent )
+NODE_BIN="$(command -v node)"
+TSX_CLI="$HERE/engine-host/node_modules/tsx/dist/cli.mjs"
+[ -f "$TSX_CLI" ] || { echo "FATAL: tsx not installed at $TSX_CLI"; exit 1; }
+
 # Render the launchd service for the continuous tick host (runs as the node user).
 TEMPLATE="$HERE/launchd/com.deliveryos.engine.plist.template"
 [ -f "$TEMPLATE" ] || { echo "FATAL: missing $TEMPLATE"; exit 1; }
@@ -64,10 +74,12 @@ ENVFILE="$SECRET_DIR/engine.env"; : > "$ENVFILE"; chmod 600 "$ENVFILE"
 
 OUT="$HOME/Library/LaunchAgents/${LABEL}.plist"; mkdir -p "$HOME/Library/LaunchAgents"
 sed -e "s|@@LABEL@@|${LABEL}|g" -e "s|@@NODE_USER@@|${NODE_USER}|g" \
+    -e "s|@@NODE@@|${NODE_BIN}|g" -e "s|@@TSXCLI@@|${TSX_CLI}|g" \
     -e "s|@@HOST_TS@@|${HERE}/engine-host/run-engine-host.ts|g" \
+    -e "s|@@WORKDIR@@|${HERE}/engine-host|g" \
     -e "s|@@ENVFILE@@|${ENVFILE}|g" -e "s|@@LOGDIR@@|${SECRET_DIR}|g" \
     "$TEMPLATE" > "$OUT"
-echo "OK: rendered engine service -> $OUT"
+echo "OK: rendered engine service -> $OUT  (node=$NODE_BIN)"
 
 if [ "$DO_LOAD" = 1 ]; then
   launchctl unload "$OUT" 2>/dev/null || true

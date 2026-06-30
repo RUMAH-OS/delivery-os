@@ -16,7 +16,10 @@
 import { readFileSync } from "node:fs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { createEngine } from "../../workflow-engine/index.js";
+// Import the RUNNER directly from engine.js — NOT the barrel (index.js), which re-exports the HTTP route
+// factories (goals/workflow/approvals-route) that pull in `hono`. The tick daemon serves no HTTP; the
+// goal-API is a separate capability (Sprint 5.3 / control surface), so the daemon stays dependency-light.
+import { createEngine } from "../../workflow-engine/engine.js";
 import { workflowRun, workflowStep, outbox } from "../../workflow-engine/schema.js";
 
 // The launchd service passes secrets via a 0600 ENGINE_ENV_FILE (KEY=VALUE lines) rather than the
