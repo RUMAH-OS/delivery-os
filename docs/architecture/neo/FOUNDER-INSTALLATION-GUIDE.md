@@ -519,7 +519,7 @@ in the config templates (NEO-EXEC-07 §5). **None of these is a secret value** �
 - [ ] **The Delete Test passes.** CI `rm -rf infrastructure/execution-node/` ⇒ **Core still typechecks and the
       contracts still resolve** — the Runtime builds with the entire Neo adapter deleted (the operational
       definition of host-agnostic; NEO-EXEC-07 §1.2 E2).  **[AUTOMATED-BY-SCRIPT]**
-- [ ] **The Runtime is infra-independent.** The dependency-direction gate (`residency-guard.mjs`) is green: no file
+- [ ] **The Runtime is infra-independent.** The dependency-direction gate (`scripts/arch-boundary-guard.mjs`) is green: no file
       under `templates/governance-engine` or `templates/workflow-engine` imports anything under
       `infrastructure/execution-node/` or an infra SDK.  **[AUTOMATED-BY-SCRIPT]**
 - [ ] **The reboot-survival cold-boot test passes** (NEO-OPS-06 §3.5):  **[MANUAL]**

@@ -14,8 +14,8 @@ Two forms ship:
 ## The identity property (why the Hobby author rule is satisfied with no manual click)
 
 `vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN` performs **no actor check** — the **token**
-carries the deploy identity. So a deploy executed on Neo lands **attributed to the founder
-(bkasanwiredjo)** without anyone pressing "Redeploy" in the Vercel UI (resolves the
+carries the deploy identity. So a deploy executed on Neo lands **attributed to the founder's
+account** (the token owner) without anyone pressing "Redeploy" in the Vercel UI (resolves the
 `plos-vercel-deploy-identity-constraint` foot-gun). The token is read only from `secrets.VERCEL_TOKEN`
 and is never written to the tree or echoed.
 
