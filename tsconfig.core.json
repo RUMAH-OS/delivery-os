@@ -1,0 +1,49 @@
+{
+  // =============================================================================
+  // Delivery OS — the SPLIT Core tsconfig (the structural artifact of the boundary).
+  // =============================================================================
+  // "Core builds" becomes a concrete, runnable assertion: `tsc --noEmit -p tsconfig.core.json`
+  // typechecks ONLY the Core + Contracts surface of the governance-engine, with EVERY adapter
+  // folder absent. It is the buildability oracle of the standing Delete Test (scripts/delete-test.mjs):
+  // delete an adapter subsystem in a throwaway worktree, then run this -> 0 errors means no Core file
+  // had a compile-time dependence on the deleted adapter (a direction leak the static gate missed would
+  // surface here as an unresolved-import error).
+  //
+  // SCOPE NOTE (honest): scoped to templates/governance-engine — the Core whose adapter
+  // (adapters/postgres) the Delete Test deletes. The workflow-engine is the OTHER Core engine but it
+  // depends on hono/drizzle-orm/zod, which are not installed in the only available toolchain
+  // (examples/finance-os-demo/node_modules), so it cannot typecheck standalone here; it has no adapter
+  // subsystem to delete, so it is out of this oracle's scope. The arch-boundary-guard still gates BOTH
+  // engines for import direction (architecture.config.json -> layers.core.folders).
+  //
+  // TOOLCHAIN NOTE: there is no root node_modules. `types`/@types/node resolve via typeRoots pointing at
+  // the finance-os-demo toolchain. In a Delete-Test WORKTREE (which has no node_modules at all) the test
+  // generates a derived tsconfig that overrides typeRoots to the MAIN checkout's @types — so this base
+  // file stays clean for a direct `tsc -p tsconfig.core.json` from the repo root.
+  // =============================================================================
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "typeRoots": ["./examples/finance-os-demo/node_modules/@types"],
+    "rootDir": ".",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true
+  },
+  "include": [
+    "templates/governance-engine/*.ts"
+  ],
+  "exclude": [
+    "templates/governance-engine/adapters",
+    "templates/governance-engine/scripts",
+    "templates/governance-engine/golden-master.ts",
+    "templates/governance-engine/runtime-stores-cage.ts"
+  ]
+}

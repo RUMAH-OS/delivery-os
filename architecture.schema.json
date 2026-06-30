@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://delivery-os/architecture.schema.json",
+  "title": "Delivery OS — architecture boundary config",
+  "description": "The single declarative source of truth for the layer boundary (Repository Principle). The arch-boundary-guard and the standing Delete Test are driven entirely by this file; they carry no hard-coded folder names. Validated fail-closed: an invalid config refuses to run the gate.",
+  "type": "object",
+  "required": ["version", "layers", "exclude", "infraSdkDenylist", "deleteTest"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "_comment": { "type": "string" },
+    "layers": {
+      "type": "object",
+      "description": "Layer membership. A file is classified by the LONGEST matching folder/file prefix; a layer's `exclude` re-pins a sub-path out of that layer (to whichever other layer claims it, else unclassified).",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["folders", "mayImport", "denyInfraSdk"],
+        "additionalProperties": true,
+        "properties": {
+          "description": { "type": "string" },
+          "folders": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Repo-relative folder prefixes or exact file paths (POSIX slashes) that belong to this layer."
+          },
+          "exclude": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Sub-paths re-pinned OUT of this layer (e.g. ports.ts -> contracts; adapters/ -> adapters; scripts/ -> unclassified test harness)."
+          },
+          "mayImport": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "The layers this layer is permitted to import. An edge to a layer NOT in this list is a [direction] violation. Dependencies must flow inward: adapter -> contract -> core."
+          },
+          "denyInfraSdk": {
+            "type": "boolean",
+            "description": "When true, a bare import of any infraSdkDenylist entry (and any infraCallDenylist inline pattern) is an [infra-sdk] violation. Core/Contracts = true; Adapters = false (SDKs legally live there)."
+          }
+        }
+      }
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Globally excluded from the scan: build output + vendored/consumer/demo trees + the throwaway delete-test worktree. Supports a trailing /** glob and bare directory names."
+    },
+    "infraSdkDenylist": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Infrastructure-plane SDKs forbidden in any denyInfraSdk layer. Matched by exact PACKAGE NAME (so `pg` matches `pg` and `pg/...` but NOT `drizzle-orm/pg-core`), or as a glob when the entry contains `*` (matched against the full specifier, e.g. `@slack/*`, `*runner*`)."
+    },
+    "infraCallDenylist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "re", "why"],
+        "properties": {
+          "id": { "type": "string" },
+          "re": { "type": "string", "description": "A RegExp source tested per line in denyInfraSdk layers." },
+          "why": { "type": "string" }
+        }
+      },
+      "description": "Inline infrastructure-call patterns forbidden in denyInfraSdk layers (e.g. execFileSync of a relative-path tool = plane wiring). Carried over from the residency-guard."
+    },
+    "deleteTest": {
+      "type": "object",
+      "required": ["coreTsconfig", "toolchainNodeModules", "coreSelfTests", "subsystems"],
+      "additionalProperties": true,
+      "properties": {
+        "coreTsconfig": { "type": "string", "description": "The split tsconfig (core+contracts, adapters/scripts excluded). `tsc --noEmit -p <this>` is the 'Core builds' assertion." },
+        "toolchainNodeModules": { "type": "string", "description": "A repo-relative node_modules carrying tsc + tsx + @types/node (the worktree has none of its own). The Delete Test runs the toolchain from HERE against the worktree sources." },
+        "coreSelfTests": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "REAL governance-engine self-tests (the tree under deletion, NOT a vendored copy). Run via tsx against the post-deletion worktree. They import the real organs, so a Core organ that illegitimately imported a deleted adapter would FAIL them."
+        },
+        "subsystems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "remove"],
+            "properties": {
+              "id": { "type": "string" },
+              "remove": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "note": { "type": "string" }
+            }
+          },
+          "description": "Per-subsystem delete matrix. A subsystem whose `remove` folders are all absent today is SKIPPED with a WARN (armed ahead of the code)."
+        },
+        "oracleProbe": {
+          "type": "object",
+          "required": ["injectImportInto", "injectImport"],
+          "properties": {
+            "injectImportInto": { "type": "string", "description": "A REAL Core organ to plant an illegitimate adapter import into (--prove-oracle mode)." },
+            "injectImport": { "type": "string", "description": "The illegitimate Core->adapter import line planted to prove the Delete Test oracle has teeth (it MUST then go red)." }
+          }
+        }
+      }
+    }
+  }
+}

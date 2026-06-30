@@ -1,0 +1,113 @@
+{
+  "$schema": "./architecture.schema.json",
+  "version": 1,
+  "_comment": "THE BOUNDARY AS DATA. The single declarative source of truth for the Repository Principle's layer boundary (docs/architecture/PRINCIPLE-repository-and-dependency-rule.md). The arch-boundary-guard (scripts/arch-boundary-guard.mjs) and the standing Delete Test (scripts/delete-test.mjs) are driven ENTIRELY by this file — they carry no hard-coded folder names. Editing the boundary = editing this file (caught by CODEOWNERS review). This ALSO removes the templates/ layout ambiguity BY DECLARATION (no folder moves): each real folder is assigned a layer here. Layers: Core (the infrastructure-agnostic Runtime) <- Contracts (the only legal cross-layer surface) <- Adapters (plane-bound; consume Core only via Contracts). Dependencies flow strictly INWARD: adapter -> contract -> core, never outward.",
+
+  "layers": {
+    "core": {
+      "description": "The Runtime — Governance Engine + Workflow Engine organ surface. Infrastructure-agnostic, imports nothing outward, vendored byte-identical. Excludes: the port/contract surfaces (re-pinned to contracts), the reference adapter (re-pinned to adapters), the self-test harness + validation cages (test code, not organ surface — unclassified, not gated).",
+      "folders": ["templates/governance-engine", "templates/workflow-engine"],
+      "exclude": [
+        "templates/governance-engine/ports.ts",
+        "templates/governance-engine/metric-probe.ts",
+        "templates/governance-engine/execution-provider-port.ts",
+        "templates/governance-engine/health-contract.ts",
+        "templates/governance-engine/adapters",
+        "templates/governance-engine/scripts",
+        "templates/governance-engine/residency-guard.mjs",
+        "templates/workflow-engine/contracts",
+        "templates/workflow-engine/scripts"
+      ],
+      "mayImport": ["core", "contracts"],
+      "denyInfraSdk": true
+    },
+    "contracts": {
+      "description": "Ports / portable substrates — the ONLY legal cross-layer surface, defined Core-side. governance-engine/ports.ts (the port shapes) + governance-engine/metric-probe.ts (the portable probe contract + the L3 read-only invariant `assertReadOnlyTarget` that BOTH Core organs AND the postgres adapter consume — it carries no driver import; it is the substrate the adapter implements against) + governance-engine/execution-provider-port.ts (the compute-IN ExecutionProviderPort/PlacementPort the future Execution-Node adapter implements; host-agnostic — opaque resource_class/labels/capabilities strings) + governance-engine/health-contract.ts (the health-OUT Health-Emission Contract the future Monitoring adapter consumes; Core emits HeartbeatRecord/PlatformHealthReport + the isReady predicate, names no monitor) + workflow-engine/contracts (approvals-v1) + the top-level contracts/ cross-consumer seam definitions.",
+      "folders": [
+        "templates/governance-engine/ports.ts",
+        "templates/governance-engine/metric-probe.ts",
+        "templates/governance-engine/execution-provider-port.ts",
+        "templates/governance-engine/health-contract.ts",
+        "templates/workflow-engine/contracts",
+        "contracts"
+      ],
+      "mayImport": ["core", "contracts"],
+      "denyInfraSdk": true
+    },
+    "adapters": {
+      "description": "Outer ring — plane-bound implementations that consume Core ONLY via Contracts (never a Core internal). Today: the reference Postgres adapter (governance-engine/adapters/postgres, imports the `postgres` driver legally). Armed for: infrastructure/** (the future Execution-Infra node), execution-infra/, slack-surface/, monitoring/. SDKs legally live here (denyInfraSdk=false).",
+      "folders": [
+        "templates/governance-engine/adapters",
+        "infrastructure",
+        "execution-infra",
+        "slack-surface",
+        "monitoring"
+      ],
+      "mayImport": ["contracts", "adapters"],
+      "denyInfraSdk": false
+    },
+    "composition": {
+      "description": "The Clean-Architecture `main` / COMPOSITION ROOT — the OUTERMOST layer (outside every gated ring). It is the ONLY place permitted to import BOTH Core (createGovernanceRuntime) AND the adapters, because wiring an inner organ to an outer adapter is exactly what a composition root does (Clean Architecture: `main` depends on everything; nothing depends on `main`). It is NOT an adapter — an adapter importing a Core internal would (correctly) trip the inward-only guard; this layer is the narrow, enumerated, file-by-file exception that does the wiring instead. Entries are EXACT launchd entry files under infrastructure/execution-node/bootstrap/ (the WORKER_ENTRY / RUNTIME_TICK_ENTRY / SUPERVISOR_ENTRY the plists invoke). Each exact-file entry out-specifics the `adapters` claim on `infrastructure` (longest-prefix wins), so ONLY these three files are reclassified — the rest of infrastructure/ stays `adapters`. They are removed with infrastructure/ by the Delete Test, so Core still builds without them.",
+      "folders": [
+        "infrastructure/execution-node/bootstrap/worker-entry.mjs",
+        "infrastructure/execution-node/bootstrap/runtime-tick.mjs",
+        "infrastructure/execution-node/bootstrap/supervisor-entry.mjs"
+      ],
+      "mayImport": ["core", "contracts", "adapters", "composition"],
+      "denyInfraSdk": false
+    }
+  },
+
+  "exclude": ["node_modules", ".git", "dist", "build", "examples/**", ".delete-test/**"],
+
+  "infraSdkDenylist": [
+    "postgres",
+    "pg",
+    "dockerode",
+    "docker",
+    "tailscale",
+    "neo",
+    "@slack/*",
+    "@slack/web-api",
+    "@octokit/*",
+    "@actions/*",
+    "*runner*"
+  ],
+
+  "infraCallDenylist": [
+    {
+      "id": "execfile-relative-tool",
+      "re": "\\b(?:execFileSync|execSync|spawnSync|exec)\\s*\\([^)]*?[\"'][.]{1,2}/",
+      "why": "shelling a relative-path tool is plane wiring — it belongs to an adapter, not Core/Contracts"
+    }
+  ],
+
+  "deleteTest": {
+    "coreTsconfig": "tsconfig.core.json",
+    "toolchainNodeModules": "examples/finance-os-demo/node_modules",
+    "coreSelfTests": [
+      "templates/governance-engine/scripts/self-test.ts",
+      "templates/governance-engine/golden-master.ts",
+      "templates/governance-engine/scripts/governance-runtime-self-test.ts"
+    ],
+    "subsystems": [
+      {
+        "id": "governance-postgres-adapter",
+        "remove": ["templates/governance-engine/adapters"],
+        "note": "The only concrete adapter on disk today. Proves the REAL Core builds (tsc -p tsconfig.core.json) AND the REAL governance-engine self-tests run green with the adapter deleted — the corrected oracle (exercises templates/governance-engine, NOT examples/**/vendor)."
+      },
+      {
+        "id": "execution-infrastructure",
+        "remove": ["infrastructure", "execution-infra"],
+        "note": "Armed. SKIPPED-WARN until the Execution-Infra folder is created (the principle places it in its own top-level folder when implementation resumes)."
+      },
+      { "id": "slack-surface", "remove": ["slack-surface"], "note": "Armed. SKIPPED-WARN until built." },
+      { "id": "monitoring", "remove": ["monitoring"], "note": "Armed. SKIPPED-WARN until built." }
+    ],
+    "oracleProbe": {
+      "injectImportInto": "templates/governance-engine/goal-contract.ts",
+      "injectImport": "import { createPostgresRuntimeStores } from \"./adapters/postgres/index.js\";\nvoid createPostgresRuntimeStores;",
+      "_note": "A REFERENCED binding import — the realistic Core->adapter leak (a Core organ pulling AND using a concrete adapter factory). The binding forces tsc type-resolution (a side-effect-only `import \"x\"` does NOT error under moduleResolution:Bundler); the reference (`void ...`) stops esbuild/tsx from eliding the unused import. So deleting the adapter makes BOTH the tsc 'Core builds' assertion (TS2307) AND the runtime self-test (ERR_MODULE_NOT_FOUND) go red — proving the oracle genuinely depends on the not-deleted Core."
+    }
+  }
+}

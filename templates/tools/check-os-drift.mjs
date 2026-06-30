@@ -69,6 +69,36 @@ if (pin === "?") { // no pin = the framework itself (versioned by its own tags) 
     warns.push(`router §9 os_version \`${routerVer}\` != stamp ${stamp} — re-run render-kernel`);
 }
 
+// --- Repository Principle: the dependency-enforcement layer must be PRESENT on disk if declared ---
+//     Closes the "kernel advertises enforcement that disk doesn't have, un-gated" gap (the WAVE1-CHALLENGE
+//     most-dangerous-gap: CLAUDE.md §3 claims the boundary is enforced; nothing checked that the enforcement
+//     artifacts exist). If architecture.config.json declares the boundary, the gate script + the split Core
+//     tsconfig + the Delete Test + the schema + the pre-push Gate-5 wiring must ALL exist — so the enforcement
+//     claim is checkable, not remembered. (The boundary is itself drift-gated.)
+{
+  const archConfigPath = join(ROOT, "architecture.config.json");
+  if (existsSync(archConfigPath)) {
+    let archCfg = null;
+    try { archCfg = JSON.parse(read(archConfigPath)); }
+    catch (e) { fails.push(`architecture.config.json is present but not valid JSON (${e.message}) — the boundary spec must parse (fail-closed)`); }
+    if (archCfg) {
+      const need = [
+        ["scripts/arch-boundary-guard.mjs", "the dependency-direction + infra-SDK gate"],
+        [(archCfg.deleteTest && archCfg.deleteTest.coreTsconfig) || "tsconfig.core.json", "the split Core tsconfig (the 'Core builds' assertion)"],
+        ["scripts/delete-test.mjs", "the standing Delete Test"],
+        ["architecture.schema.json", "the config schema (fail-closed validation)"],
+      ];
+      for (const [rel, what] of need) {
+        if (!existsSync(join(ROOT, rel)))
+          fails.push(`architecture.config.json declares the dependency-enforcement layer but ${rel} (${what}) is MISSING — the kernel would advertise enforcement that disk does not have`);
+      }
+      const prePush = read(join(ROOT, ".githooks", "pre-push"));
+      if (prePush && !/arch-boundary-guard/.test(prePush))
+        fails.push(`architecture.config.json declares the boundary but .githooks/pre-push has no Gate-5 (arch-boundary-guard) wiring — the static gate is un-invoked (enforced-by-nothing)`);
+    }
+  }
+}
+
 for (const w of warns) console.error(`WARN: ${w}`);
 if (fails.length) {
   for (const f of fails) console.error(`FAIL: ${f}`);

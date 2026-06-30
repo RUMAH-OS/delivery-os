@@ -39,4 +39,16 @@ if [ -f scripts/check-hook-paths.mjs ]; then
     exit 1
   fi
 fi
+
+# Gate 5 — architectural-boundary guard (Repository Principle): dependencies must flow strictly INWARD
+# (adapter -> contract -> core). Config-driven (architecture.config.json); static analysis over a few hundred
+# files — tens of milliseconds, zero deps, no network. Catches a Core/Contract that imports an adapter or a
+# denylisted infra SDK at the moment it is authored. Fail-closed, every push, any git client.
+if [ -f scripts/arch-boundary-guard.mjs ]; then
+  if ! node scripts/arch-boundary-guard.mjs >&2; then
+    echo "✗ push blocked by Delivery OS arch-boundary-guard: an import crosses an architectural boundary." >&2
+    echo "  (see the [direction]/[infra-sdk] finding above for the exact rule + fix; the boundary is architecture.config.json)" >&2
+    exit 1
+  fi
+fi
 exit 0
