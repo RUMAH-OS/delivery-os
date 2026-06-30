@@ -18,7 +18,7 @@ Make Delivery OS **easy for Claude to operate inside** — low cognitive load, h
 
 ## 3. North Star  — *north star?*
 The **AI Operating System reference model**: CLAUDE.md is the kernel; skills are callable capabilities; the wiki is the context layer; governance is the **enforced floor invoked through** the OS, never the front door.
-**Invariants (outrank any change):** POINTS-never-RESTATES · one-source-of-truth-per-concern (§7) · author≠verifier (§3) · **verification is operationally enforced, not remembered (§12)** · no speculative scaffolding (Waterline §8) · surface disagreements, never smooth them (§11).
+**Invariants (outrank any change):** POINTS-never-RESTATES · one-source-of-truth-per-concern (§7) · author≠verifier (§3) · **verification is operationally enforced, not remembered (§12)** · no speculative scaffolding (Waterline §8) · surface disagreements, never smooth them (§11) · **infrastructure-agnostic core / Repository Principle** — Delivery OS is one repo of co-evolving subsystems; the repo boundary is NOT the architectural boundary; the Runtime depends on nothing outward (no adapter subsystem, no concrete environment: Neo/Docker/Tailscale/runner/Slack); dependencies flow strictly inward through contracts; consumers stay in separate repos. Dependency direction is clean today (independently re-verified 2026-06-30); to be made structural by a dependency-direction gate + a standing Delete Test — **DESIGNED, not yet built** → `docs/architecture/PRINCIPLE-repository-and-dependency-rule.md` (principle ratified 2026-06-30; enforcement pending implementation).
 
 ## 4. Wiki  — *where is the framework's own knowledge?*
 Delivery OS keeps its durable knowledge as **append-only history**, not a project wiki:
