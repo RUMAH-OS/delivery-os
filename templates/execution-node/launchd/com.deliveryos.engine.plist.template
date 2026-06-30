@@ -8,11 +8,14 @@
 <dict>
   <key>Label</key>            <string>@@LABEL@@</string>
   <key>UserName</key>         <string>@@NODE_USER@@</string>
+  <!-- launchd has a minimal PATH, so the node + tsx binaries are ABSOLUTE (resolved by the provisioner).
+       tsx runs the .ts host directly; node_modules (drizzle-orm/postgres) resolve from @@WORKDIR@@ upward. -->
   <key>ProgramArguments</key> <array>
-    <string>/usr/bin/env</string>
-    <string>tsx</string>
+    <string>@@NODE@@</string>
+    <string>@@TSXCLI@@</string>
     <string>@@HOST_TS@@</string>
   </array>
+  <key>WorkingDirectory</key> <string>@@WORKDIR@@</string>
   <key>EnvironmentVariables</key>
   <dict><key>ENGINE_ENV_FILE</key><string>@@ENVFILE@@</string></dict>
   <key>KeepAlive</key>        <true/>

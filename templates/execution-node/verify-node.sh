@@ -39,7 +39,15 @@ if want runner; then
   else bad "runner required but not registered"; fi
 fi
 if want heartbeat; then
-  ls "$HOME/Library/LaunchAgents/"*heartbeat*.plist >/dev/null 2>&1 && pass "heartbeat service installed" || bad "heartbeat required but not installed"
+  # the heartbeat is the platform engine's continuous tick daemon (com.deliveryos.engine).
+  if launchctl list com.deliveryos.engine >/dev/null 2>&1; then
+    pgrep -f run-engine-host.ts >/dev/null 2>&1 && pass "heartbeat: engine tick daemon loaded + running" \
+      || bad "heartbeat: engine service loaded but no live tick process"
+  elif ls "$HOME/Library/LaunchAgents/"*engine*.plist >/dev/null 2>&1; then
+    bad "heartbeat: engine service rendered but not loaded (launchctl load -w)"
+  else
+    bad "heartbeat required but the engine service is not installed"
+  fi
 fi
 if want mesh; then
   command -v tailscale >/dev/null && pass "mesh client present" || bad "mesh required but tailscale missing"

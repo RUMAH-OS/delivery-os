@@ -2,3 +2,6 @@
 Thumbs.db
 *.log
 .claude/.verify-state.json
+# Execution-Node runtime deps installed by provision-engine-runtime.sh (the node installs the host's
+# deps; the platform repo stays dependency-free — the no-runtime invariant, ADR-005).
+node_modules/
