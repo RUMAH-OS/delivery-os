@@ -47,11 +47,29 @@ const TICK_IDLE_MS = Number(process.env.TICK_IDLE_MS ?? 2000); // back off when 
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// node identity for the heartbeat row (which Execution Node wrote the last beat).
+const NODE_ID = process.env.NODE_ID || process.env.HOSTNAME || "execution-node";
+const HEARTBEAT_WRITE_MS = Number(process.env.HEARTBEAT_WRITE_MS ?? 20_000); // throttle the liveness write
+
 async function main(): Promise<void> {
   // Compute lives on the node; durable state lives in the managed store.
   const sqlClient = postgres(DB_URL, { max: 4, prepare: false });
   const db = drizzle(sqlClient);
   const engine = createEngine({ db: db as any, tables: { workflowRun, workflowStep, outbox } });
+
+  // M3.1 — the LIVENESS heartbeat (host-owned, not engine-core). A DB-plane watchdog (Supabase pg_cron, a
+  // DIFFERENT failure domain than this node's compute) reads `engine_heartbeat.last_beat_at` and alarms if it
+  // goes stale — replacing the GitHub-Actions dead-man-switch cron (zero hosted minutes). The `engine_heartbeat`
+  // table is owned by migration 0005 (applied by provision-engine-runtime.sh); the host only STAMPS it.
+  let lastHbWrite = 0;
+  const stampHeartbeat = async () => {
+    const now = Date.now();
+    if (now - lastHbWrite < HEARTBEAT_WRITE_MS) return;
+    lastHbWrite = now;
+    await sqlClient`
+      INSERT INTO engine_heartbeat (node_id, last_beat_at) VALUES (${NODE_ID}, now())
+      ON CONFLICT (node_id) DO UPDATE SET last_beat_at = now()`;
+  };
 
   // Domain definition packs (consumer-contributed; configured, never hard-imported here).
   await loadPacks();
@@ -61,10 +79,12 @@ async function main(): Promise<void> {
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);
 
-  console.log("Delivery OS engine host LIVE (continuous tick) — durable store is managed/off-node.");
+  console.log(`Delivery OS engine host LIVE (continuous tick) — durable store is managed/off-node. node=${NODE_ID}`);
+  await stampHeartbeat(); // first beat at boot
   while (!stopping) {
     try {
       const report = await engine.tick();
+      await stampHeartbeat();
       await sleep(report.advanced ? TICK_BUSY_MS : TICK_IDLE_MS);
     } catch (e) {
       // a transient store blip must not kill the host (the node is the liveness anchor); log + back off.
