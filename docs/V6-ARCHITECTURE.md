@@ -29,8 +29,18 @@ earned-never-scaffolded · three-tier memory + learning loop + incident-provenan
 boundary-first. **Net test for every asset: it must SUBTRACT a rule/step while closing a repeated/expensive gap.**
 
 ## Build backlog (prioritized; high-leverage first)
+
+> **NEXT PLATFORM MILESTONE (ADR-005 — the third Platform Extraction):** the **Execution Runtime Extraction**
+> (#0 below) is scheduled **ahead of every dependent**. The Execution Engine, Heartbeat Runtime, and runner
+> ownership move from the consumer (rumah-admin) to Delivery OS platform capabilities, hosted on Execution
+> Node 1 (Neo). It is **not deferred and not a separate initiative** — it runs first, then the roadmap
+> continues in order. **Blocks:** rumah-admin Sprint 5.3 (goal-intake C1 / `/goal` front door) and
+> un-SHADOWing the goal-governance loop — both depend on the platform-owned execution target existing. No
+> consumer-bound runner / temporary compromise without explicit founder approval.
+
 | # | Capability | Kind | Repo | Lev | Kills |
 |---|---|---|---|---|---|
+| **0** | **Execution Runtime Extraction (ADR-005)** — M1 define platform-owned execution home · M2 relocate engine/heartbeat/scheduler off the consumer · M3 re-point consumers to the platform goal-API · M4 provision Neo's runner+heartbeat against the platform target (`verify-node.sh --require runner,heartbeat`) | milestone | delivery-os | **H** | the layering inversion: engine/heartbeat/runner owned by a consumer; **blocks** Sprint 5.3 goal-intake + a fully-operational Execution Node 1 |
 | 1 | Shared per-event-type **seam contract** (executable, versioned, incl. content-encoding) | skill | delivery-os | H | FV-4/5 root: `events-v1.ts` payload is `z.record` → HTML/text + missing-notice passed component QA, detonated at live |
 | 2 | Cross-repo **seam-gate** (workflow-scoped, fail-closed before live, drives real Admin→PLOS path) | gate | delivery-os | H | the crystallized root (validates components not workflows) |
 | 3 | **integration-architect** base agent (owns the seam producer+consumer) | agent | all | H | nobody owns the cross-repo seam |
