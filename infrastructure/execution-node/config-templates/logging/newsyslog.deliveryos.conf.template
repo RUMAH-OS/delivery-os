@@ -1,0 +1,22 @@
+# ==============================================================================================================
+# TEMPLATE  ·  newsyslog.deliveryos.conf   (macOS log rotation for the launchd daemon logs)
+# ==============================================================================================================
+# PURPOSE      Rotates the worker/supervisor/runner/colima logs that the launchd plists write to {{LOG_DIR}}.
+#              launchd does NOT rotate; macOS newsyslog does. A hard size cap prevents the "logs fill the disk"
+#              rot vector (NEO-HBM §5.1, EIB §13). Refs: NEO-EXEC-07 §4 (log redirect+rotate).
+#
+# INSTALLED BY bootstrap/install-daemons.sh renders {{LOG_DIR}}/{{RUNNER_USER}} → copies to
+#              /etc/newsyslog.d/deliveryos.conf. FOUNDER-INSTALLATION-GUIDE §7.1 (the daemons' log posture).
+#              TEMPLATE: NO secret values.
+#
+# FORMAT       logfilename                       [owner:group]   mode  count  size(KB)  when  flags
+# PLACEHOLDERS {{LOG_DIR}} (e.g. /Users/ci-runner/Library/Logs/delivery-os) · {{RUNNER_USER}} (e.g. ci-runner)
+# ==============================================================================================================
+{{LOG_DIR}}/worker.out.log       {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/worker.err.log       {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/supervisor.out.log   {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/supervisor.err.log   {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/runner.out.log       {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/runner.err.log       {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/colima.out.log       {{RUNNER_USER}}:staff  644  7  10240  *  GN
+{{LOG_DIR}}/colima.err.log       {{RUNNER_USER}}:staff  644  7  10240  *  GN

@@ -1,0 +1,19 @@
+{
+  "_README": [
+    "TEMPLATE · healthchecks.config.example — the off-Neo dead-man (push) check-in config shape.",
+    "PURPOSE: the parameters for the Healthchecks.io check that the com.deliveryos.supervisor pusher feeds. The",
+    "  supervisor POSTs the ping URL every period_seconds ONLY when /ready is green (NEO-HBM ADR-003), so a",
+    "  degraded-but-running node also stops pinging. The weekly all-green digest is the dead-man for the dead-man.",
+    "CONSUMED BY: bootstrap/install-daemons.sh writes period/grace into the supervisor env; the founder creates the",
+    "  matching Healthchecks check in §6.1 (FOUNDER-INSTALLATION-GUIDE). NEO-EXEC-07 §5.5 / NEO-HBM §4.2.",
+    "NO SECRETS: ping_url_secret_ref is METADATA only — the actual ping URL is seeded into the System keychain",
+    "  under the key 'HC_PING_URL' and is NEVER written into this file.",
+    "PLACEHOLDERS: {{NODE_ID}} (e.g. neo-node2) · {{HC_PERIOD_SECONDS}} (e.g. 60) · {{HC_GRACE_SECONDS}} (300-600)."
+  ],
+  "check_name": "{{NODE_ID}}-deadman",
+  "period_seconds": {{HC_PERIOD_SECONDS}},
+  "grace_seconds": {{HC_GRACE_SECONDS}},
+  "ping_gated_on": "/ready",
+  "ping_url_secret_ref": "HC_PING_URL",
+  "weekly_all_green_digest": true
+}

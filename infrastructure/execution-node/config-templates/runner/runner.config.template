@@ -1,0 +1,21 @@
+{
+  "_README": [
+    "TEMPLATE · runner.config.example — the ephemeral GitHub Actions self-hosted runner registration shape.",
+    "PURPOSE: the parameters register-runner.sh passes to actions/runner config.sh. The runner is EPHEMERAL",
+    "  (clean per job — the highest-leverage isolation control), labelled self-hosted,{{RUNNER_LABEL}}, owned by",
+    "  the NON-ADMIN {{RUNNER_USER}}, and long-polls OUTBOUND to GitHub (no inbound port). NEO-EXEC-07 §5.6 / §6 C3.",
+    "CONSUMED BY: bootstrap/register-runner.sh → ./config.sh --url https://github.com/{{OWNER}}/{{REPO}}",
+    "  --ephemeral --labels self-hosted,{{RUNNER_LABEL}} --unattended (token founder-supplied at install).",
+    "NO SECRETS: registration_token_ref is METADATA only — the short-lived registration token is founder-supplied",
+    "  at install time (gh api .../registration-token) and is NEVER written into this file.",
+    "PLACEHOLDERS: {{OWNER}}/{{REPO}} (e.g. RUMAH-OS/delivery-os) · {{RUNNER_LABEL}} (e.g. neo) · {{RUNNER_USER}} (e.g. ci-runner)."
+  ],
+  "url": "https://github.com/{{OWNER}}/{{REPO}}",
+  "labels": ["self-hosted", "{{RUNNER_LABEL}}"],
+  "ephemeral": true,
+  "unattended": true,
+  "runner_user": "{{RUNNER_USER}}",
+  "registration_token_ref": "GH_RUNNER_REG_TOKEN",
+  "work_folder": "_work",
+  "no_pull_request_target": true
+}

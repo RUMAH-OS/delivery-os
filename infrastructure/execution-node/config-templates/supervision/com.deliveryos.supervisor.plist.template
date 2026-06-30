@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================================================
+  TEMPLATE  ·  com.deliveryos.supervisor.plist   (launchd LaunchDaemon — the Neo health bridge)
+  ============================================================================================================
+  PURPOSE      The `com.deliveryos.supervisor` daemon: runs the health bridge — serves /health + /ready on the
+               tailnet-only bind, and runs the /ready-GATED Healthchecks pusher (the off-node dead-man's PUSH
+               check-in). It pings the keychain-resolved HC_PING_URL only when isReady(report) is true, so a degraded-but-running
+               node also stops pinging (NEO-HBM ADR-003). This is the thing that converts silent rot into a page.
+               Refs: NEO-EXEC-07 §4 / §5.2 ; NEO-HBM-v1 Layer D/F ; consumes health-bridge/healthchecks-pusher.
+
+  INSTALLED BY infrastructure/execution-node/bootstrap/install-daemons.sh  (NEO-EXEC-07 §6 C5)
+               → renders the placeholders → `sudo launchctl bootstrap system <rendered>.plist`.
+               TEMPLATE: NO secret values. HC_PING_URL is a capability URL treated as a low-value secret and is
+               read from the System keychain at start — it is NOT written into this file (only its keychain ref).
+
+  BOOT POSTURE LaunchDaemon, non-admin user, System-keychain secrets (same posture as the worker, NEO-OPS-06 §3).
+  SUPERVISION  RunAtLoad · KeepAlive · ThrottleInterval (a flapping pusher escalates to the off-node domain).
+
+  PLACEHOLDERS the founder fills (FOUNDER-INSTALLATION-GUIDE §0):
+               {{RUNNER_USER}}        non-admin user                               e.g. ci-runner
+               {{NODE_BIN}}           pinned node binary                           e.g. /opt/homebrew/bin/node
+               {{SUPERVISOR_ENTRY}}   the health-bridge entry (main)               e.g. /Users/ci-runner/delivery-os/infrastructure/execution-node/bootstrap/supervisor-entry.mjs
+               {{WORKING_DIR}}        daemon working directory                     e.g. /Users/ci-runner/delivery-os
+               {{NODE_ID}}            registry node id                             e.g. neo-node2
+               {{TAILNET_BIND_ADDR}}  tailscale0 / MagicDNS bind addr              (NEVER 0.0.0.0)
+               {{HEALTH_PORT}}        the ACL health port                          e.g. 8787
+               {{HC_PERIOD_SECONDS}}  gated push cadence (seconds)                 e.g. 60
+               {{LOG_DIR}}            rotated-log directory                        e.g. /Users/ci-runner/Library/Logs/delivery-os
+               NOTE: HC_PING_URL is seeded into the System keychain (key ref "HC_PING_URL"), NOT this plist.
+  ============================================================================================================
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.deliveryos.supervisor</string>
+
+  <key>UserName</key>
+  <string>{{RUNNER_USER}}</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{NODE_BIN}}</string>
+    <string>{{SUPERVISOR_ENTRY}}</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>{{WORKING_DIR}}</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DOS_NODE_ID</key>
+    <string>{{NODE_ID}}</string>
+    <key>DOS_SECRET_SOURCE</key>
+    <string>system-keychain</string>
+    <!-- /health + /ready bind to the tailnet interface only (NTS-DOS-v1 §A.2). -->
+    <key>DOS_HEALTH_BIND</key>
+    <string>{{TAILNET_BIND_ADDR}}</string>
+    <key>DOS_HEALTH_PORT</key>
+    <string>{{HEALTH_PORT}}</string>
+    <!-- The pusher posts to the keychain-resolved HC_PING_URL only when /ready is green (ADR-003). -->
+    <key>DOS_HC_PING_URL_REF</key>
+    <string>HC_PING_URL</string>
+    <key>DOS_HC_PERIOD_SECONDS</key>
+    <string>{{HC_PERIOD_SECONDS}}</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>{{LOG_DIR}}/supervisor.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>{{LOG_DIR}}/supervisor.err.log</string>
+</dict>
+</plist>

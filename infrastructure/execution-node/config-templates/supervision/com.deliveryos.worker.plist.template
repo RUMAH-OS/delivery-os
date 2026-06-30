@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================================================
+  TEMPLATE  ·  com.deliveryos.worker.plist   (launchd LaunchDaemon — the Neo worker daemon)
+  ============================================================================================================
+  PURPOSE      The always-on `com.deliveryos.worker` drain loop on Neo (Execution Node 1): owns its own clock,
+               ticks the runtime (drains the durable Supabase bus), and stamps the engine heartbeat.
+               Body = infrastructure/execution-node/worker-daemon.ts via the unclassified composition root.
+               Refs: NEO-EXEC-07 §4 / §5.1 ; NEO-HBM-v1 Layer A/B ; NEO-OPS-06 §3 (FileVault/App-Nap).
+
+  INSTALLED BY infrastructure/execution-node/bootstrap/install-daemons.sh  (NEO-EXEC-07 §6 C5)
+               → renders the placeholders → `sudo launchctl bootstrap system <rendered>.plist`.
+               This is a TEMPLATE: it contains NO secret values. Secrets are read at process start from the
+               System keychain (DOS_SECRET_SOURCE=system-keychain), NEVER from this file or a dotfile.
+
+  BOOT POSTURE LaunchDaemon (not LaunchAgent): starts at boot, before any GUI login, as a non-admin user.
+               Reads the SYSTEM keychain (root-readable at boot), NEVER a user-login keychain (NEO-OPS-06 §3.1
+               Decision A). The real WORKER_ENTRY runs config-doctor (flags: include-local, enforce) FIRST and
+               exits non-zero on an incomplete secret set — fail-closed boot (KeepAlive throttles, dead-man fires).
+
+  SUPERVISION  KeepAlive (relaunch on crash) · ThrottleInterval (damp a crash-loop so the off-node dead-man
+               escalates rather than hot-looping invisibly) · ProcessType=Background (App-Nap exclusion class;
+               the process additionally sets NSAppSleepDisabled for its domain) · `caffeinate -dimsu` wrap so a
+               drain is never interrupted by sleep.
+
+  PLACEHOLDERS the founder fills (FOUNDER-INSTALLATION-GUIDE §0):
+               {{RUNNER_USER}}        non-admin user that owns the daemon          e.g. ci-runner
+               {{NODE_BIN}}           absolute path to the pinned node binary      e.g. /opt/homebrew/bin/node
+               {{WORKER_ENTRY}}       the launchd composition-root entry (main)    e.g. /Users/ci-runner/delivery-os/infrastructure/execution-node/bootstrap/worker-entry.mjs
+               {{RUNTIME_TICK_ENTRY}} the runtime-drain module the root wires      e.g. /Users/ci-runner/delivery-os/infrastructure/execution-node/bootstrap/runtime-tick.mjs
+               {{WORKING_DIR}}        daemon working directory                     e.g. /Users/ci-runner/delivery-os
+               {{NODE_ID}}            the registry node id                         e.g. neo-node2
+               {{TICK_INTERVAL_MS}}   tick cadence ms (15000-30000, NOT 5000)      e.g. 20000
+               {{TAILNET_BIND_ADDR}}  the tailscale0 / MagicDNS bind addr          (NEVER 0.0.0.0)
+               {{LOG_DIR}}            rotated-log directory (owned by RUNNER_USER)  e.g. /Users/ci-runner/Library/Logs/delivery-os
+               Logs are rotated by macOS newsyslog (see config-templates/newsyslog.deliveryos.conf), NOT launchd.
+  ============================================================================================================
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.deliveryos.worker</string>
+
+  <key>UserName</key>
+  <string>{{RUNNER_USER}}</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-dimsu</string>
+    <string>{{NODE_BIN}}</string>
+    <string>{{WORKER_ENTRY}}</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>{{WORKING_DIR}}</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- App-Nap exclusion class (the process also sets NSAppSleepDisabled for its own domain). -->
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DOS_NODE_ID</key>
+    <string>{{NODE_ID}}</string>
+    <!-- The composition-root seam (P3.1): WORKER_ENTRY is the main; RUNTIME_TICK names the drain module it wires. -->
+    <key>DOS_WORKER_ENTRY</key>
+    <string>{{WORKER_ENTRY}}</string>
+    <key>DOS_RUNTIME_TICK</key>
+    <string>{{RUNTIME_TICK_ENTRY}}</string>
+    <!-- Boot fail-closed posture: secrets come from the System keychain, never a login keychain. -->
+    <key>DOS_SECRET_SOURCE</key>
+    <string>system-keychain</string>
+    <key>DOS_TICK_INTERVAL_MS</key>
+    <string>{{TICK_INTERVAL_MS}}</string>
+    <!-- Bind to the tailnet interface only — NEVER 0.0.0.0 / a routable LAN address (NTS-DOS-v1 §A.2). -->
+    <key>DOS_HEALTH_BIND</key>
+    <string>{{TAILNET_BIND_ADDR}}</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>{{LOG_DIR}}/worker.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>{{LOG_DIR}}/worker.err.log</string>
+</dict>
+</plist>

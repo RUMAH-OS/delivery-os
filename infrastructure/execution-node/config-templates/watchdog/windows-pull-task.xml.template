@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<!--
+  ============================================================================================================
+  TEMPLATE  ·  windows-watchdog.example   (the Windows pull-watchdog — Scheduled Task XML, the backup domain)
+  ============================================================================================================
+  PURPOSE      The off-Neo PULL watchdog: a Windows Scheduled Task on windows-node1 that, every
+               {{POLL_INTERVAL_MIN}} minutes, pulls Neo's tailnet /ready AND runs a direct Supabase probe — the
+               SECOND, independent failure domain behind Healthchecks.io. It catches "daemon up enough to ping
+               Healthchecks but actually wedged" and disambiguates a bus outage from a node outage (it can report
+               "bus down, node fine"). Refs: NEO-HBM-v1 §4.2 / §5.4 ; NEO-EXEC-07 §5 B6.
+
+  INSTALLED BY the founder on windows-node1: Task Scheduler → Import Task → this file (after rendering the
+               the placeholders), OR `schtasks /Create /XML windows-watchdog.xml /TN DeliveryOS-NeoWatchdog`.
+               FOUNDER-INSTALLATION-GUIDE §9.2. Reaches Neo over the TAILNET (the public SaaS cannot reach Neo).
+               TEMPLATE: NO secret values; the watchdog script reads any Supabase probe cred from the Windows
+               credential store, never from this file.
+
+  PLACEHOLDERS the founder fills (FOUNDER-INSTALLATION-GUIDE §0):
+               {{NEO_MAGICDNS}}      Neo's MagicDNS name              e.g. neo
+               {{HEALTH_PORT}}       the /ready port                  e.g. 8787
+               {{POLL_INTERVAL_MIN}} poll cadence in minutes          e.g. 5
+               {{WATCHDOG_SCRIPT}}   path to the pull-probe script    e.g. C:\DeliveryOS\watchdog\neo-pull-watchdog.ps1
+               {{FOUNDER_EMAIL}}     alert recipient identity         (the off-node alert channel)
+  ============================================================================================================
+-->
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Delivery OS — off-Neo pull-watchdog: polls neo /ready over the tailnet + a direct Supabase probe (the independent backup failure domain).</Description>
+    <URI>\DeliveryOS-NeoWatchdog</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <TimeTrigger>
+      <Repetition>
+        <Interval>PT{{POLL_INTERVAL_MIN}}M</Interval>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+      <StartBoundary>2026-01-01T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+    </TimeTrigger>
+    <BootTrigger>
+      <Enabled>true</Enabled>
+    </BootTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>S4U</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <ExecutionTimeLimit>PT2M</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>powershell.exe</Command>
+      <!-- The script pulls http://{{NEO_MAGICDNS}}:{{HEALTH_PORT}}/ready (tailnet) AND a direct Supabase probe;
+           on K consecutive 503/unreachable it alerts the founder over an independent channel. -->
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "{{WATCHDOG_SCRIPT}}" -NeoHost "{{NEO_MAGICDNS}}" -HealthPort "{{HEALTH_PORT}}" -AlertTo "{{FOUNDER_EMAIL}}"</Arguments>
+    </Exec>
+  </Actions>
+</Task>

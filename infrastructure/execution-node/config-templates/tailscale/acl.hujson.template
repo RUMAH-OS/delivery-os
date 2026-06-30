@@ -1,0 +1,116 @@
+// ==============================================================================================================
+// TEMPLATE  ·  tailscale-acl.hujson   (the default-deny Tailscale policy-as-code + tests[])
+// ==============================================================================================================
+// PURPOSE      The complete default-deny ACL for the Delivery OS execution tailnet (NTS-DOS-v1 §D, parameterized).
+//              tag:ci-runner is a tailnet SINK (reachable by nothing); the watchdog reaches ONLY the health port;
+//              tag:external is QUARANTINED (the network enforcement of the data_class boundary); Tailscale SSH is
+//              keyless + ACL-governed; funnel:deny is pinned on tag:ci-runner. Ships WITH its tests[] block — an
+//              ACL without tests is an assertion; an ACL with tests is a gate.
+//
+// INSTALLED BY infrastructure/execution-node/bootstrap/join-tailnet.sh renders the placeholders; the FOUNDER then
+//              PASTES the rendered HuJSON into the Tailscale admin console → Access Controls → Save, and confirms
+//              the console's ACL test runner shows tests[] PASSING (FOUNDER-INSTALLATION-GUIDE §4.3). NEO-EXEC-07
+//              §5.3 / §6 C2. This is policy-as-code; it carries NO secret values and NO real 100.x IPs (MagicDNS).
+//
+// PLACEHOLDERS the founder fills (FOUNDER-INSTALLATION-GUIDE §0):
+//              {{FOUNDER_EMAIL}}  the only group:founder member   (the founder's tailnet identity)
+//              {{HEALTH_PORT}}    the /health + /ready port        e.g. 8787
+//              {{DISPATCH_PORT}}  inter-node dispatch (latent)     e.g. 9443
+// ==============================================================================================================
+{
+  // ---- WHO owns which tags (only these identities may assign a tag to a device) -------------------
+  "tagOwners": {
+    "tag:dev":       ["group:founder"],
+    "tag:exec-node": ["group:founder"],
+    "tag:ci-runner": ["group:founder"],
+    "tag:watchdog":  ["group:founder"],
+    "tag:external":  ["group:founder"]   // a cloud node is still founder-owned, but trust-fenced below
+  },
+
+  "groups": {
+    // The only human. A second contributor is a NAMED re-evaluation trigger (NTS §G / NEO-OPS-06 §4a), not a
+    // silent group add.
+    "group:founder": ["{{FOUNDER_EMAIL}}"]
+  },
+
+  // MagicDNS convenience alias (documentation; pinning a 100.x here is discouraged — IPs drift).
+  "hosts": {
+    "neo": "neo"
+  },
+
+  // ---- THE ACCESS MATRIX (default-deny; every line is an explicit allow) --------------------------
+  "acls": [
+    // 1) The founder's own devices reach everything. The keys-to-the-kingdom device class.
+    {
+      "action": "accept",
+      "src": ["group:founder"],
+      "dst": ["*:*"]
+    },
+
+    // 2) The DEV PC (founder's build host) reaches the exec nodes' OPS surface only: ssh, serve-https, health.
+    //    No blanket *:* — a dev-host compromise cannot freely pivot across every port on the exec node.
+    {
+      "action": "accept",
+      "src": ["tag:dev"],
+      "dst": ["tag:exec-node:22", "tag:exec-node:443", "tag:exec-node:{{HEALTH_PORT}}"]
+    },
+
+    // 3) The WATCHDOG reaches ONLY the health endpoint on exec nodes. Not SSH, not anything else.
+    {
+      "action": "accept",
+      "src": ["tag:watchdog"],
+      "dst": ["tag:exec-node:{{HEALTH_PORT}}"]
+    },
+
+    // 4) EXEC NODES reach each other on the inter-node DISPATCH port only (future ExecutionProviderPort hand-off).
+    {
+      "action": "accept",
+      "src": ["tag:exec-node"],
+      "dst": ["tag:exec-node:{{DISPATCH_PORT}}"]
+    }
+
+    // 5) tag:ci-runner: NO inbound acl line exists — a ci-runner device is a tailnet SINK (default-deny). Its
+    //    OUTBOUND SaaS egress is not a tailnet flow (host-firewall's job, NTS §E.5).
+    // 6) tag:external: NO line grants it any inbound and NO line lets it reach tag:exec-node / tag:dev. It is
+    //    QUARANTINED — reachable only by group:founder (rule 1). This is the network enforcement of the
+    //    data_class trust boundary (RS-DOS §54.2).
+  ],
+
+  // ---- TAILSCALE SSH (keyless, identity-tied; NTS §C) ---------------------------------------------
+  "ssh": [
+    {
+      // The founder may SSH to any owned exec node, as root or the ci-runner user. "check" forces periodic
+      // re-auth for high-value sessions on the prod-token node.
+      "action": "check",
+      "src": ["group:founder"],
+      "dst": ["tag:exec-node"],
+      "users": ["root", "ci-runner"]
+    },
+    {
+      // The dev host may SSH to exec nodes as the NON-privileged ci-runner user only, never root.
+      "action": "accept",
+      "src": ["tag:dev"],
+      "dst": ["tag:exec-node"],
+      "users": ["ci-runner"]
+    }
+    // No ssh rule names tag:ci-runner or tag:external as a SOURCE → they can SSH to nothing.
+    // No ssh rule lists tag:dev as a DESTINATION → nothing can SSH INTO the dev PC over Tailscale.
+  ],
+
+  // ---- DEVICE POSTURE / ATTRIBUTES ---------------------------------------------------------------
+  "nodeAttrs": [
+    {
+      // A ci-runner may NEVER be Funnel-exposed to the public internet (belt-and-suspenders with default-deny).
+      "target": ["tag:ci-runner"],
+      "attr": ["funnel:deny"]
+    }
+  ],
+
+  // ---- TESTS: assert the policy says what we think (the gate, shipped WITH the policy) ------------
+  "tests": [
+    { "src": "tag:watchdog",  "accept": ["tag:exec-node:{{HEALTH_PORT}}"], "deny": ["tag:exec-node:22", "tag:exec-node:{{DISPATCH_PORT}}"] },
+    { "src": "tag:ci-runner", "deny":   ["tag:dev:22", "tag:exec-node:22", "tag:exec-node:{{HEALTH_PORT}}"] },
+    { "src": "tag:external",  "deny":   ["tag:exec-node:{{HEALTH_PORT}}", "tag:exec-node:{{DISPATCH_PORT}}", "tag:dev:22"] },
+    { "src": "tag:dev",       "accept": ["tag:exec-node:{{HEALTH_PORT}}"], "deny": ["tag:exec-node:{{DISPATCH_PORT}}"] }
+  ]
+}

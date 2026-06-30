@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================================================
+  TEMPLATE  ·  com.colima.plist   (launchd service — the colima VM / Docker socket autostart)
+  ============================================================================================================
+  PURPOSE      REFERENCE template for the colima autostart launchd job. Normally colima is managed by Homebrew
+               services (`brew services start colima`), which generates `homebrew.mxcl.colima.plist`. This file
+               documents the EQUIVALENT shape so install-daemons.sh can confirm colima autostart and the founder
+               can reconcile the Homebrew-generated plist. The Docker socket must be up (postgres:16 reachable)
+               BEFORE any CI job or the worker needs it. Refs: NEO-EXEC-07 §4 / §5.4 ; NEO-OPS-06 §2.2.
+
+  INSTALLED BY infrastructure/execution-node/bootstrap/install-daemons.sh confirms `com.colima` autostart
+               (NEO-EXEC-07 §6 C5). The VM profile (cpu/mem/disk) is pinned in config-templates/colima.yaml.
+               TEMPLATE: NO secret values; colima holds no secrets. The test Postgres binds loopback (127.0.0.1)
+               ONLY — never the tailnet, never 0.0.0.0 (NTS-DOS-v1 §A.2 / §E.5).
+
+  PLACEHOLDERS the founder fills (FOUNDER-INSTALLATION-GUIDE §0):
+               {{RUNNER_USER}}    non-admin user that owns the VM    e.g. ci-runner
+               {{COLIMA_BIN}}     absolute path to the colima binary e.g. /opt/homebrew/bin/colima
+               {{COLIMA_PROFILE}} the colima profile name            e.g. default
+               {{LOG_DIR}}        rotated-log directory              e.g. /Users/ci-runner/Library/Logs/delivery-os
+  ============================================================================================================
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.colima</string>
+
+  <key>UserName</key>
+  <string>{{RUNNER_USER}}</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{COLIMA_BIN}}</string>
+    <string>start</string>
+    <string>--profile</string>
+    <string>{{COLIMA_PROFILE}}</string>
+    <string>--foreground</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>{{LOG_DIR}}/colima.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>{{LOG_DIR}}/colima.err.log</string>
+</dict>
+</plist>

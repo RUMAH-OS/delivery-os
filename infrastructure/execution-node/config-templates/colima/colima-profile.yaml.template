@@ -1,0 +1,31 @@
+# ==============================================================================================================
+# TEMPLATE  ·  colima.yaml   (the pinned colima VM profile for the Neo CI Docker socket)
+# ==============================================================================================================
+# PURPOSE      The pinned colima VM profile that backs the runner's `postgres:16` for CI. CPU/mem/disk are CAPPED
+#              (disk is a known self-hosted rot vector — prune weekly); autostart brings the Docker socket up at
+#              boot before any CI job needs it. The test Postgres binds loopback (127.0.0.1) ONLY — never the
+#              tailnet, never 0.0.0.0 (NTS-DOS-v1 §A.2). Refs: NEO-EXEC-07 §5.4 ; NEO-OPS-06 §2.2.
+#
+# INSTALLED BY bootstrap/install-daemons.sh (or `colima start` standalone) after rendering the placeholders:
+#              `colima start --cpu {{COLIMA_CPU}} --memory {{COLIMA_MEMORY_GB}} --disk {{COLIMA_DISK_GB}}`, or by
+#              placing the rendered file at ~/.colima/<profile>/colima.yaml. FOUNDER-INSTALLATION-GUIDE §3.1.
+#              TEMPLATE: NO secret values; colima holds no secrets.
+#
+# RENDER NOTE  The numeric placeholders below are replaced with bare integers at render time (e.g. 4/8/60),
+#              producing valid YAML scalars. NO secrets, NO real IPs.
+#
+# PLACEHOLDERS the founder fills (FOUNDER-INSTALLATION-GUIDE §0):
+#              {{COLIMA_CPU}}        vCPUs          e.g. 4
+#              {{COLIMA_MEMORY_GB}}  memory (GiB)   e.g. 8
+#              {{COLIMA_DISK_GB}}    disk cap (GiB) e.g. 60
+# ==============================================================================================================
+cpu: {{COLIMA_CPU}}
+memory: {{COLIMA_MEMORY_GB}}
+disk: {{COLIMA_DISK_GB}}
+runtime: docker
+arch: aarch64
+autoStart: true
+# the Docker socket address inside the VM (colima default; rendered Neo never publishes it on the tailnet).
+network:
+  address: false
+mountType: virtiofs

@@ -1,0 +1,35 @@
+# =============================================================================
+# runs-on-flip.snippet.yml  —  the ONE-LINE-per-job move + the UI kill-switch
+# -----------------------------------------------------------------------------
+# This is a SNIPPET, not a workflow. It shows the exact `runs-on:` value to paste
+# into each binding-check job. The ONLY change per job is the `runs-on:` line; the
+# job's steps are unchanged (the logic is platform-agnostic — Node + postgres:16 +
+# gitleaks run identically on Neo's colima as on a GitHub-hosted runner).
+#
+# THE CONTRACT for `vars.CI_RUNNER` (a GitHub repo VARIABLE, not a secret):
+#   • UNSET / empty           -> resolves to 'ubuntu-latest'  (the GitHub-hosted FLOOR)
+#   • '["self-hosted","neo"]' -> resolves to [self-hosted, neo] (routes the job to Neo)
+#
+# The value, when set, MUST be a JSON array string (it is parsed by fromJSON()).
+# To ROLL BACK: CLEAR / DELETE the variable in the GitHub UI -> empty -> ubuntu-latest,
+# in seconds, with NO commit and NO dependency on Neo. (NEO-ARCH-01 §B.4 / ADR-004.)
+# Do NOT set the variable to a bare 'ubuntu-latest' string — that is not valid JSON;
+# the rollback is to CLEAR it, which falls through to ubuntu-latest by the expression.
+#
+# The `neo` label is the SAME label register-runner.sh (P3.2) registers the runner
+# with: DOS_RUNNER_LABELS="neo,macos,self-hosted". runs-on [self-hosted, neo] matches.
+# =============================================================================
+jobs:
+  build-and-migrate:
+    # THE ONE LINE. Everything else in this job is unchanged.
+    runs-on: "${{ vars.CI_RUNNER == '' && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER) }}"
+    # ... existing services:, env:, steps: unchanged ...
+
+  # Apply the IDENTICAL one-line change to every other binding-check job that should
+  # move to Neo (e.g. engine-ownership). Flip non-binding clones FIRST (parity-prove a
+  # byte-identical verdict, NEO-ARCH-01 §B.3.2 / M1), then binding checks ONE AT A TIME
+  # (the M3 founder ★ gate). A single flaky check can be reverted in isolation by giving
+  # just that one job a literal `runs-on: ubuntu-latest` while the rest stay on the var.
+  engine-ownership:
+    runs-on: "${{ vars.CI_RUNNER == '' && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER) }}"
+    # ... existing steps: unchanged ...

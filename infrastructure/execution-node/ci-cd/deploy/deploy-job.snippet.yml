@@ -1,0 +1,85 @@
+# =============================================================================
+# deploy-job.snippet.yml  —  the token-attributed deploy job (Neo) with a
+#                            BINDING post-deploy verify (no continue-on-error)
+# -----------------------------------------------------------------------------
+# A SNIPPET of a single `deploy` job to drop into a consumer's deploy.yml. It is the
+# PLOS deploy.yml pattern (pull -> build -> deploy --prebuilt --prod), moved onto the
+# Neo runner via vars.CI_RUNNER, with the Supabase pooler migrate added BEFORE code,
+# and the PLOS soft spot fixed: the post-deploy verify is BINDING (NEO-EXEC-07 §7.3).
+#
+# IDENTITY: `vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN` does NO actor
+# check — the TOKEN carries the identity. So a Neo deploy lands attributed to the
+# founder with no manual click (resolves the Hobby author rule). NEVER hard-code the
+# token: it is read from secrets.VERCEL_TOKEN only.
+#
+# CLASS-C stays a founder boundary: the runner EXECUTES an authorized deploy (merge
+# to main), it does not AUTHORIZE one. The deploy-approval / co-equal-token gate
+# (NEO-ARCH-00 §6.5) is carried as a hard go-live precondition.
+# =============================================================================
+jobs:
+  deploy:
+    name: Deploy to production (Neo, token-attributed)
+    # Routed to Neo by the same kill-switch as CI; clearing vars.CI_RUNNER falls back
+    # to ubuntu-latest (which can still deploy — the token is the identity, not the host).
+    runs-on: "${{ vars.CI_RUNNER == '' && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER) }}"
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      # --- fail-closed guard: the required secrets exist (else stop readably) ------
+      - name: Guard — required Vercel secrets are set
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          missing=0
+          for var in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!var}" ]; then echo "::error::Missing required secret: $var"; missing=1; fi
+          done
+          test "$missing" -eq 0 || { echo "Provision the three Vercel repo secrets, then re-run."; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      # --- pinned deploy CLI (deterministic; API floor >= 47.2.2) ------------------
+      - name: Install Vercel CLI (pinned)
+        run: npm install --global vercel@48.12.1
+
+      # --- pre-build config gate (fail-closed) — unchanged from PLOS --------------
+      - name: Config doctor — validate prod config (pre-build gate)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: node infra/config-doctor.mjs --env production
+
+      # --- Supabase migrate over the SESSION POOLER (5432), BEFORE code -----------
+      # Forward-only, expand/contract. Neo is IPv4 -> it MUST use the pooler, never
+      # the IPv6-only db.<ref>.supabase.co direct host. Runs before the deploy so the
+      # schema is ahead of the code that reads it.
+      - name: Supabase migrate (session pooler, forward-only, pre-deploy)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}   # session pooler :5432 connstring
+        run: supabase migration up --db-url "$SUPABASE_DB_URL"
+
+      # --- token-attributed prebuilt deploy ---------------------------------------
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+      - name: Build (production, prebuilt)
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Deploy (production, prebuilt — attributed to the token, no manual click)
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "Deployed: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # --- BINDING post-deploy verify (NO continue-on-error — fixes PLOS's soft spot) -
+      # If the deployed system is not healthy, the JOB FAILS — surfacing a bad release
+      # loudly instead of marking it green. The retries give the heartbeat/drain
+      # self-heal window; an UNHEALTHY result after the retries is a real failure.
+      # (NEO-ARCH-01 §B.3.3 / RS-DOS C19 prod rung: "no continue-on-error".)
+      - name: Post-deploy health verification (BINDING)
+        run: |
+          node infra/post-deploy-verify.mjs \
+            --base "${{ steps.deploy.outputs.url }}" \
+            --service "${{ vars.DEPLOY_SERVICE_NAME }}" \
+            --retries 4 --retry-delay-ms 5000

@@ -1,0 +1,127 @@
+# =============================================================================
+# reusable-deploy.yml  —  a CALLABLE reusable workflow for the Neo deploy
+# -----------------------------------------------------------------------------
+# The deploy-job.snippet.yml shape, packaged as a `workflow_call` reusable workflow
+# so multiple consumer repos can share ONE deploy definition. A consumer's deploy.yml
+# becomes a thin caller (see the `caller example` block at the bottom).
+#
+# Install path (per repo): .github/workflows/reusable-deploy.yml
+# Secrets are DECLARED (workflow_call requires it) and PASSED by the caller; no value
+# is ever embedded. The post-deploy verify is BINDING — there is no continue-on-error.
+# =============================================================================
+name: Reusable deploy (Vercel production, token-attributed, binding verify)
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "Service name passed to post-deploy-verify (e.g. property-lead-os)"
+        required: true
+        type: string
+      vercel_cli_version:
+        description: "Pinned Vercel CLI version (API floor >= 47.2.2)"
+        required: false
+        default: "48.12.1"
+        type: string
+      node_version:
+        description: "Node version to match the repo's CI (PLOS 22 / admin 20)"
+        required: false
+        default: "22"
+        type: string
+    secrets:
+      VERCEL_TOKEN:
+        description: "Vercel access token — carries the deploy identity"
+        required: true
+      VERCEL_ORG_ID:
+        description: "Vercel team/org id (non-secret identifier, passed as a secret)"
+        required: true
+      VERCEL_PROJECT_ID:
+        description: "Vercel project id"
+        required: true
+      SUPABASE_DB_URL:
+        description: "Supabase SESSION pooler (:5432) connection string for migrate"
+        required: true
+
+# Never run two production deploys at once.
+concurrency:
+  group: vercel-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production (Neo, token-attributed, binding verify)
+    runs-on: "${{ vars.CI_RUNNER == '' && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER) }}"
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Guard — required Vercel secrets are set
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          missing=0
+          for var in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!var}" ]; then echo "::error::Missing required secret: $var"; missing=1; fi
+          done
+          test "$missing" -eq 0 || { echo "Provision the three Vercel repo secrets, then re-run."; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install Vercel CLI (pinned)
+        run: npm install --global vercel@${{ inputs.vercel_cli_version }}
+
+      - name: Config doctor — validate prod config (pre-build gate)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: node infra/config-doctor.mjs --env production
+
+      - name: Supabase migrate (session pooler, forward-only, pre-deploy)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: supabase migration up --db-url "$SUPABASE_DB_URL"
+
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build (production, prebuilt)
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Deploy (production, prebuilt — attributed to the token)
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "Deployed: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # BINDING — no continue-on-error. An unhealthy deploy FAILS the job.
+      - name: Post-deploy health verification (BINDING)
+        run: |
+          node infra/post-deploy-verify.mjs \
+            --base "${{ steps.deploy.outputs.url }}" \
+            --service "${{ inputs.service_name }}" \
+            --retries 4 --retry-delay-ms 5000
+
+# ── caller example (the consumer's .github/workflows/deploy.yml becomes this) ──
+#
+# name: Deploy (Vercel production)
+# on:
+#   push:
+#     branches: [main]
+#   workflow_dispatch:
+# jobs:
+#   call-deploy:
+#     uses: ./.github/workflows/reusable-deploy.yml
+#     with:
+#       service_name: property-lead-os
+#       node_version: "22"
+#     secrets:
+#       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+#       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+#       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+#       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

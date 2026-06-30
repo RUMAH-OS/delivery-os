@@ -1,0 +1,8 @@
+# Host-specific bootstrap state — NEVER committed.
+# node-config.env is the founder's resolved placeholder sheet (NON-SECRET, but
+# host-specific). Only node-config.env.example is tracked. Rendered plists/ACLs
+# are written to ~/.delivery-os/neo-render (outside the tree) — belt-and-suspenders
+# ignore here in case DOS_RENDER_DIR is pointed inside the repo.
+node-config.env
+*.rendered
+/neo-render/
