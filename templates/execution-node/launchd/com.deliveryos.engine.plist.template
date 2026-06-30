@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Delivery OS Execution Node — platform Engine Host service (M2, ADR-005). Runs the CONTINUOUS tick host
+     as a daemon (the always-on node replaces the serverless */5 cron). Placeholders (@@...@@) rendered on
+     the node by provision-engine-runtime.sh; never commit a rendered copy. KeepAlive relaunches the host if
+     it exits; the durable store is managed/off-node, so a node restart never loses run/step state. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>@@LABEL@@</string>
+  <key>UserName</key>         <string>@@NODE_USER@@</string>
+  <key>ProgramArguments</key> <array>
+    <string>/usr/bin/env</string>
+    <string>tsx</string>
+    <string>@@HOST_TS@@</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>ENGINE_ENV_FILE</key><string>@@ENVFILE@@</string></dict>
+  <key>KeepAlive</key>        <true/>
+  <key>RunAtLoad</key>        <true/>
+  <key>ProcessType</key>      <string>Background</string>
+  <key>StandardOutPath</key>  <string>@@LOGDIR@@/engine.out</string>
+  <key>StandardErrorPath</key><string>@@LOGDIR@@/engine.err</string>
+</dict>
+</plist>
