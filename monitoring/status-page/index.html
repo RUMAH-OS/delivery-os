@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delivery OS — node status</title>
+  <!--
+    ===========================================================================================================
+    monitoring/status-page/index.html — the founder's ONE-SCREEN status surface (NEO-HBM-v1 §8).
+    -----------------------------------------------------------------------------------------------------------
+    Self-contained, off-Neo, NO SECRET. It fetches a SAME-ORIGIN `status.json` (falling back to the bundled
+    `status.sample.json` for local preview) and renders it through the pure `status.mjs` shaper — the SAME shaper
+    the Node self-test exercises, so the screen the founder sees is the shape that was proven.
+
+    WHY no secret in the page: Neo's /health|/ready bind to the TAILNET only; a public static host cannot reach
+    them. An off-Neo COLLECTOR (which holds the tailnet/Supabase reach) writes `status.json` next to this file;
+    the page only ever reads that same-origin snapshot. The credential lives at the collector edge, never here.
+    (See MONITORING.md.) This is the no-Prometheus, founder-glance surface: one render over data that exists.
+    ===========================================================================================================
+  -->
+  <style>
+    :root {
+      --ok: #1f9d55; --degraded: #c98a00; --down: #c0392b; --unknown: #6b7280;
+      --bg: #0f1115; --panel: #1a1d24; --ink: #e6e8ec; --muted: #9aa0aa; --line: #2a2e37;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 24px 18px 64px; }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+    h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    .headline { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 13px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .ok { background: var(--ok); } .degraded { background: var(--degraded); } .down { background: var(--down); } .unknown { background: var(--unknown); }
+    .bg-ok { background: rgba(31,157,85,.16); color: #7ee2a8; }
+    .bg-degraded { background: rgba(201,138,0,.16); color: #f0c860; }
+    .bg-down { background: rgba(192,57,43,.18); color: #f0938a; }
+    .bg-unknown { background: rgba(107,114,128,.18); color: #c2c7cf; }
+    .sub { color: var(--muted); font-size: 13px; margin: 2px 0 22px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+    .big { font-size: 22px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: none; }
+    .pill { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
+    .crit { color: var(--muted); font-size: 11px; }
+    .detail { color: var(--muted); font-size: 13px; }
+    .err { color: var(--down); }
+    footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
+    code { background: #11131a; padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Delivery OS — node status</h1>
+      <span id="headline" class="headline bg-unknown"><span class="dot unknown"></span><span id="headline-text">loading…</span></span>
+    </header>
+    <div class="sub" id="subline">is everything healthy? — one screen, off-Neo, survives Neo being down.</div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Node</h2>
+        <div class="big" id="node-service">—</div>
+        <div class="detail" id="node-age">last report —</div>
+      </div>
+      <div class="card">
+        <h2>Off-Neo dead-man (watchdog)</h2>
+        <div class="big"><span id="watchdog-pill" class="pill bg-unknown"><span class="dot unknown"></span><span id="watchdog-status">—</span></span></div>
+        <div class="detail" id="watchdog-age">last check-in —</div>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Subsystem</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody id="subsystems"><tr><td colspan="3" class="detail">loading…</td></tr></tbody>
+    </table>
+
+    <footer id="footer">—</footer>
+  </div>
+
+  <script type="module">
+    import { shapeStatus } from "./status.mjs";
+
+    // read-only: same-origin status.json (the off-Neo collector's snapshot), falling back to the bundled sample.
+    async function loadSnapshot() {
+      for (const src of ["./status.json", "./status.sample.json"]) {
+        try {
+          const res = await fetch(src, { cache: "no-store" });
+          if (res.ok) return { snap: await res.json(), src };
+        } catch { /* try the next source */ }
+      }
+      return { snap: null, src: null };
+    }
+
+    function el(id) { return document.getElementById(id); }
+    function cls(suffix) { return "bg-" + (suffix || "unknown"); }
+
+    function render(view, src) {
+      // headline
+      const hl = el("headline");
+      hl.className = "headline " + cls(view.node.verdictClass);
+      hl.querySelector(".dot").className = "dot " + view.node.verdictClass;
+      el("headline-text").textContent = view.headline;
+
+      // node card
+      el("node-service").textContent = view.node.service + (view.node.reachable ? "" : " (unreachable)");
+      const ageEl = el("node-age");
+      ageEl.textContent = "last report " + view.node.reportAge;
+      ageEl.className = "detail" + (view.node.reportAgeBucket === "red" ? " err" : "");
+
+      // watchdog card
+      const wp = el("watchdog-pill");
+      wp.className = "pill " + cls(view.watchdog.statusClass);
+      wp.querySelector(".dot").className = "dot " + view.watchdog.statusClass;
+      el("watchdog-status").textContent = view.watchdog.status;
+      el("watchdog-age").textContent = "last check-in " + view.watchdog.lastPingAge;
+
+      // subsystems
+      const tbody = el("subsystems");
+      tbody.innerHTML = "";
+      if (!view.subsystems.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="detail">no subsystem data — node unreachable.</td></tr>';
+      } else {
+        for (const s of view.subsystems) {
+          const tr = document.createElement("tr");
+          const crit = s.critical ? ' <span class="crit">(critical)</span>' : "";
+          tr.innerHTML =
+            `<td>${escapeHtml(s.name)}${crit}</td>` +
+            `<td><span class="pill ${cls(s.statusClass)}"><span class="dot ${s.statusClass}"></span>${escapeHtml(s.status)}</span></td>` +
+            `<td class="detail">${escapeHtml(s.detail)}${s.actionable ? ` — <code>${escapeHtml(s.actionable)}</code>` : ""}</td>`;
+          tbody.appendChild(tr);
+        }
+      }
+
+      el("footer").textContent =
+        `source: ${src || "none"} · collected ${view.collectedAt || "?"} · rendered ${view.generatedAt}`;
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    async function tick() {
+      const { snap, src } = await loadSnapshot();
+      if (!snap) {
+        el("headline-text").textContent = "no data";
+        el("footer").textContent = "no status.json or status.sample.json reachable.";
+        return;
+      }
+      const view = shapeStatus({ neoReport: snap.neoReport, healthchecks: snap.healthchecks, collectedAt: snap.collectedAt });
+      render(view, src);
+    }
+
+    tick();
+    setInterval(tick, 30_000); // re-pull the off-Neo snapshot every 30s (the page itself touches Neo never).
+  </script>
+</body>
+</html>

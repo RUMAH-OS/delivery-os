@@ -1,0 +1,28 @@
+{
+  "_README": [
+    "SAMPLE snapshot the status page renders when no live status.json is present (local preview + the shaper",
+    "self-test fixture). The off-Neo COLLECTOR writes the real status.json with this exact shape: `neoReport`",
+    "is Neo's /ready body (the Core PlatformHealthReport contract shape), `healthchecks` is the off-Neo dead-man",
+    "state, `collectedAt` is when the collector snapshotted. NO SECRET — host + status only."
+  ],
+  "collectedAt": "2026-06-30T12:00:00.000Z",
+  "neoReport": {
+    "service": "neo-node2",
+    "verdict": "ok",
+    "ok": true,
+    "checkedAt": "2026-06-30T12:00:00.000Z",
+    "subsystems": [
+      { "name": "node-liveness", "status": "ok", "critical": true, "detail": "worker process up" },
+      { "name": "engine-heartbeat", "status": "ok", "critical": true, "detail": "last tick 4s ago, tickSeq advancing" },
+      { "name": "consumer-cursor", "status": "ok", "critical": true, "detail": "drain cursor advancing" },
+      { "name": "disk", "status": "ok", "critical": false, "detail": "headroom 62%" },
+      { "name": "runner", "status": "ok", "critical": false, "detail": "self-hosted runner online", "actionable": "svc.sh status" },
+      { "name": "goal-supervisor", "status": "ok", "critical": false, "detail": "last ProgressSample within window" }
+    ],
+    "summary": { "total": 6, "ok": 6, "degraded": 0, "down": 0, "unknown": 0 }
+  },
+  "healthchecks": {
+    "status": "up",
+    "lastPingAt": "2026-06-30T11:59:40.000Z"
+  }
+}
