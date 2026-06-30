@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Delivery OS Execution Node — heartbeat launchd template. Placeholders (@@...@@) are rendered by
+     provision-heartbeat.sh on the node. NEVER commit a rendered copy (it would carry machine paths). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>@@LABEL@@</string>
+  <key>ProgramArguments</key> <array><string>@@PROGRAM@@</string></array>
+  <key>StartInterval</key>    <integer>@@INTERVAL@@</integer>
+  <key>RunAtLoad</key>        <true/>
+  <key>ProcessType</key>      <string>Background</string>
+  <key>StandardOutPath</key>  <string>@@LOGDIR@@/heartbeat.out</string>
+  <key>StandardErrorPath</key><string>@@LOGDIR@@/heartbeat.err</string>
+</dict>
+</plist>

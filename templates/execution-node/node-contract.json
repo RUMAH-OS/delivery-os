@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Delivery OS Execution Node Contract",
+  "description": "Declares what a host MUST provide to be a valid Delivery OS Execution Node. The platform owns this contract; each node publishes a node-instance record asserting which capabilities it has activated. A node is valid iff verify-node.sh passes against this contract. No field names a project, host, or path — those are instance-local.",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["identity", "toolchain", "capabilities"],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "description": "Engineering identity the node executes as. Builder GitHub identity for attribution; a dedicated, non-admin OS user for process isolation. Never the founder identity, never the human login account.",
+      "required": ["githubIdentity", "osRunnerUser", "notFounder"],
+      "properties": {
+        "githubIdentity": { "type": "string", "description": "the builder GitHub login used for git/API attribution" },
+        "osRunnerUser": { "type": "string", "description": "dedicated non-admin OS user that runs execution services" },
+        "notFounder": { "const": true, "description": "MUST be true — execution never runs as the founder identity or the human login user" }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "description": "Minimum toolchain a node must provide. Versions are floors; a node may exceed them but must honour per-project pins.",
+      "required": ["git", "node", "packageManagers"],
+      "properties": {
+        "git": { "type": "string" },
+        "node": { "type": "string", "description": "must satisfy the stack pin (e.g. 22.x); managed by a version manager so per-project pins are honoured" },
+        "packageManagers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "The capabilities the Execution Layer defines. Each is optional to ACTIVATE on a given node, but if activated must satisfy its sub-contract. 'workstation' and 'localCI' need no grant; 'runner','heartbeat','mesh' are operator-gated.",
+      "properties": {
+        "workstation":  { "type": "boolean", "description": "primary engineering surface (builder identity)" },
+        "localCI":      { "type": "boolean", "description": "run build + independent VERIFY locally, zero hosted-CI minutes" },
+        "runner": {
+          "type": "object",
+          "properties": {
+            "active": { "type": "boolean" },
+            "scope": { "enum": ["repo", "org-group"], "description": "repo-level (smallest blast radius) or an allow-listed org runner group" },
+            "ephemeral": { "const": true, "description": "MUST be ephemeral — one job per registration" },
+            "privateOnly": { "const": true, "description": "MUST refuse public repos / fork PRs" },
+            "labels": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "heartbeat": {
+          "type": "object",
+          "description": "always-on host that drives the execution-engine tick at a real interval (what serverless daily-cron tiers cannot honour)",
+          "properties": {
+            "active": { "type": "boolean" },
+            "intervalSeconds": { "type": "integer", "minimum": 60 },
+            "service": { "enum": ["launchd", "systemd"] }
+          }
+        },
+        "mesh": {
+          "type": "object",
+          "description": "secure overlay network for remote/inter-node access",
+          "properties": {
+            "active": { "type": "boolean" },
+            "provider": { "type": "string" }
+          }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "description": "Non-negotiable properties every node upholds.",
+      "items": { "type": "string" },
+      "default": [
+        "execution never runs as the founder identity or the human login user",
+        "high-value secrets (prod DB, signing keys, money/PII creds) are kept off the self-hosted scope",
+        "no platform-canonical state lives only on a node; a node is reconstructable from this layer + operator grants",
+        "the runner refuses public repos and untrusted fork PRs"
+      ]
+    }
+  }
+}

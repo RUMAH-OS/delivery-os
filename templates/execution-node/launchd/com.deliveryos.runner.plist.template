@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Delivery OS Execution Node — self-hosted runner launchd template. Runs the runner as a daemon under
+     the dedicated NON-admin user. Placeholders (@@...@@) rendered on the node; never commit a rendered
+     copy. With --ephemeral the runner exits after one job; KeepAlive re-launches it to await the next,
+     so each job still gets a fresh registration/process. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>@@LABEL@@</string>
+  <key>UserName</key>         <string>@@RUNNER_USER@@</string>
+  <key>ProgramArguments</key> <array>
+    <string>@@RUNNER_HOME@@/run.sh</string>
+  </array>
+  <key>WorkingDirectory</key> <string>@@RUNNER_HOME@@</string>
+  <key>KeepAlive</key>        <true/>
+  <key>RunAtLoad</key>        <true/>
+  <key>ProcessType</key>      <string>Standard</string>
+  <key>StandardOutPath</key>  <string>@@RUNNER_HOME@@/runner.out</string>
+  <key>StandardErrorPath</key><string>@@RUNNER_HOME@@/runner.err</string>
+</dict>
+</plist>
