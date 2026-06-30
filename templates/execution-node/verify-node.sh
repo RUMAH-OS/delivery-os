@@ -50,7 +50,14 @@ if want heartbeat; then
   fi
 fi
 if want mesh; then
-  command -v tailscale >/dev/null && pass "mesh client present" || bad "mesh required but tailscale missing"
+  if ! command -v tailscale >/dev/null 2>&1; then
+    bad "mesh required but tailscale missing"
+  elif tailscale ip -4 >/dev/null 2>&1; then
+    # `tailscale ip -4` returns an address ONLY when the node is authenticated + connected to the tailnet.
+    pass "mesh: connected to tailnet ($(tailscale ip -4 2>/dev/null | head -1))"
+  else
+    bad "mesh: tailscale installed but NOT connected (NeedsLogin) — run: sudo tailscale up"
+  fi
 fi
 
 echo "== $([ $fail = 0 ] && echo 'NODE OK' || echo 'NODE INCOMPLETE') =="
