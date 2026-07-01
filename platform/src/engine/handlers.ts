@@ -46,6 +46,12 @@ export function registerHandler(key: string, fn: Handler): void {
   HANDLERS[key] = fn;
 }
 
+// Remove a handler (E-PH M3a deregistration). Used when a tenant deregisters — its proxy handlers are unwired so
+// a stale step resolves to `unknown handler` (a clean terminal step failure) rather than calling a dead tenant.
+export function unregisterHandler(key: string): void {
+  delete HANDLERS[key];
+}
+
 export async function runHandler(handler: string, ctx: StepContext): Promise<HandlerResult> {
   const fn = HANDLERS[handler];
   if (!fn) return { ok: false, transient: false, error: `unknown handler ${handler}` };

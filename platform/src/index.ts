@@ -15,6 +15,8 @@ import { migrateUp } from "./db/migrate-core.js";
 import { createOsEngineRuntime } from "./engine-runtime.js";
 import { createServer, OS_VERSION } from "./server.js";
 import { startHeartbeatLoop, NODE_ID } from "./heartbeat.js";
+import { PgCapabilityRegistrationStore } from "./capability-registration-store-pg.js";
+import { rehydrateRegistrations } from "./capability-registration.js";
 
 async function migrate(): Promise<void> {
   const sql = postgres(databaseUrl(), { max: 1 });
@@ -37,7 +39,19 @@ export async function boot(opts: { migrate?: boolean; serve?: boolean; tick?: bo
   const os = createOsEngineRuntime();
   console.log(`[boot] ${OS_VERSION} engine constructed — registered tenant packs: ${os.registeredPackIds().length} (bare OS)`);
 
-  const app = createServer(os);
+  // DURABILITY (E-PH M3a): the platform-owned registration store. On boot the OS RE-HYDRATES tenant
+  // registrations persisted across a restart — re-synthesizing each tenant's proxy handlers (never importing
+  // tenant code). Skipped when migrations are off (the DB-free test/boot posture keeps the bare OS bare).
+  const registrationStore = new PgCapabilityRegistrationStore();
+  if (doMigrate) {
+    const rehydrated = await rehydrateRegistrations(os, registrationStore);
+    console.log(
+      `[boot] re-hydrated ${rehydrated.tenants} tenant registration(s) (${rehydrated.packs} pack(s))` +
+        (rehydrated.failures.length ? ` — ${rehydrated.failures.length} failed: ${rehydrated.failures.map((f) => f.tenantId).join(", ")}` : ""),
+    );
+  }
+
+  const app = createServer(os, { registrationStore });
   let stopTick: (() => void) | undefined;
   let server: ReturnType<typeof serve> | undefined;
 

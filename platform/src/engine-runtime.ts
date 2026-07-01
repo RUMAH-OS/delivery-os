@@ -24,6 +24,7 @@
 import {
   createCapabilityRuntime,
   registerPacks,
+  deregisterPacks,
   type CapabilityPack,
   type CapabilityRuntime,
 } from "./engine/capability-pack.js";
@@ -87,6 +88,10 @@ export interface OsEngineRuntime {
    *  Fail-closed on cross-pack key conflicts (the engine's registerPacks throws). Rebuilds the goals route so
    *  the newly registered capability is selectable. Returns the resulting registry snapshot. */
   registerCapabilityPacks(packs: CapabilityPack[]): { registeredPackIds: string[]; enqueueKeys: string[]; selectors: SelectableCapability[] };
+  /** THE RUNTIME DEREGISTRATION API — remove the given packs from the OS registry (E-PH M3a). Rebuilds the goals
+   *  route so the removed capabilities are no longer selectable. Proves tenant removal doesn't break the OS: the
+   *  OS keeps serving with the remaining packs (I-PI survival). Returns the resulting registry snapshot. */
+  deregisterCapabilityPacks(packIds: string[]): { registeredPackIds: string[]; enqueueKeys: string[]; selectors: SelectableCapability[] };
   /** the currently registered selectable capabilities (EMPTY on a bare OS). */
   selectors(): SelectableCapability[];
   /** the derived enqueue allow-list (EMPTY on a bare OS). */
@@ -135,6 +140,16 @@ export function createOsEngineRuntime(opts?: {
       // Register into the engine's OWN capability registry (fail-closed on cross-pack conflicts).
       const { enqueueKeys, selectors } = registerPacks(packs);
       for (const p of packs) if (!registeredIds.includes(p.id)) registeredIds.push(p.id);
+      currentEnqueueKeys = enqueueKeys;
+      currentSelectors = selectors;
+      rebuildGoalsRoute();
+      return { registeredPackIds: [...registeredIds], enqueueKeys: [...enqueueKeys], selectors: [...selectors] };
+    },
+    deregisterCapabilityPacks(packIds: string[]) {
+      // Remove from the engine's OWN capability registry, then drop them from the local snapshot + rebuild routing.
+      const { enqueueKeys, selectors } = deregisterPacks(packIds);
+      const drop = new Set(packIds);
+      for (let i = registeredIds.length - 1; i >= 0; i--) if (drop.has(registeredIds[i]!)) registeredIds.splice(i, 1);
       currentEnqueueKeys = enqueueKeys;
       currentSelectors = selectors;
       rebuildGoalsRoute();

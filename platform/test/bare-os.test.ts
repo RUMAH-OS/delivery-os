@@ -68,8 +68,8 @@ describe("step 1 — BARE BOOT (zero tenant packs) + migrations apply clean", ()
 
   it("migrations applied clean on a bare DB (every OS migration, no tenant schema) and are idempotent", async () => {
     // First run applied every discovered file (fresh DB): 0000 role + 0001-0005 engine + 0006 outbox +
-    // 0052/0053/0054/0055 platform spine = 11 forward migrations.
-    expect(discovered).toBe(11);
+    // 0052/0053/0054/0055 platform spine + 0056 capability registrations (E-PH M3a) = 12 forward migrations.
+    expect(discovered).toBe(12);
     expect(firstApplied).toBe(discovered);
     // Idempotent re-run: nothing to apply.
     const mig = postgres(databaseUrl(), { max: 1 });

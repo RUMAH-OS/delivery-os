@@ -22,9 +22,9 @@
 // the SAME definition key, verifier id, or handler key is a programming error: registerPacks THROWS a clear
 // CapabilityConflictError (fail-closed — a silent last-writer-wins overwrite would mask a collision).
 
-import { registerDefinition, getDefinition, type WorkflowDefinition } from "./definitions.js";
-import { registerVerifier, getVerifier, type Verifier, type VerifierRung } from "./verifiers.js";
-import { registerHandler, type Handler } from "./handlers.js";
+import { registerDefinition, getDefinition, unregisterDefinition, type WorkflowDefinition } from "./definitions.js";
+import { registerVerifier, getVerifier, unregisterVerifier, type Verifier, type VerifierRung } from "./verifiers.js";
+import { registerHandler, unregisterHandler, type Handler } from "./handlers.js";
 import { createEngine, type EngineContext, type Engine } from "./engine.js";
 import { createWorkflowRoute, type ScopeGuard } from "./workflow-route.js";
 import { createApprovalsRoute } from "./approvals-route.js";
@@ -132,6 +132,29 @@ export function registerPacks(packs: CapabilityPack[]): { enqueueKeys: string[];
     }
     void sel;
   }
+  return { enqueueKeys: [...DEFINITION_OWNER.keys()], selectors: [...SELECTOR_REGISTRY.values()] };
+}
+
+// ── deregisterPacks — the additive inverse of registerPacks (E-PH M3a). Removes every registered definition /
+// verifier / handler / selector OWNED by the given pack ids, and forgets the pack id (so a later re-register is
+// clean, not an idempotent no-op). Unknown pack ids are ignored (idempotent deregister). This is what makes a
+// tenant REMOVABLE: deleting a tenant ⇒ its packs deregister ⇒ its capabilities leave the registry ⇒ the OS keeps
+// serving (I-PI survival). Returns the resulting registry snapshot (the same shape registerPacks returns). ──
+export function deregisterPacks(packIds: string[]): { enqueueKeys: string[]; selectors: SelectableCapability[] } {
+  const drop = new Set(packIds);
+  for (const [key, owner] of [...DEFINITION_OWNER]) {
+    if (drop.has(owner)) { unregisterDefinition(key); DEFINITION_OWNER.delete(key); }
+  }
+  for (const [id, owner] of [...VERIFIER_OWNER]) {
+    if (drop.has(owner)) { unregisterVerifier(id); VERIFIER_OWNER.delete(id); }
+  }
+  for (const [key, owner] of [...HANDLER_OWNER]) {
+    if (drop.has(owner)) { unregisterHandler(key); HANDLER_OWNER.delete(key); }
+  }
+  for (const [key, owner] of [...SELECTOR_OWNER]) {
+    if (drop.has(owner)) { SELECTOR_OWNER.delete(key); SELECTOR_REGISTRY.delete(key); }
+  }
+  for (const id of drop) REGISTERED_PACK_IDS.delete(id);
   return { enqueueKeys: [...DEFINITION_OWNER.keys()], selectors: [...SELECTOR_REGISTRY.values()] };
 }
 

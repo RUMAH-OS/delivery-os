@@ -98,6 +98,12 @@ export function getVerifierRung(id: string): VerifierRung | undefined {
   return VERIFIERS[id]?.rung;
 }
 
+// Remove a verifier (E-PH M3a deregistration). When a tenant deregisters, its verifiers leave the registry.
+// Additive; the engine never calls this on its own execution path.
+export function unregisterVerifier(id: string): void {
+  delete VERIFIERS[id];
+}
+
 // ── eval-the-evaluator (the calibration gate, ku-verifier-must-be-evaluated) ────────────────────────
 // A labeled case = an OPAQUE candidate + its EXPECTED ground-truth label (pass|fail). The engine/app runs
 // the verifier over every case and scores it: accuracy + the two ERROR RATES that matter for safety:
