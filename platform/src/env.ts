@@ -61,3 +61,28 @@ export function databaseUrl(): string {
   if (!url) throw new Error("DATABASE_URL is not set — the OS runtime needs a platform-owned Postgres");
   return url;
 }
+
+// =============================================================================
+// Production-DB identity — OS-OWNED, config-driven (I-PI: the OS carries NO tenant project ref in source).
+// =============================================================================
+// The prod-DB guard (src/db/guard-prod.ts) + the audited break-glass (src/db/break-glass.ts) were relocated
+// into the OS in E-PH M2. In rumah-admin these hardcoded that tenant's Supabase project ref. The OS must never
+// embed a tenant's identity (PLATFORM-HOME-EXTRACTION.md I-PI), so the "which DB is production" fact is read
+// from the platform environment (PLATFORM_PROD_DB_REF) instead of a baked-in ref. Unset ⇒ empty ⇒ the ref
+// check matches nothing (the coarse PROD_POOLER_HOST signal in guard-prod still applies); an OS deployment that
+// wants ref-level prod protection sets PLATFORM_PROD_DB_REF to its OWN platform prod project ref.
+export const PROD_DB_REF = process.env.PLATFORM_PROD_DB_REF ?? "";
+
+// The regional pooler host that fronts the platform production DB — OS-OWNED, config-driven (same I-PI reason
+// as PROD_DB_REF: the OS embeds no tenant infra host in source). guard-prod uses it as a COARSE, deliberately
+// conservative fail-closed signal on top of the ref check. Unset ⇒ empty ⇒ matches nothing (an empty host must
+// never match every URL); an OS deployment that wants host-level prod protection sets PLATFORM_PROD_POOLER_HOST
+// to its OWN platform prod pooler host.
+export const PROD_POOLER_HOST = process.env.PLATFORM_PROD_POOLER_HOST ?? "";
+
+/** True when the URL targets the configured platform production project ref. Fail-open on the ref alone when no
+ *  ref is configured (guard-prod layers the PROD_POOLER_HOST host signal on top); never matches a local/test DB. */
+export function isProductionDb(url: string | undefined): boolean {
+  if (!url || !PROD_DB_REF) return false;
+  return url.includes(PROD_DB_REF);
+}
