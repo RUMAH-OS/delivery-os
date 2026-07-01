@@ -20,12 +20,9 @@ export interface MountConfig {
   url: string;
 }
 
-// The default mounts the control surface observes (the live engine mounts from the plan). Override via
-// ProjectOwner config / env for other environments.
-export const DEFAULT_MOUNTS: MountConfig[] = [
-  { name: "admin", url: "https://rumah-admin.vercel.app" },
-  { name: "plos", url: "https://property-lead-os.vercel.app" },
-];
+// Bare OS knows zero tenants (I-PI). Mounts are populated from tenant registration in M4 (dynamic
+// probeMounts); no tenant URL is baked into OS source. Override via ProjectOwner config / env.
+export const DEFAULT_MOUNTS: MountConfig[] = [];
 
 const PROBE_TIMEOUT_MS = 8_000;
 

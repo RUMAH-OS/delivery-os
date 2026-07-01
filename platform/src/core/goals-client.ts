@@ -13,7 +13,7 @@ import { z } from "zod";
 
 // ── Config (env-driven; the shell passes these through; the proof injects a base URL directly). ──
 export interface GoalsClientConfig {
-  baseUrl: string; // e.g. https://rumah-admin.vercel.app  (or http://127.0.0.1:8788 in the proof)
+  baseUrl: string; // e.g. https://<engine-mount>.example  (or http://127.0.0.1:8788 in the proof)
   token: string; // a bearer token carrying workflow:runtime + workflow:observe
   fetchImpl?: typeof fetch; // injectable for tests; defaults to global fetch
 }

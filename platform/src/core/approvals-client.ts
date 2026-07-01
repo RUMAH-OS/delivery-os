@@ -12,7 +12,7 @@
 import { z } from "zod";
 
 export interface ApprovalsClientConfig {
-  baseUrl: string; // same mount as the engine, e.g. https://rumah-admin.vercel.app (or .../api for PLOS)
+  baseUrl: string; // same mount as the engine, e.g. https://<engine-mount>.example (or .../api for a consumer)
   humanToken: string; // a VERIFIED-HUMAN JWT with workflow:admin — NOT the service token
   fetchImpl?: typeof fetch; // injectable for tests; defaults to global fetch
 }
