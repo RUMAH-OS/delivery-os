@@ -2,10 +2,10 @@
 // PROD-DB GUARD (DEFAULT-DENY, ALWAYS ON) — the permanent prevention for the 2026-06-25 incident, hardened
 // by Sprint 1.1 to close DRB-v1 CONFLICT-03. RS-DOS-v1 §30/§57.
 // =============================================================================
-// ROOT CAUSE (confirmed): the repo `.env` carries the PRODUCTION DATABASE_URL (project ref
-// `clfocpodfbtgzivnivck`, host `aws-0-eu-west-1.pooler.supabase.com`). Any destructive DB entrypoint that
-// resolved DATABASE_URL from `.env` (or the dev machine's ambient env, which is the prod SoR) therefore
-// executed against PRODUCTION — that is how dev/test fixtures reached prod (`npm run db:seed`/`db:migrate`).
+// ROOT CAUSE (confirmed): a repo `.env` that carries the PRODUCTION DATABASE_URL (the configured platform prod
+// project ref + its pooler host — both OS-owned via env, never a hardcoded tenant identity). Any destructive DB
+// entrypoint that resolved DATABASE_URL from `.env` (or the dev machine's ambient env) therefore executed
+// against PRODUCTION — that is how dev/test fixtures reached prod (`npm run db:seed`/`db:migrate`).
 //
 // THIS MODULE is the single fail-closed guard every WRITING / DESTRUCTIVE DB entrypoint MUST call AFTER
 // loadEnv() and BEFORE opening a connection. Default = REFUSE when DATABASE_URL targets prod.
@@ -23,17 +23,17 @@
 // guard governs whether a prod CONNECTION may be opened for a scoped apply; it never relaxes those triggers.
 
 import { createHash } from "node:crypto";
-import { PROD_DB_REF, isProductionDb } from "../env.js";
+import { PROD_DB_REF, PROD_POOLER_HOST, isProductionDb } from "../env.js";
 
-// The regional Supabase pooler host that fronts the prod project. Matching the host is a COARSE, deliberately
-// conservative signal (fail-closed): a throwaway scratch DB uses localhost/docker or a non-eu-west host; the
-// local test DB uses localhost and never matches.
-export const PROD_POOLER_HOST = "aws-0-eu-west-1.pooler.supabase.com";
+// PROD_POOLER_HOST (the configured platform prod pooler host, if any) is OS-owned + config-driven in env.ts.
+// Matching the host is a COARSE, deliberately conservative fail-closed signal: a throwaway scratch DB uses
+// localhost/docker, and the local test DB uses localhost and never matches. Unset ⇒ empty ⇒ matches nothing.
 
-/** True when the URL targets the prod project ref OR the prod pooler host. */
+/** True when the URL targets the configured prod project ref OR the configured prod pooler host (if either is
+ *  set). An empty (unconfigured) host never matches — so it can never flag every URL as prod. */
 export function urlTargetsProd(url: string | undefined): boolean {
   if (!url) return false;
-  return isProductionDb(url) || url.includes(PROD_POOLER_HOST);
+  return isProductionDb(url) || (PROD_POOLER_HOST !== "" && url.includes(PROD_POOLER_HOST));
 }
 
 /** sha256 hex of a connection string — matches src/db/break-glass.ts#urlFingerprint exactly. */

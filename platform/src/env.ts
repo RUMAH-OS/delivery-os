@@ -73,6 +73,13 @@ export function databaseUrl(): string {
 // wants ref-level prod protection sets PLATFORM_PROD_DB_REF to its OWN platform prod project ref.
 export const PROD_DB_REF = process.env.PLATFORM_PROD_DB_REF ?? "";
 
+// The regional pooler host that fronts the platform production DB — OS-OWNED, config-driven (same I-PI reason
+// as PROD_DB_REF: the OS embeds no tenant infra host in source). guard-prod uses it as a COARSE, deliberately
+// conservative fail-closed signal on top of the ref check. Unset ⇒ empty ⇒ matches nothing (an empty host must
+// never match every URL); an OS deployment that wants host-level prod protection sets PLATFORM_PROD_POOLER_HOST
+// to its OWN platform prod pooler host.
+export const PROD_POOLER_HOST = process.env.PLATFORM_PROD_POOLER_HOST ?? "";
+
 /** True when the URL targets the configured platform production project ref. Fail-open on the ref alone when no
  *  ref is configured (guard-prod layers the PROD_POOLER_HOST host signal on top); never matches a local/test DB. */
 export function isProductionDb(url: string | undefined): boolean {
