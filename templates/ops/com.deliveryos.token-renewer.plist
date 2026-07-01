@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Delivery OS — service-token auto-renewer (launchd timer, macOS / a node like Neo).
+  Re-mints GOALS_API_TOKEN from the vault-held signing key BEFORE expiry so the
+  long-running adapter never goes stale. No manual re-issuance ever.
+
+  Install:
+    cp com.deliveryos.token-renewer.plist ~/Library/LaunchAgents/
+    # edit the paths + DELIVERYOS_VAULT below, then:
+    launchctl load ~/Library/LaunchAgents/com.deliveryos.token-renewer.plist
+    launchctl start com.deliveryos.token-renewer     # run once now
+  Logs: stderr → the StandardErrorPath below (audit lines only — NEVER a value).
+
+  The master key comes from the 0600 vault key file (default <vault>/.master.key) or
+  the Keychain — NOT from this plist. Do not put secrets in this file.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>com.deliveryos.token-renewer</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>node</string>
+    <string>/opt/deliveryos/rumah-admin/scripts/renew-service-token.mjs</string>
+    <string>--once</string>
+    <string>--env</string>              <string>prod</string>
+    <string>--token-key</string>        <string>GOALS_API_TOKEN</string>
+    <string>--ttl</string>              <string>2592000</string>   <!-- 30d -->
+    <string>--threshold</string>        <string>604800</string>    <!-- renew when <7d left -->
+    <string>--sub</string>              <string>svc-neo</string>
+    <string>--aud</string>              <string>service</string>
+    <!-- optional rotation-safety probe of the engine with the current token:
+    <string>--probe</string>            <string>https://rumah-admin.vercel.app/v1/health</string> -->
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DELIVERYOS_VAULT</key>        <string>/opt/deliveryos/vault</string>
+    <!-- optional: alert webhook for rotation-safety fail-closed events -->
+    <!-- <key>DELIVERYOS_ALERT_WEBHOOK</key> <string>https://hooks.slack.com/services/…</string> -->
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>    <integer>4</integer>
+    <key>Minute</key> <integer>17</integer>
+  </dict>
+  <key>RunAtLoad</key>            <true/>
+  <key>StandardErrorPath</key>    <string>/opt/deliveryos/logs/token-renewer.err.log</string>
+  <key>StandardOutPath</key>      <string>/dev/null</string>
+</dict>
+</plist>
