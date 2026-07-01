@@ -44,10 +44,23 @@ export type Cause =
   | "DB_UNREACHABLE"
   | "CONFIG_KEY_MISSING"
   | "POOL_EXHAUSTION"
+  | "QUERY_TIMEOUT"
   | "STUCK_CONSUMER_CURSOR"
   | "HEARTBEAT_STALE"
   | "EXTERNAL_API_ERROR"
   | "UNKNOWN";
+
+export type PreflightSeverity = "blocker" | "should" | "nice";
+export interface PreflightFinding {
+  severity: PreflightSeverity;
+  code: string;
+  message: string;
+}
+export interface DbClientPreflightResult {
+  ok: boolean;
+  file: string;
+  findings: PreflightFinding[];
+}
 
 export interface Symptom {
   subsystem?: string;
@@ -79,3 +92,4 @@ export function httpStatusForVerdict(verdict: Verdict): number;
 export function runHealth(service: string, probes: Probe[], now?: Date): Promise<HealthReport>;
 export function classifyFailure(symptom?: Symptom): Diagnosis;
 export function validateReport(report: unknown): { valid: boolean; errors: string[] };
+export function assertDbClientHardening(source: string, opts?: { file?: string }): DbClientPreflightResult;

@@ -59,7 +59,7 @@
           },
           "rule": {
             "type": "string",
-            "description": "Validation rule id understood by config-doctor: postgres-pooler-6543 | postgres-url | url | non-empty | flag | secret-min:N | enum:a|b|c"
+            "description": "Validation rule id understood by config-doctor: postgres-pooler-6543 | postgres-url | url | non-empty | flag | int-positive | secret-min:N | enum:a|b|c. Use 'int-positive' for numeric tuning knobs (pool size, a timeout in ms/s) — it is the ENV-ROBUSTNESS STANDARD: an empty/0/non-numeric value FAILS the gate up front instead of silently coercing to 0 at runtime (the BUG-209-1 trap, where Number(\"\")===0 disabled a serverless DB client's statement_timeout/pool bound). Its code-side companion is Number(env)||default (never Number(env ?? default)), asserted by platform-health's preflight-db-client."
           },
           "required": {
             "description": "true/false (all environments) OR an object keyed by environment name with boolean values.",

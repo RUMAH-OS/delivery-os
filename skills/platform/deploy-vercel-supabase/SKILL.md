@@ -31,6 +31,22 @@ OS gap. This pack is that home for the Vercel+Supabase plane.
 - **Supabase connections**: `db.<ref>.supabase.co` (direct, 5432) is **IPv6-only** — unreachable from
   IPv4-only machines. Operator/migrator → **session pooler** (5432); serverless app → **transaction pooler**
   (6543) with `prepare: false` and a SMALL pool. Pooler username = `<role>.<project-ref>`.
+- **HANG-SAFE DB CLIENT — the STANDARD (PLOS prod incident 2026-06-27).** A serverless DB client MUST declare,
+  or it can hang a request past the gateway to **HTTP 000** (a hung promise never throws, so the page `try/catch`
+  cannot rescue it):
+  1. **`statement_timeout`** (a per-connection server-side query bound, under the gateway ceiling — e.g. 8000ms <
+     Vercel's ~25s). This is the **only** available ceiling on a pool-acquire/query hang: postgres.js has **no
+     pool-acquire timeout**, so bounding the WORK each held connection does is what forces connections to cycle
+     back → a fast degraded throw, not a gateway-busting hang. `connect_timeout` is NOT a substitute — it bounds
+     ESTABLISHING a connection (~17ms; never the problem), not acquiring one or running a query.
+  2. **A bounded pool (`max`)** — an explicit, finite ceiling.
+  3. **Env-robustness: `Number(env) || default`, never `Number(env ?? default)`.** `??` only catches null/undefined;
+     an env present as the **empty string** sails through and `Number("")===0`, silently disabling the timeout/pool
+     (BUG-209-1). Declare numeric knobs with the config-registry `int-positive` rule so an empty value FAILS the
+     gate up front. **Assert all three in CI/preflight**: `node <tools>/platform-health.mjs preflight-db-client --file
+     <db-client>` (the vendored `infra/platform-health.mjs` in a consumer; exits non-zero on a missing bound) — and
+     tell a pool-acquire/query hang apart from a connection
+     outage with the diagnostics taxonomy (`QUERY_TIMEOUT`/`POOL_EXHAUSTION` vs `DB_UNREACHABLE`).
 - **Auth**: new Supabase projects sign **ES256** (asymmetric, UUID key-id); an HS256 verifier needs the
   **Legacy JWT secret** (long base64). Don't confuse the two — an auth design assuming the old issuer model
   cost a cycle.

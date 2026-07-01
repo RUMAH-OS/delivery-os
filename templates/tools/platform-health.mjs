@@ -184,11 +184,26 @@ export const CAUSE = Object.freeze({
   DB_UNREACHABLE: "DB_UNREACHABLE",
   CONFIG_KEY_MISSING: "CONFIG_KEY_MISSING",
   POOL_EXHAUSTION: "POOL_EXHAUSTION",
+  QUERY_TIMEOUT: "QUERY_TIMEOUT",
   STUCK_CONSUMER_CURSOR: "STUCK_CONSUMER_CURSOR",
   HEARTBEAT_STALE: "HEARTBEAT_STALE",
   EXTERNAL_API_ERROR: "EXTERNAL_API_ERROR",
   UNKNOWN: "UNKNOWN",
 });
+
+// THE CONNECT-vs-POOL-ACQUIRE DISTINCTION (the incident the blind-board RCA caught, 2026-06-27).
+// A PLOS prod hang to HTTP 000 was first lensed as a connection-ESTABLISHMENT failure (the #208
+// connect_timeout fix) but was actually unbounded POOL-ACQUIRE / QUERY-RUNTIME queuing (the #209
+// statement_timeout fix). The two have OPPOSITE remedies, so the taxonomy MUST tell them apart:
+//   • DB_UNREACHABLE   = the TCP/TLS connection cannot be ESTABLISHED (ECONNREFUSED/ENOTFOUND/…)
+//                        → the DB/host/network is the problem; connect_timeout is the relevant bound.
+//   • POOL_EXHAUSTION  = a connection cannot be ACQUIRED from the pool (all `max` busy, acquire queue
+//                        grows) → the DB is reachable; pool size / fan-out / a leak is the problem.
+//   • QUERY_TIMEOUT    = a connection WAS acquired and a query RAN too long (statement_timeout fired,
+//                        pg 57014) → the DB is reachable; the query/index/fan-out is the problem.
+// Connect establishment is ~17ms in prod; a 30s+ hang is NEVER establishment. classifyFailure orders
+// QUERY_TIMEOUT and POOL_EXHAUSTION BEFORE DB_UNREACHABLE so an acquire/runtime hang is never misread
+// as an outage.
 
 // The config-doctor delegation string — a config-class fault is NOT diagnosed here
 // (one source of truth per concern); it points the operator at the config layer.
@@ -217,21 +232,42 @@ export function classifyFailure(symptom = {}) {
     };
   }
 
-  // --- connection-pool exhaustion (the serverless fan-out 503; distinct from a hard outage) ---
+  // --- query-runtime timeout (statement_timeout FIRED — the bound WORKING, NOT a hang/outage) ---
+  // pg 57014 (query_canceled). This is the #209 statement_timeout doing its job: a query that ran
+  // past the budget is CANCELLED into a fast throw instead of hanging the request past the gateway.
+  // It is a POOL-ACQUIRE/QUERY-RUNTIME symptom (the DB is reachable, a query was too slow), NOT a
+  // connection failure — so it MUST be classified before DB_UNREACHABLE.
   if (
-    /too many clients|remaining connection slots|sorry, too many clients|max(?:imum)? .*connections|connection pool (?:timeout|exhausted)|timeout exceeded when trying to connect|connection terminated due to connection timeout|pool is (?:full|draining)/i.test(m) ||
-    code === "53300" || // postgres too_many_connections
-    (sub.includes("pool") && /timeout/i.test(m))
+    code === "57014" ||
+    /statement timeout|canceling statement due to statement timeout|query[_ ]cancell?ed|statement_timeout/i.test(m)
   ) {
     return {
-      cause: CAUSE.POOL_EXHAUSTION,
-      detail: `the connection pool is exhausted/timing out (${oneLine(m) || "no free connection"}).`,
+      cause: CAUSE.QUERY_TIMEOUT,
+      detail: `a query exceeded statement_timeout and was cancelled (${oneLine(m) || "pg 57014 query_canceled"}). The DB is REACHABLE — this is the bound working (fast throw, not a hang), not an outage.`,
       actionable:
-        "Confirm DATABASE_URL is the Supabase TRANSACTION-POOLER (port 6543) — a direct :5432 connection exhausts the pool under serverless fan-out (verify with config-doctor). Then check for a connection leak (unclosed clients) and the pool `max`.",
+        "This is NOT a connection failure — do not chase the network/pooler. Find the slow query (a missing index, an oversized page fan-out, a lock wait); reduce the work or raise DB_STATEMENT_TIMEOUT_MS DELIBERATELY (never to 0/empty — that disables the bound; see config-doctor int-positive / the DB-client preflight). A recurring statement_timeout means the request path's degraded fallback IS firing — the app stays reachable, but the underlying query needs fixing.",
     };
   }
 
-  // --- DB unreachable (a real outage / network / DNS / refused) ---
+  // --- connection-pool exhaustion / ACQUIRE timeout (the serverless fan-out hang; NOT a hard outage) ---
+  // A connection cannot be ACQUIRED from the pool: all `max` are busy and the acquire queue grows
+  // (or the session pooler's client cap is hit). The DB is reachable; the fix is pool size / fan-out /
+  // a leak, NOT the network. Ordered before DB_UNREACHABLE so an acquire-queue hang is never misread
+  // as an establishment outage (the connect-vs-pool-acquire distinction).
+  if (
+    /too many clients|remaining connection slots|sorry, too many clients|max(?:imum)? .*connections|connection pool (?:timeout|exhausted)|timeout exceeded when trying to connect|connection terminated due to connection timeout|pool is (?:full|draining)|timed out (?:acquiring|fetching) a connection|could not acquire|no (?:available|free) connection|acquire(?:ment)? timeout|EMAXCONNSESSION/i.test(m) ||
+    code === "53300" || // postgres too_many_connections
+    (sub.includes("pool") && /timeout|acquire|wait|queue/i.test(m))
+  ) {
+    return {
+      cause: CAUSE.POOL_EXHAUSTION,
+      detail: `a connection could not be ACQUIRED from the pool — all connections busy / acquire queue growing (${oneLine(m) || "no free connection"}). Typically pool-acquire pressure (the DB reachable, the pool starved), though a connect-timeout phrasing can also come from a paused/unreachable DB — confirm reachability first.`,
+      actionable:
+        "FIRST confirm the DB is actually up (a paused/unreachable Supabase project can surface a similar connect-timeout message — if it is down, this is really DB_UNREACHABLE). Once the DB is confirmed reachable: confirm DATABASE_URL is the Supabase TRANSACTION-POOLER (port 6543) — a direct :5432 connection caps the pool under serverless fan-out (verify with config-doctor); bound the work each held connection does with a statement_timeout (so connections always cycle back — the load-bearing fix postgres.js's missing pool-acquire timeout otherwise leaves unbounded); right-size `max`; reduce per-request fan-out; and check for a connection leak (unclosed clients).",
+    };
+  }
+
+  // --- DB unreachable (a real outage: TCP/TLS connection cannot be ESTABLISHED — network/DNS/refused) ---
   if (
     /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNRESET|EHOSTUNREACH|connection refused|getaddrinfo|terminating connection|server closed the connection|could not connect|connection terminated unexpectedly|database (?:is )?unreachable/i.test(m) ||
     ["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "ECONNRESET", "EHOSTUNREACH"].includes(code) ||
@@ -239,7 +275,7 @@ export function classifyFailure(symptom = {}) {
   ) {
     return {
       cause: CAUSE.DB_UNREACHABLE,
-      detail: `the database is not reachable from the pooled connection (${oneLine(m) || code || "no response"}).`,
+      detail: `the database connection could not be ESTABLISHED (${oneLine(m) || code || "no response"}) — a TCP/TLS/DNS-level failure, distinct from a pool-acquire or query-runtime hang.`,
       actionable:
         "Check the Supabase project is up (not paused) and DATABASE_URL host/port resolve; confirm the pooler host with config-doctor. If Supabase is up and config is valid, suspect a network/egress block from the deploy.",
     };
@@ -307,6 +343,93 @@ function numAbove(a, b) {
 }
 
 // =============================================================================
+// 2b. THE PROD-DB-CLIENT PREFLIGHT — assert a serverless DB client is hang-safe.
+// =============================================================================
+// A deploy/runtime PREFLIGHT (static, source-level): the THREE properties a prod
+// serverless DB client MUST declare so it cannot hang a request past the gateway to
+// HTTP 000. This is the STANDARD distilled from the 2026-06-27 PLOS incident, where a
+// client with only a connect bound (no statement_timeout, no bounded pool, and a
+// `Number(env ?? d)` env read) hung on unbounded pool-acquire queuing:
+//   1. statement_timeout — a per-connection server-side query bound. The ONLY available
+//      ceiling on pool-acquire/query-runtime hangs (postgres.js has no pool-acquire timeout);
+//      it forces every held connection to cycle back within the budget → a fast degraded
+//      throw instead of a gateway-busting hang.
+//   2. a BOUNDED pool (`max`) — an explicit, finite connection ceiling.
+//   3. ENV-ROBUSTNESS — numeric knobs read as `Number(env)||default`, NEVER
+//      `Number(env ?? default)`: an empty-string env makes `Number("")===0`, silently
+//      disabling the timeout/pool (BUG-209-1). The `??` form is FLAGGED as a finding.
+// PURE: operates on the client SOURCE string. No file IO, no env. Returns
+// { ok, findings:[{severity, code, message}] }; ok === no BLOCKER finding.
+export function assertDbClientHardening(source, { file = "<db-client>" } = {}) {
+  const raw = String(source == null ? "" : source);
+  // Scan DECOMMENTED code only: a client that DOCUMENTS the anti-pattern in a JSDoc/comment
+  // (e.g. numEnv's own doc quoting `Number(env ?? d)` as the trap it closes) must not false-positive.
+  // Strip block comments, then line comments — but never the `//` inside a `://` URL scheme.
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const findings = [];
+  const add = (severity, code, message) => findings.push({ severity, code, message });
+
+  // 3 — the empty-env trap: any `Number( process.env... ?? ... )` is the disable-on-empty bug.
+  // Match a Number(...) call whose argument reads process.env and uses `??` before the close paren.
+  const nullishEnv = /Number\(\s*(?:process\.)?env[^)]*\?\?[^)]*\)/i.test(src);
+  if (nullishEnv)
+    add(
+      "blocker",
+      "env-nullish-coalesce",
+      "a numeric env knob is read as `Number(env ?? default)` — an empty-string env coerces to 0 and DISABLES the bound (BUG-209-1). Use `Number(env) || default` (or a numEnv() helper).",
+    );
+
+  // 1 — statement_timeout must be declared.
+  const hasStatementTimeout = /statement_timeout/i.test(src);
+  if (!hasStatementTimeout)
+    add(
+      "blocker",
+      "no-statement-timeout",
+      "no statement_timeout declared. Without it a pool-acquire/query hang has NO ceiling (postgres.js has no pool-acquire timeout) → the request hangs past the gateway to HTTP 000. Declare a per-connection statement_timeout under the platform default (< the gateway ceiling).",
+    );
+  // 1a — postgres.js foot-gun: statement_timeout MUST live inside the `connection:{}` block (it is sent
+  // as a startup parameter). At the top level postgres.js silently IGNORES it — declared but dead.
+  // Advisory (not a blocker): we cannot prove the driver from a string, but flag the likely-dead case.
+  if (hasStatementTimeout && /postgres\s*\(/.test(src) && !/connection\s*:\s*\{[^}]*statement_timeout/is.test(src))
+    add(
+      "should",
+      "statement-timeout-not-in-connection",
+      "statement_timeout is present but not inside a `connection: { … }` block. In postgres.js it is a connection startup parameter — placed elsewhere it is silently IGNORED (declared but dead). Confirm it is applied (read it back with `SHOW statement_timeout` at boot).",
+    );
+  // 1b — value sanity: a LITERAL default >= the gateway ceiling still hangs past it. We can only read a
+  // literal fallback (Number(env)||<N> / ?? <N>); env-supplied values are checked at the config layer (int-positive).
+  const litMs = src.match(/statement_timeout[^;\n]*?(?:\|\||\?\?)\s*(\d{3,})/);
+  if (litMs && Number(litMs[1]) >= 25000)
+    add(
+      "should",
+      "statement-timeout-too-high",
+      `the statement_timeout default (${litMs[1]}ms) is >= the typical ~25s serverless gateway ceiling — a query can still run past the gateway and hang to HTTP 000. Set it comfortably UNDER the platform's request budget.`,
+    );
+
+  // 2 — a bounded pool must be declared. Accept postgres.js `max:`, a pool_size/pool_max knob, or a
+  // URL-style `connection_limit` (Prisma). `max:` is matched only when it plausibly configures a client
+  // (postgres()/Pool()/createClient nearby) to reduce false-positives from unrelated `max:` config.
+  const hasBoundedPool =
+    /\bconnection_limit\b/i.test(src) ||
+    /\bpool_?(?:size|max)\b/i.test(src) ||
+    (/\bmax\s*:/.test(src) && /\b(?:postgres|Pool|createPool|createClient|drizzle)\s*\(/.test(src));
+  if (!hasBoundedPool)
+    add(
+      "blocker",
+      "no-bounded-pool",
+      "no bounded pool size declared (postgres.js `max:` / a pool_size knob / Prisma `connection_limit`). An unbounded/implicit pool either exhausts the session-pooler cap or hides the fan-out-vs-pool mismatch. Declare an explicit bound.",
+    );
+
+  // advisory: a connect bound is good practice (fail-fast on a cold/starved connect) but is NOT
+  // the load-bearing bound — its absence is a nudge, not a blocker (statement_timeout is the floor).
+  if (!/connect_timeout/i.test(src))
+    add("nice", "no-connect-timeout", "no connect_timeout declared — add one to fail fast on a cold/starved connection (advisory; statement_timeout is the load-bearing bound).");
+
+  const ok = !findings.some((f) => f.severity === "blocker");
+  return { ok, file, findings };
+}
+
+// =============================================================================
 // 3. CANONICAL-SHAPE VALIDATION (used by `validate` + the per-app shape tests).
 // =============================================================================
 export function validateReport(report) {
@@ -343,10 +466,12 @@ async function main() {
   if (process.argv.includes("--self-test")) return selfTest();
   if (cmd === "diagnose") return cmdDiagnose();
   if (cmd === "validate") return cmdValidate();
+  if (cmd === "preflight-db-client") return cmdPreflightDbClient();
   process.stdout.write(
     "platform-health — runtime health + diagnostics engine (Infrastructure Platform).\n\n" +
       "  node platform-health.mjs diagnose [--symptom '<json>'] [--json]   (or pipe symptom JSON on stdin)\n" +
       "  node platform-health.mjs validate [--report '<json>']             (or pipe report JSON on stdin)\n" +
+      "  node platform-health.mjs preflight-db-client --file <path> [--json]  (assert a prod DB client is hang-safe)\n" +
       "  node platform-health.mjs --self-test\n",
   );
   process.exit(0);
@@ -391,6 +516,41 @@ async function cmdValidate() {
   }
   process.stderr.write("INVALID — not the canonical health shape:\n" + v.errors.map((e) => `  ✗ ${e}`).join("\n") + "\n");
   process.exit(1);
+}
+
+// preflight-db-client: read a DB-client source file and assert it is hang-safe.
+// EXIT 0 = no blocker · 1 = a blocker finding · 2 = usage/IO error.
+async function cmdPreflightDbClient() {
+  const file = arg("--file");
+  if (!file) {
+    process.stderr.write("platform-health: preflight-db-client needs --file <path-to-db-client>.\n");
+    process.exit(2);
+  }
+  let source;
+  try {
+    const { readFileSync } = await import("node:fs");
+    source = readFileSync(file, "utf8");
+  } catch (e) {
+    process.stderr.write(`platform-health: cannot read ${file} (${e.message}).\n`);
+    process.exit(2);
+  }
+  const res = assertDbClientHardening(source, { file });
+  if (process.argv.includes("--json")) {
+    process.stdout.write(JSON.stringify(res, null, 2) + "\n");
+  } else {
+    process.stdout.write(`\nDB-client preflight — ${file}\n`);
+    if (!res.findings.length) process.stdout.write("  ✓ statement_timeout · bounded pool · env-robustness — all present.\n");
+    for (const f of res.findings) {
+      const icon = f.severity === "blocker" ? "✗" : f.severity === "nice" ? "·" : "!";
+      process.stdout.write(`  ${icon} [${f.severity}] ${f.code}: ${f.message}\n`);
+    }
+    process.stdout.write(
+      res.ok
+        ? "\nRESULT: PASS — the prod DB client declares the hang-safe standard.\n"
+        : "\nRESULT: FAIL — a BLOCKER property is missing; this client can hang a request past the gateway (HTTP 000). Fix the ✗ items.\n",
+    );
+  }
+  process.exit(res.ok ? 0 : 1);
 }
 
 // =============================================================================
@@ -459,6 +619,38 @@ async function runHealthSelfTest(cases, assert) {
   assert("dx EXTERNAL_API_ERROR (http 502)", dx({ subsystem: "external-api", httpStatus: 502 }) === "EXTERNAL_API_ERROR");
   assert("dx UNKNOWN (unrecognized) — but NOT silent", (() => { const r = classifyFailure({ error: new Error("???weird???") }); return r.cause === "UNKNOWN" && /weird/.test(r.detail); })());
   assert("dx config beats db ordering (env error not misread as outage)", dx({ subsystem: "database", error: new Error("Invalid environment configuration: SUPABASE_URL Invalid url") }) === "CONFIG_KEY_MISSING");
+
+  // --- THE CONNECT-vs-POOL-ACQUIRE DISTINCTION (the blind-board correction, 2026-06-27) ---
+  assert("dx QUERY_TIMEOUT (statement_timeout fired, pg 57014)", dx({ subsystem: "database", code: "57014", error: new Error("canceling statement due to statement timeout") }) === "QUERY_TIMEOUT");
+  assert("dx QUERY_TIMEOUT (message only)", dx({ subsystem: "db", error: new Error("ERROR: canceling statement due to statement timeout") }) === "QUERY_TIMEOUT");
+  assert("dx QUERY_TIMEOUT is NOT misread as an outage", dx({ subsystem: "database", error: new Error("statement timeout") }) !== "DB_UNREACHABLE");
+  assert("dx POOL_EXHAUSTION (acquire-queue wait, not establishment)", dx({ subsystem: "db-pool", error: new Error("Timed out acquiring a connection from the pool") }) === "POOL_EXHAUSTION");
+  assert("dx POOL_EXHAUSTION (EMAXCONNSESSION session cap)", dx({ subsystem: "database", error: new Error("EMAXCONNSESSION: max clients reached") }) === "POOL_EXHAUSTION");
+  assert("dx DB_UNREACHABLE is ESTABLISHMENT-only (refused → still an outage)", dx({ subsystem: "database", error: new Error("ECONNREFUSED") }) === "DB_UNREACHABLE");
+  assert("dx ordering: a statement-timeout on the db subsystem is QUERY_TIMEOUT, not DB_UNREACHABLE", dx({ subsystem: "database", error: new Error("canceling statement due to statement timeout") }) === "QUERY_TIMEOUT");
+
+  // --- the prod-DB-client PREFLIGHT (the hang-safe standard) ---
+  const goodClient = `postgres(url, { max: Number(process.env.DB_POOL_MAX) || 8, connect_timeout: Number(process.env.DB_CONNECT_TIMEOUT) || 10, connection: { statement_timeout: Number(process.env.DB_STMT) || 8000 } })`;
+  assert("preflight PASS: a client with statement_timeout + bounded pool + Number||default", assertDbClientHardening(goodClient).ok === true);
+  const noStmt = `postgres(url, { max: Number(process.env.DB_POOL_MAX) || 8, connect_timeout: 10 })`;
+  assert("preflight FAIL: missing statement_timeout is a BLOCKER", (() => { const r = assertDbClientHardening(noStmt); return r.ok === false && r.findings.some((f) => f.code === "no-statement-timeout"); })());
+  const nullishClient = `postgres(url, { max: Number(process.env.DB_POOL_MAX ?? 8), connection: { statement_timeout: Number(process.env.DB_STMT ?? 8000) } })`;
+  assert("preflight FAIL: `Number(env ?? d)` empty-env trap is a BLOCKER", (() => { const r = assertDbClientHardening(nullishClient); return r.ok === false && r.findings.some((f) => f.code === "env-nullish-coalesce"); })());
+  const noPool = `postgres(url, { connection: { statement_timeout: Number(process.env.DB_STMT) || 8000 } })`;
+  assert("preflight FAIL: no bounded pool (`max`) is a BLOCKER", (() => { const r = assertDbClientHardening(noPool); return r.ok === false && r.findings.some((f) => f.code === "no-bounded-pool"); })());
+  // regression: a client that only MENTIONS the anti-pattern in a comment (numEnv's doc) must PASS.
+  const documentedClient = `// avoid Number(process.env.X ?? d) — empty-env coerces to 0\n${goodClient}`;
+  assert("preflight: the anti-pattern quoted in a COMMENT does not false-positive", assertDbClientHardening(documentedClient).ok === true);
+  // a Prisma-style URL pool bound (connection_limit) counts as a bounded pool (driver-agnostic).
+  const prismaish = `new PrismaClient({ datasources: { db: { url: "postgres://h/db?connection_limit=5&statement_timeout=8000" } } })`;
+  assert("preflight: connection_limit counts as a bounded pool", (() => { const r = assertDbClientHardening(prismaish); return !r.findings.some((f) => f.code === "no-bounded-pool"); })());
+  // value sanity: a literal statement_timeout default at/over the ~25s gateway still hangs → SHOULD.
+  const tooHigh = `postgres(url, { max: Number(process.env.M) || 8, connection: { statement_timeout: Number(process.env.T) || 30000 } })`;
+  assert("preflight: statement_timeout default >= 25s is flagged (still hangs past the gateway)", (() => { const r = assertDbClientHardening(tooHigh); return r.findings.some((f) => f.code === "statement-timeout-too-high"); })());
+  // postgres.js wrong-nesting: statement_timeout at the top level is silently ignored → SHOULD.
+  const wrongNest = `postgres(url, { max: 8, statement_timeout: 8000 })`;
+  assert("preflight: postgres.js statement_timeout outside connection{} is flagged (declared-but-dead)", (() => { const r = assertDbClientHardening(wrongNest); return r.findings.some((f) => f.code === "statement-timeout-not-in-connection"); })());
+  assert("preflight: missing connect_timeout is only a NICE nudge (not a blocker)", (() => { const c = `postgres(url, { max: Number(process.env.M) || 8, connection: { statement_timeout: Number(process.env.T) || 8000 } })`; const r = assertDbClientHardening(c); return r.ok === true && r.findings.some((f) => f.code === "no-connect-timeout" && f.severity === "nice"); })());
 
   const failed = cases.filter((c) => !c.ok);
   for (const c of cases) process.stdout.write(`${c.ok ? "✓" : "✗"} ${c.name}\n`);
