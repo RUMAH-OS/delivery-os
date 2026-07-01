@@ -72,3 +72,9 @@ export function registerDefinition(def: WorkflowDefinition): void {
 export function getDefinition(key: string): WorkflowDefinition | undefined {
   return DEFINITIONS[key];
 }
+
+// Remove a definition (E-PH M3a deregistration). When a tenant deregisters, its definitions leave the registry
+// so a goal can no longer enqueue an un-serviced run. Additive; the engine never calls this on its own path.
+export function unregisterDefinition(key: string): void {
+  delete DEFINITIONS[key];
+}

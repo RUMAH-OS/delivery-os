@@ -9,11 +9,30 @@ import { Hono } from "hono";
 import type { Principal } from "./engine/human-principal.js";
 import type { OsEngineRuntime } from "./engine-runtime.js";
 import { stampHeartbeat, readHeartbeat, NODE_ID } from "./heartbeat.js";
+import { CapabilityConflictError } from "./engine/capability-pack.js";
+import {
+  RegistrationRequestSchema,
+  registerTenantManifest,
+  deregisterTenant,
+  InMemoryCapabilityRegistrationStore,
+  type CapabilityRegistrationStore,
+  type AdapterExecOptions,
+} from "./capability-registration.js";
 
 export const OS_VERSION = "delivery-os-platform/M1";
 
-export function createServer(os: OsEngineRuntime): Hono<{ Variables: { principal: Principal } }> {
+// The HTTP capability-registration surface (E-PH M3a) is wired with a durable store + adapter-callback tunables.
+// Boot injects the Postgres store (durability) + the real global fetch; tests inject an in-memory store + a fast
+// exec profile. Default: in-memory store (a bare OS with no durable registrations, e.g. the M1 battery).
+export interface ServerDeps {
+  registrationStore?: CapabilityRegistrationStore;
+  adapterExec?: AdapterExecOptions;
+}
+
+export function createServer(os: OsEngineRuntime, deps: ServerDeps = {}): Hono<{ Variables: { principal: Principal } }> {
   const app = new Hono<{ Variables: { principal: Principal } }>();
+  const registrationStore = deps.registrationStore ?? new InMemoryCapabilityRegistrationStore();
+  const adapterExec = deps.adapterExec;
 
   // ── liveness ──────────────────────────────────────────────────────────────────────────────────────
   // Health = the bare-OS survival observable: is the OS up, and is it running with ZERO tenant packs?
@@ -47,18 +66,64 @@ export function createServer(os: OsEngineRuntime): Hono<{ Variables: { principal
       empty: os.registeredPackIds().length === 0,
     }),
   );
-  app.post("/v1/capabilities", (c) =>
-    c.json(
-      {
-        error: {
-          code: "not_implemented",
-          message:
-            "runtime capability registration over HTTP (a tenant POSTs its manifest + adapter callback URL) is the M3 consume-flip surface. In M1 the registration API is the in-process os.registerCapabilityPacks() seam.",
+  // ── POST /v1/capabilities — the M3a consume-flip surface. A tenant POSTs a manifest of DATA (definitions +
+  // selectors + the handler keys it services) + an adapter callback URL. The OS validates (zod, fail-closed),
+  // synthesizes a PROXY handler per handler key (a closure that calls the tenant back over HTTP — the OS imports
+  // ZERO tenant code), registers them through the same in-process seam (fail-closed on cross-pack conflict), and
+  // persists the manifest so it survives a restart. Returns the resulting registry snapshot + the callback token
+  // the tenant must authenticate. ──
+  app.post("/v1/capabilities", async (c) => {
+    let raw: unknown;
+    try {
+      raw = await c.req.json();
+    } catch {
+      return c.json({ error: { code: "bad_request", message: "body must be JSON" } }, 400);
+    }
+    const parsed = RegistrationRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return c.json({ error: { code: "invalid_manifest", message: "manifest failed validation", issues: parsed.error.issues } }, 400);
+    }
+    try {
+      const snap = await registerTenantManifest(os, registrationStore, parsed.data, adapterExec);
+      return c.json(
+        {
+          registeredPackIds: snap.registeredPackIds,
+          enqueueKeys: snap.enqueueKeys,
+          selectors: snap.selectors.map((s) => s.definitionKey),
+          token: snap.token,
         },
-      },
-      501,
-    ),
-  );
+        200,
+      );
+    } catch (e) {
+      // FAIL-CLOSED: a cross-pack key conflict is a 409 (never a silent overwrite); nothing was persisted.
+      if (e instanceof CapabilityConflictError) {
+        return c.json({ error: { code: "capability_conflict", message: e.message } }, 409);
+      }
+      return c.json({ error: { code: "registration_failed", message: e instanceof Error ? e.message : String(e) } }, 500);
+    }
+  });
+
+  // ── DELETE /v1/capabilities/:tenantId — deregister a tenant. Its packs leave the registry (goals route
+  // rebuilt, proxy handlers unwired), its stored manifest is forgotten, and OTHER tenants keep serving. Proves a
+  // tenant is REMOVABLE without breaking the OS (I-PI survival). Idempotent: an unknown tenant is a clean no-op. ──
+  app.delete("/v1/capabilities/:tenantId", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    try {
+      const snap = await deregisterTenant(os, registrationStore, tenantId);
+      return c.json(
+        {
+          tenantId,
+          deregisteredPackIds: snap.deregisteredPackIds,
+          registeredPackIds: snap.registeredPackIds,
+          enqueueKeys: snap.enqueueKeys,
+          selectors: snap.selectors.map((s) => s.definitionKey),
+        },
+        200,
+      );
+    } catch (e) {
+      return c.json({ error: { code: "deregistration_failed", message: e instanceof Error ? e.message : String(e) } }, 500);
+    }
+  });
 
   // ── the GOAL front door (POST /v1/goals) — delegates to the CURRENT goals route (rebuilt on registration).
   // On a bare OS the selector registry is empty → every goal fail-closes to 422 no-match, never a crash. ──
