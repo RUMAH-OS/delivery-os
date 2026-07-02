@@ -29,6 +29,14 @@
 //   is a step failure, not "the founder was ambiguous." It PROPAGATES (ReasoningInvocationError /
 //   UnknownReasoningClassError / NoAvailableModelError) exactly as the ReasoningPort raises it — conflating
 //   "I can't reach a model" with "please clarify" would itself be a lie. The caller decides how to degrade.
+//
+// WIRING (deferred — next step, NOT this slice): the live control surface still classifies intent via the
+//   keyword+stub `classifyIntent(text, llm)` (src/core/intent.ts), used at src/core/project-owner.ts
+//   `handle()`. Adopting THIS organ there is the intended replacement, but it is NOT a clean/additive drop-in
+//   in this slice: that path holds a bare `LlmClient`, not a `ReasoningPort`, and its public `POReply`
+//   shape + constructor deps would have to change on the LIVE Slack-PO surface. The organ ships STANDALONE +
+//   gated so the swap is a small, reviewable follow-up: thread a ReasoningPort into the ProjectOwner and call
+//   `classify()` (keeping the deterministic founder-identity/admission gate in goal-intake-c1 in front).
 
 import type { ReasonRequest, ReasonResult } from "../reasoning-port.js";
 import type { ResolveContext } from "../model-router.js";
