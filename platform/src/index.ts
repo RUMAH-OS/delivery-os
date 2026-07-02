@@ -19,6 +19,7 @@ import { PgCapabilityRegistrationStore } from "./capability-registration-store-p
 import { rehydrateRegistrations } from "./capability-registration.js";
 import { loadRoutingConfig, RoutingConfigError } from "./reasoning/routing-config.js";
 import { ModelRouter } from "./reasoning/model-router.js";
+import { armedReasoning } from "./reasoning/boot-organs.js";
 
 // BOOT RESOLUTION MAP (ADR-reasoning-model-routing.md §"Model-agnostic enforcement"): resolve every reasoning
 // class against the deployment's model access and LOG the map. Availability is runtime-resolved — a not-yet-
@@ -85,7 +86,18 @@ export async function boot(opts: { migrate?: boolean; serve?: boolean; tick?: bo
   let server: ReturnType<typeof serve> | undefined;
 
   if (doTick) {
-    stopTick = startHeartbeatLoop(os).stop;
+    // THE ENFORCE-FLIP ACTIVATION (PLATFORM_REASONING_DRIVES_GOALS): flag ON ⇒ CONSTRUCT the real bound organs
+    // once and inject them into the sweep, so the reconciler drives goals by reasoning (fail-closed to the
+    // founder on hard pre-flight calls). Flag OFF (the DEFAULT) ⇒ armedReasoning() constructs NOTHING and returns
+    // undefined — the loop stays inert SHADOW (zero autonomous mutation), byte-for-byte the prior behavior. The
+    // double-gate lives in reconcileSweep; this only decides whether the capability is even built + handed in.
+    const reasoning = armedReasoning();
+    console.log(
+      reasoning
+        ? "[boot] enforce-flip ARMED — reasoning drives goals (fail-closed to founder on hard calls)"
+        : "[boot] enforce-flip OFF — shadow reconcile (zero autonomous mutation)",
+    );
+    stopTick = startHeartbeatLoop(os, undefined, { reasoning }).stop;
     console.log(`[boot] heartbeat/reconciler loop started (node ${NODE_ID})`);
   }
   if (doServe) {
