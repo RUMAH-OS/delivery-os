@@ -14,11 +14,14 @@
 // OS with zero goals the organs are NEVER invoked (the sweep loops over an empty portfolio), so no model is ever
 // spawned by merely constructing this stack.
 //
-// FAIL-CLOSED SINK (interim): the founder-action DRAFT the goal-driver emits alongside a pre-flight HALT is, for
-// now, LOGGED (`[founder-action] …`). A FAP writer / Slack draft is a later slice; an honest console line is the
-// interim sink — the draft is surfaced, never silently dropped.
+// FOUNDER-ACTION SINK: the founder-action DRAFT the goal-driver emits alongside a pre-flight HALT is (a) LOGGED
+// (`[founder-action] …`, the honest interim console line) AND (b) PERSISTED as an append-only `founder_action`
+// event on the platform event stream (0057) — the OS side of the founder-action → Slack loop, drainable via
+// GET /v1/events. Persistence is FAIL-SOFT: a store failure is logged and swallowed so a reconciler sweep never
+// crashes on a persistence fault (surfacing the draft must never break the sole-mutator loop).
 
 import { ClaudeCliLlm } from "../core/llm.js";
+import { appendEvent } from "../events/event-store.js";
 import { loadRoutingConfig } from "./routing-config.js";
 import { ModelRouter } from "./model-router.js";
 import { ReasoningPort } from "./reasoning-port.js";
@@ -33,14 +36,46 @@ import type { FounderActionDraft } from "./goal-driver.js";
 import { reasoningDrivesGoals } from "../env.js";
 import { randomUUID } from "node:crypto";
 
-/** The interim founder-action sink: LOG the drafted pre-flight escalation (a FAP/Slack writer is a later slice).
- *  Honest + cited — it surfaces the goal, the halt reason, and the organ trace spine, never drops the draft. */
+/** LOG the drafted pre-flight escalation. Honest + cited — it surfaces the goal, the halt reason, and the organ
+ *  trace spine, never drops the draft. Always runs (the durable append is layered ON TOP, never instead of it). */
 function logFounderAction(draft: FounderActionDraft): void {
   console.log(
     `[founder-action] goal=${draft.goalId} kind=${draft.kind} reason=${draft.reason} — ${draft.summary}` +
       (draft.blockers.length ? ` | blockers: ${draft.blockers.map((b) => `${b.claim} (${b.source})`).join("; ")}` : "") +
       (draft.traceStages.length ? ` | trace: ${draft.traceStages.join(" → ")}` : ""),
   );
+}
+
+/** Build the founder-action SINK the reconciler sweep invokes on a pre-flight HALT. It (a) STILL logs the draft
+ *  AND (b) PERSISTS a well-formed `founder_action` event on the platform event stream (drainable by the Slack
+ *  adapter via GET /v1/events). FAIL-SOFT: a persistence failure is logged and swallowed so a store fault can
+ *  never crash the sweep (the sole-mutator loop keeps running). The `append` fn is injectable for tests; it
+ *  defaults to the real DB-backed appendEvent. */
+export function makeFounderActionSink(
+  append: typeof appendEvent = appendEvent,
+): (draft: FounderActionDraft) => Promise<void> {
+  return async (draft) => {
+    logFounderAction(draft); // (a) surface the draft — always, even if the durable append below fails.
+    try {
+      // (b) durable, drainable record. payload mirrors the draft's re-checkable fields (trace = the organ spine).
+      await append({
+        type: "founder_action",
+        aggregate: { type: "goal", id: draft.goalId },
+        payload: {
+          kind: draft.kind,
+          reason: draft.reason,
+          summary: draft.summary,
+          blockers: draft.blockers,
+          trace: draft.traceStages,
+        },
+      });
+    } catch (e) {
+      // FAIL-SOFT: a persistence fault must not break the reconciler sweep — log loud, swallow, keep going.
+      console.error(
+        `[founder-action] persist FAILED (fail-soft — sweep continues) goal=${draft.goalId}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
 }
 
 /**
@@ -75,7 +110,7 @@ export function buildBootReasoning(): ReasoningSweepDeps {
   // id; Math.random/Date.now would also be fine in app code, but a UUID is unambiguous and collision-free).
   const ctx: ResolveContext = { requestId: `boot:${randomUUID()}` };
 
-  return { organs, ctx, onFounderAction: logFounderAction };
+  return { organs, ctx, onFounderAction: makeFounderActionSink() };
 }
 
 /**
