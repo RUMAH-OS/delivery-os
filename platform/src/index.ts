@@ -17,6 +17,32 @@ import { createServer, OS_VERSION } from "./server.js";
 import { startHeartbeatLoop, NODE_ID } from "./heartbeat.js";
 import { PgCapabilityRegistrationStore } from "./capability-registration-store-pg.js";
 import { rehydrateRegistrations } from "./capability-registration.js";
+import { loadRoutingConfig, RoutingConfigError } from "./reasoning/routing-config.js";
+import { ModelRouter } from "./reasoning/model-router.js";
+
+// BOOT RESOLUTION MAP (ADR-reasoning-model-routing.md §"Model-agnostic enforcement"): resolve every reasoning
+// class against the deployment's model access and LOG the map. Availability is runtime-resolved — a not-yet-
+// provisioned model simply reports resolves=false and falls through its fallback chain. This is diagnostic
+// only; it must NEVER crash boot (a config fault is logged loud; unavailable models are expected + fine).
+function logReasoningResolutionMap(): void {
+  try {
+    const router = new ModelRouter(loadRoutingConfig()); // default predicate: all available (no runtime probe yet)
+    const map = router.resolveAll();
+    const classes = Object.keys(map);
+    const unresolvable = classes.filter((c) => !map[c as keyof typeof map].resolvable);
+    console.log(
+      `[boot] reasoning resolution map — ${classes.length} classes resolved` +
+        (unresolvable.length ? ` (UNRESOLVABLE: ${unresolvable.join(", ")})` : " (all resolvable)"),
+    );
+    for (const c of classes) {
+      const e = map[c as keyof typeof map];
+      console.log(`[boot]   ${c}: ${e.candidates.map((x) => `${x.model}${x.resolves ? "" : "(x)"}`).join(" → ")}`);
+    }
+  } catch (e) {
+    const why = e instanceof RoutingConfigError ? e.message : e instanceof Error ? e.message : String(e);
+    console.warn(`[boot] reasoning resolution map SKIPPED (routing config fault, non-fatal): ${why}`);
+  }
+}
 
 async function migrate(): Promise<void> {
   const sql = postgres(databaseUrl(), { max: 1 });
@@ -38,6 +64,9 @@ export async function boot(opts: { migrate?: boolean; serve?: boolean; tick?: bo
   // THE FLIP: construct the engine with zero tenant packs.
   const os = createOsEngineRuntime();
   console.log(`[boot] ${OS_VERSION} engine constructed — registered tenant packs: ${os.registeredPackIds().length} (bare OS)`);
+
+  // Log the class→model resolution map (diagnostic; never crashes boot — see logReasoningResolutionMap).
+  logReasoningResolutionMap();
 
   // DURABILITY (E-PH M3a): the platform-owned registration store. On boot the OS RE-HYDRATES tenant
   // registrations persisted across a restart — re-synthesizing each tenant's proxy handlers (never importing
