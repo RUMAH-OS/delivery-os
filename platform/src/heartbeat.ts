@@ -12,7 +12,7 @@
 //      portfolio is empty → idle.
 // The heartbeat NEVER mutates a GoalContract itself — it drives the reconciler, which is the sole mutator.
 import { sql } from "./db/client.js";
-import { reconcileSweep, type SweepResult } from "./reconciler-loop.js";
+import { reconcileSweep, type SweepResult, type ReasoningSweepDeps } from "./reconciler-loop.js";
 import type { OsEngineRuntime } from "./engine-runtime.js";
 
 export const NODE_ID = process.env.OS_NODE_ID ?? "os-runtime-local";
@@ -40,11 +40,17 @@ export async function readHeartbeat(nodeId: string = NODE_ID): Promise<string | 
   return row?.last_beat_at ?? null;
 }
 
-/** One beat: stamp liveness → engine tick → reconciler sweep. Returns the observable beat report. */
-export async function beat(os: OsEngineRuntime, opts: { enforce?: boolean } = {}): Promise<BeatResult> {
+/** One beat: stamp liveness → engine tick → reconciler sweep. Returns the observable beat report.
+ *  `reasoning` is the enforce-flip capability constructed at boot (undefined ⇒ the sweep keeps its exact
+ *  current SHADOW behavior — the double-gate in reconcileSweep is the authority; passing it here just makes the
+ *  real bound organs available to a sweep that the flag also arms). */
+export async function beat(
+  os: OsEngineRuntime,
+  opts: { enforce?: boolean; reasoning?: ReasoningSweepDeps } = {},
+): Promise<BeatResult> {
   const beatAt = await stampHeartbeat();
   const report = await os.tick();
-  const reconciler = await reconcileSweep({ enforce: opts.enforce });
+  const reconciler = await reconcileSweep({ enforce: opts.enforce, reasoning: opts.reasoning });
   return {
     nodeId: NODE_ID,
     beatAt,
@@ -55,13 +61,17 @@ export async function beat(os: OsEngineRuntime, opts: { enforce?: boolean } = {}
 
 /** The running tick loop. Beats every `intervalMs` until `stop()` is called. Returns a stopper. Errors in a
  *  single beat are logged, never fatal (a late/failed beat must not kill the loop — the resync property). */
-export function startHeartbeatLoop(os: OsEngineRuntime, intervalMs = Number(process.env.OS_TICK_MS ?? 5000)): { stop: () => void } {
+export function startHeartbeatLoop(
+  os: OsEngineRuntime,
+  intervalMs = Number(process.env.OS_TICK_MS ?? 5000),
+  opts: { reasoning?: ReasoningSweepDeps } = {},
+): { stop: () => void } {
   let running = true;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const loop = async () => {
     if (!running) return;
     try {
-      await beat(os);
+      await beat(os, { reasoning: opts.reasoning });
     } catch (e) {
       console.error(`[heartbeat] beat error (non-fatal):`, e instanceof Error ? e.message : e);
     }
