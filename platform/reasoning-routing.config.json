@@ -1,0 +1,64 @@
+{
+  "_comment": "THE SINGLE HOME OF EVERY MODEL ID. Model version strings may appear NOWHERE else under platform/src/** (enforced by test/no-model-id-literals.test.ts). Per ADR-reasoning-model-routing.md: swapping/comparing/A-B-testing a model is a config edit, no code change. Naming a not-yet-available model is safe — the boot resolution map + fallback chain handle absence at runtime. Founder directive 2026-07-01: Claude Sonnet 5.0 is the primary reasoning model; Opus 4.8 rides as A/B challenger on the highest-stakes classes and as VERIFY primary (model diversity); Fable 5 is a low-traffic ARCH_REVIEW challenger; Haiku stays on cheap high-volume classes.",
+  "classes": {
+    "CONVERSE": {
+      "primary": "claude-sonnet-5-0",
+      "challengers": [{ "model": "claude-opus-4-8", "traffic": 0.1 }],
+      "fallback": ["claude-opus-4-8", "claude-sonnet-4-6"],
+      "params": { "thinking": "medium" }
+    },
+    "CLASSIFY": {
+      "primary": "claude-haiku-4-5",
+      "fallback": ["claude-sonnet-4-6"],
+      "params": { "thinking": "off" }
+    },
+    "REACHABILITY": {
+      "primary": "claude-sonnet-5-0",
+      "fallback": ["claude-sonnet-4-6"],
+      "params": { "thinking": "low" }
+    },
+    "PLAN": {
+      "primary": "claude-sonnet-5-0",
+      "challengers": [{ "model": "claude-opus-4-8", "traffic": 0.2 }],
+      "fallback": ["claude-opus-4-8"],
+      "params": { "thinking": "high" }
+    },
+    "ARCH_REVIEW": {
+      "primary": "claude-sonnet-5-0",
+      "challengers": [
+        { "model": "claude-opus-4-8", "traffic": 0.3 },
+        { "model": "claude-fable-5", "traffic": 0.1 }
+      ],
+      "fallback": ["claude-opus-4-8"],
+      "params": { "thinking": "max" }
+    },
+    "INVESTIGATE": {
+      "primary": "claude-sonnet-5-0",
+      "fallback": ["claude-opus-4-8"],
+      "params": { "thinking": "high" }
+    },
+    "REPO_ANALYSIS": {
+      "primary": "claude-sonnet-5-0",
+      "fallback": ["claude-sonnet-4-6"],
+      "params": { "thinking": "medium" }
+    },
+    "CODE": {
+      "primary": "claude-sonnet-5-0",
+      "challengers": [{ "model": "claude-opus-4-8", "traffic": 0.2 }],
+      "fallback": ["claude-opus-4-8", "claude-sonnet-4-6"],
+      "params": { "thinking": "high" }
+    },
+    "VERIFY": {
+      "primary": "claude-opus-4-8",
+      "fallback": ["claude-sonnet-5-0"],
+      "params": { "thinking": "high" },
+      "constraint": "model_diverse_from_author"
+    },
+    "NARRATE": {
+      "primary": "claude-haiku-4-5",
+      "fallback": ["claude-sonnet-4-6"],
+      "params": { "thinking": "off" }
+    }
+  },
+  "defaults": { "timeout_ms": 120000, "max_retries": 2 }
+}
