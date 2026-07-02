@@ -54,6 +54,24 @@ export function loadEnv(): void {
   }
 }
 
+// =============================================================================
+// The enforce-flip FLAG — PLATFORM_REASONING_DRIVES_GOALS (the reasoning-driven GoalContract governance).
+// =============================================================================
+// When UNSET / not exactly "true" (the DEFAULT): the reconciler sweep keeps its EXACT current behavior — it
+// assembles gsVerdict:null and drives ZERO autonomous mutation (fail-closed SHADOW). When "true": the sweep
+// routes each pre-flight GoalContract through the reasoning goal-driver (src/reasoning/goal-driver.ts), whose
+// reasoned verdict feeds the EXISTING sole mutator (po-reconciler-c2.applyReconcilePlan). This is the ONLY
+// behavior change the flip introduces, and it is FULLY REVERSIBLE: unset the flag ⇒ current behavior returns.
+// Read here (never off a bare process.env at a call site) so precedence + the .env files apply uniformly.
+export const REASONING_DRIVES_GOALS_FLAG = "PLATFORM_REASONING_DRIVES_GOALS";
+
+/** True IFF the enforce-flip flag is explicitly set to "true" (case-insensitive). Fail-closed default: any
+ *  other value (unset / "false" / "1" / typo) ⇒ false ⇒ the reconciler keeps its exact zero-mutation behavior. */
+export function reasoningDrivesGoals(): boolean {
+  loadEnv();
+  return (process.env[REASONING_DRIVES_GOALS_FLAG] ?? "").trim().toLowerCase() === "true";
+}
+
 /** The platform DATABASE_URL (fail-closed: the OS refuses to boot without its own DB). */
 export function databaseUrl(): string {
   loadEnv();

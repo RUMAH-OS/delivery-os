@@ -25,11 +25,15 @@
 //   Net: judgment edges deferred (STUB), autonomously-justifiable edges = the reconciler's existing logic; no
 //   new transition is invented. On the bare OS the portfolio is empty, so the wiring is an idle no-op.
 import { sql } from "./db/client.js";
-import { reconcileTick, type ObservedState } from "./po-reconciler-c2.js";
+import { reconcileTick, applyReconcilePlan, type ObservedState } from "./po-reconciler-c2.js";
 import { isSettled } from "./po-autoloop-c2.js";
 import { readProgressSeries, countAttempts, readCumulativeCost } from "./runtime-stores.js";
-import type { GoalState } from "./goal-contract.js";
+import { readContract, type GoalState } from "./goal-contract.js";
 import type { ProgressPoint } from "./goal-supervisor-c7.js";
+import { reasoningDrivesGoals } from "./env.js";
+import { driveGoalContract, type FounderActionDraft } from "./reasoning/goal-driver.js";
+import type { ReasoningOrgans } from "./reasoning/pipeline/reasoning-pipeline.js";
+import type { ResolveContext } from "./reasoning/model-router.js";
 
 const SETTLED: ReadonlyArray<GoalState> = ["DONE", "FAILED", "CLOSED", "HALTED", "SUSPENDED"];
 
@@ -50,18 +54,55 @@ export interface SweepResult {
   decisions: Record<string, number>;
 }
 
+// ── THE ENFORCE-FLIP seam (flag-gated, OFF by default) ───────────────────────────────────────────────────────
+// The injected reasoning capability that lets the sweep REASON about each goal and drive its pre-flight
+// lifecycle. It is consulted ONLY when the PLATFORM_REASONING_DRIVES_GOALS flag is set AND these deps are
+// supplied. The sweep never CONSTRUCTS a model or organ — it stays model-agnostic; the production caller that
+// flips the flag ON injects the real bound organs (defaultReasoningOrgans), a test injects stubs.
+export interface ReasoningSweepDeps {
+  /** The bound reasoning organs (stubs in tests; the real defaultReasoningOrgans in production). */
+  readonly organs: ReasoningOrgans;
+  /** The resolve context forwarded to the reasoning organs. */
+  readonly ctx: ResolveContext;
+  /** Optional sink for the founder-action DRAFT the driver emits alongside a fail-closed HALT (a FAP writer /
+   *  Slack draft / log). The driver never persists it; the caller decides. */
+  readonly onFounderAction?: (draft: FounderActionDraft) => void | Promise<void>;
+}
+
 /** One reconciler sweep across the tickable portfolio. Returns how many goals were ticked + the decision
- *  histogram. `enforce` drives REAL transitions (test/live flow only); default SHADOW mutates nothing. */
-export async function reconcileSweep(opts: { enforce?: boolean } = {}): Promise<SweepResult> {
+ *  histogram. `enforce` drives REAL transitions (test/live flow only); default SHADOW mutates nothing.
+ *
+ *  THE ENFORCE-FLIP (flag PLATFORM_REASONING_DRIVES_GOALS): with the flag OFF (the DEFAULT) — OR ON but with no
+ *  `reasoning` deps injected — the sweep keeps its EXACT current behavior (assemble gsVerdict:null, reconcileTick
+ *  with the caller's `enforce`; on the live loop that is SHADOW → zero autonomous mutation). With the flag ON AND
+ *  `reasoning` deps injected, each goal is routed through the reasoning goal-driver, whose reasoned ReconcilePlan
+ *  is enacted by the EXISTING sole mutator (po-reconciler-c2.applyReconcilePlan) in ENFORCE — the ONLY behavior
+ *  change, and fully reversible by unsetting the flag. */
+export async function reconcileSweep(opts: { enforce?: boolean; reasoning?: ReasoningSweepDeps } = {}): Promise<SweepResult> {
   const rows = await sql<{ goal_id: string; state: GoalState }[]>`
     SELECT goal_id, state FROM goal_contract WHERE state <> ALL(${SETTLED as unknown as string[]})`;
   const decisions: Record<string, number> = {};
   let transitions = 0;
+  // The flip is armed ONLY when the flag is set AND the reasoning capability was injected (fail-closed: absent
+  // the organs the OS cannot reason, so it keeps the current zero-mutation behavior — it never fabricates a model).
+  const driveByReasoning = reasoningDrivesGoals() && opts.reasoning !== undefined;
   for (const r of rows) {
     // Defensive idempotency guard via po-autoloop-c2.isSettled (the SAME settled-state predicate the lifecycle
     // controller enforces): a row that settled between the SELECT and the tick is skipped (never re-mutated).
     if (isSettled(r.state)) continue;
     const observed = await observedFor(r.goal_id);
+    if (driveByReasoning) {
+      // ENFORCE-FLIP ON: reason about the goal, then enact the reasoned plan via the SOLE mutator (ENFORCE).
+      const contract = await readContract(r.goal_id);
+      if (!contract) continue; // the contract vanished between the SELECT and the read — skip (nothing to drive).
+      const drive = await driveGoalContract({ contract, observed, ctx: opts.reasoning!.ctx, organs: opts.reasoning!.organs });
+      const execution = await applyReconcilePlan(drive.plan, { enforce: true });
+      decisions[drive.plan.decision] = (decisions[drive.plan.decision] ?? 0) + 1;
+      if (execution.executed) transitions++;
+      if (drive.founderAction) await opts.reasoning!.onFounderAction?.(drive.founderAction);
+      continue;
+    }
+    // ENFORCE-FLIP OFF (default): the EXACT current behavior — reconcileTick with the caller's enforce posture.
     const { plan, execution } = await reconcileTick(r.goal_id, observed, { enforce: opts.enforce });
     decisions[plan.decision] = (decisions[plan.decision] ?? 0) + 1;
     if (execution.executed) transitions++;
