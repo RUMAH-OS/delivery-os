@@ -22,6 +22,10 @@ export interface LlmCompleteOptions {
   // an optional system-style preamble prepended to the prompt (kept simple: we concatenate; the CLI has no
   // separate system channel in -p text mode).
   system?: string;
+  // MINIMAL ROUTING SEAM (ADR-reasoning-model-routing.md): the concrete model id the ReasoningPort resolved
+  // for this call, from CLASS → config only. The port never names a model itself; it passes what the Model
+  // Router returned. When set, ClaudeCliLlm selects it with `--model <id>`; when absent, the CLI default runs.
+  model?: string;
 }
 
 // The port. One method: text in -> text out. Everything swappable behind this.
@@ -53,8 +57,9 @@ export class ClaudeCliLlm implements LlmClient {
     const full = opts?.system ? `${opts.system}\n\n${prompt}` : prompt;
     // NON-INTERACTIVE headless session. No --dangerously-skip-permissions and no --add-dir: this is a PURE
     // text reasoning call (classify / phrase), it must NOT touch the filesystem or run tools.
-    const args = ["-p", full, "--output-format", "text"];
-    this.log(`    LLM claude -p (${full.length} chars prompt) argv=${JSON.stringify([this.bin, "-p", "<prompt>", "--output-format", "text"])}`);
+    // Model selection is DATA (the routed id), never a hard-coded string here — see LlmCompleteOptions.model.
+    const args = ["-p", full, "--output-format", "text", ...(opts?.model ? ["--model", opts.model] : [])];
+    this.log(`    LLM claude -p (${full.length} chars prompt) argv=${JSON.stringify([this.bin, "-p", "<prompt>", "--output-format", "text", ...(opts?.model ? ["--model", opts.model] : [])])}`);
     let res: ReturnType<typeof spawnSync>;
     try {
       res = spawnSync(this.bin, args, {
